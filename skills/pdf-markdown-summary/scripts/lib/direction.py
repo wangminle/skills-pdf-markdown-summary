@@ -244,6 +244,70 @@ def compute_global_anchor(
         return None
 
 
+def score_local_direction(
+    caption_bbox: "fitz.Rect",
+    page_rect: "fitz.Rect",
+    image_rects: List["fitz.Rect"],
+    vector_rects: List["fitz.Rect"],
+    clip_height: float = 400.0,
+    margin_x: float = 20.0,
+    caption_gap: float = 3.0,
+    is_table: bool = False,
+) -> Tuple[str, float]:
+    """
+    基于局部对象密度评估单个 caption 的方向。
+
+    分析 caption 上方和下方的对象覆盖率，返回得分更高的方向。
+    与全局锚点不同，这是针对单个 caption 的局部判断。
+
+    Args:
+        caption_bbox: Caption 边界框
+        page_rect: 页面边界框
+        image_rects: 图像边界框列表
+        vector_rects: 矢量对象边界框列表
+        clip_height: 预估裁剪窗口高度
+        margin_x: 水平边距
+        caption_gap: Caption 与图像间隙
+        is_table: 是否为表格
+
+    Returns:
+        (direction, confidence) 元组
+    """
+    try:
+        import fitz as _fitz
+    except ImportError:
+        _fitz = None
+
+    if _fitz is None:
+        return ('below' if is_table else 'above', 0.5)
+
+    x_left = page_rect.x0 + margin_x
+    x_right = page_rect.x1 - margin_x
+
+    above_h = max(1.0, caption_bbox.y0 - page_rect.y0 - caption_gap)
+    below_h = max(1.0, page_rect.y1 - caption_bbox.y1 - caption_gap)
+
+    clip_above = create_rect(x_left, max(page_rect.y0, caption_bbox.y0 - clip_height - caption_gap), x_right, caption_bbox.y0 - caption_gap)
+    clip_below = create_rect(x_left, caption_bbox.y1 + caption_gap, x_right, min(page_rect.y1, caption_bbox.y1 + clip_height + caption_gap))
+
+    obj_above = compute_object_ratio(clip_above, image_rects, vector_rects)
+    obj_below = compute_object_ratio(clip_below, image_rects, vector_rects)
+
+    total = obj_above + obj_below
+    if total < 0.001:
+        return ('below' if is_table else 'above', 0.5)
+
+    above_ratio = obj_above / total
+    below_ratio = obj_below / total
+
+    if above_ratio > 0.6:
+        return ('above', above_ratio)
+    elif below_ratio > 0.6:
+        return ('below', below_ratio)
+
+    return ('below' if is_table else 'above', max(above_ratio, below_ratio))
+
+
 def determine_direction(
     caption_bbox: "fitz.Rect",
     page_rect: "fitz.Rect",
@@ -254,25 +318,29 @@ def determine_direction(
     forced_above: Optional[set] = None,
     is_table: bool = False,
     page_position_heuristic: bool = True,
+    local_evidence: Optional[Tuple[str, float]] = None,
 ) -> str:
     """
     确定单个图表的提取方向。
 
-    优先级：
+    优先级（局部优先策略）：
     1. 用户显式指定（forced_below/forced_above）
-    2. 全局锚点（global_anchor）
+    2. 局部方向证据（local_evidence）
     3. 页面位置启发式
-    4. 默认值（Figure: above, Table: below）
+    4. 全局锚点（仅作 tie-break）
+    5. 默认值（Figure: above, Table: below）
 
     Args:
         caption_bbox: Caption 边界框
         page_rect: 页面边界框
         ident: 图表编号
-        global_anchor: 全局锚点方向
+        global_anchor: 全局锚点方向（仅作 tie-break）
         forced_below: 强制 below 的编号集合
         forced_above: 强制 above 的编号集合
         is_table: 是否为表格
         page_position_heuristic: 是否使用页面位置启发式
+        local_evidence: 局部方向证据 (direction, confidence)
+            由 score_local_direction() 返回，如果不提供则不使用
 
     Returns:
         'above' | 'below'
@@ -286,24 +354,34 @@ def determine_direction(
     if ident in forced_above:
         return 'above'
 
-    # 2. 全局锚点
-    if global_anchor:
-        return global_anchor
+    # 2. 局部方向证据（高置信度时直接采用）
+    if local_evidence is not None:
+        local_dir, local_conf = local_evidence
+        if local_conf >= 0.6:
+            return local_dir
 
     # 3. 页面位置启发式
     if page_position_heuristic:
         if is_table:
-            # 表格：如果 caption 在页面底部 1/4，从上方取
             page_quarter = page_rect.height * 0.75
             if caption_bbox.y1 > page_rect.y0 + page_quarter:
                 return 'above'
         else:
-            # Figure：如果 caption 在页面顶部 1/3，从下方取
             page_third = page_rect.height / 3
             if caption_bbox.y0 < page_rect.y0 + page_third:
                 return 'below'
 
-    # 4. 默认值
+    # 4. 全局锚点（仅作 tie-break：当局部证据不够强时参考）
+    if global_anchor and local_evidence is not None:
+        local_dir, local_conf = local_evidence
+        if local_conf < 0.6:
+            return global_anchor
+
+    # 5. 全局锚点（无局部证据时使用，但不再覆盖页面位置启发式）
+    if global_anchor and local_evidence is None:
+        return global_anchor
+
+    # 6. 默认值
     return 'below' if is_table else 'above'
 
 
@@ -324,5 +402,6 @@ __all__ = [
     "compute_global_anchor",
     "determine_direction",
     "score_direction_for_caption",
+    "score_local_direction",
     "compute_object_ratio",
 ]

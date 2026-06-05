@@ -29,9 +29,12 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 from .pdf_backend import create_rect, open_pdf
 
 # 导入本地模块
-from .models import AttachmentRecord, CaptionIndex, DocumentLayoutModel
+from .models import AttachmentRecord, CaptionBlock, CaptionIndex, DocumentLayoutModel
 from .idents import build_output_basename, extract_table_ident
-from .caption_detection import build_caption_index, select_best_caption, find_all_caption_candidates
+from .caption_detection import (
+    build_caption_index, select_best_caption, find_all_caption_candidates,
+    merge_caption_lines, is_caption_reference,
+)
 from .refine import (
     refine_clip_by_objects,
     detect_content_bbox_pixels,
@@ -43,6 +46,9 @@ from .refine import (
     build_text_masks_px,
     snap_clip_edges,
     estimate_ink_ratio,
+    refine_clip_x_range,
+    detect_text_pollution,
+    limit_clip_by_neighbor_captions,
 )
 from .extract_helpers import (
     collect_draw_items,
@@ -52,10 +58,10 @@ from .extract_helpers import (
     line_density,
     DrawItem,
 )
-from .direction import compute_global_anchor, determine_direction
+from .direction import compute_global_anchor, determine_direction, score_local_direction
 from .layout_model import adjust_clip_with_layout
 from .debug_visual import save_debug_visualization
-from .models import DebugStageInfo
+from .models import DebugStageInfo, CaptionBlock
 from .output import get_unique_path
 
 # 避免循环导入
@@ -185,10 +191,12 @@ def extract_tables(
             print(f"{'='*60}")
         caption_index = build_caption_index(
             doc,
-            figure_pattern=None,  # Skip figures
+            figure_pattern=False,  # 跳过 Figure（使用 False 而非 None）
             table_pattern=TABLE_LINE_RE,
             debug=debug_captions
         )
+        if debug_captions and caption_index:
+            print(f"[CAPTION_INDEX] Built with {len(caption_index.candidates)} keys for tables")
 
     # Adaptive Line Height: 统计文档行高
     typical_line_h: Optional[float] = None
@@ -250,12 +258,12 @@ def extract_tables(
                 if bbox:
                     image_rects.append(create_rect(*bbox))
 
-        # 查找 Table captions
+# 查找 Table captions
         for blk in dict_data.get("blocks", []):
             if blk.get("type", 0) != 0:
                 continue
 
-            for ln in blk.get("lines", []):
+            for ln_idx, ln in enumerate(blk.get("lines", [])):
                 spans = ln.get("spans", [])
                 if not spans:
                     continue
@@ -272,6 +280,25 @@ def extract_tables(
                 if not ident:
                     continue
 
+                # ============================================================
+                # 修复1: 使用 CaptionIndex 过滤正文引用
+                # ============================================================
+                if caption_index is not None:
+                    best_on_page = caption_index.get_best_for_page('table', ident, pno, min_score=25.0)
+                    if best_on_page is None:
+                        if debug_captions:
+                            logger.debug(f"Table {ident} p{pno+1}: skipping low-score caption candidate")
+                        continue
+
+                    line_y0 = ln.get("bbox", [0, 0, 0, 0])[1]
+                    line_bbox_x0 = ln.get("bbox", [0, 0, 0, 0])[0]
+                    y_dist = abs(line_y0 - best_on_page.rect.y0)
+                    x_dist = abs(line_bbox_x0 - best_on_page.rect.x0) if line_bbox_x0 and best_on_page.rect.x0 else 0
+                    if y_dist > 30 or x_dist > 50:
+                        if debug_captions:
+                            logger.debug(f"Table {ident} p{pno+1}: skipping non-best caption candidate (dist={y_dist:.0f}pt)")
+                        continue
+
                 # 检查是否已处理
                 if ident in seen_counts and not allow_continued:
                     continue
@@ -279,8 +306,22 @@ def extract_tables(
                 seen_counts[ident] = seen_counts.get(ident, 0) + 1
                 is_continued = seen_counts[ident] > 1
 
+                # ============================================================
+                # 修复2: 多行 caption 合并 bbox 和文本
+                # ============================================================
+                caption_block = merge_caption_lines(
+                    blk, ln_idx, TABLE_LINE_RE,
+                    typical_line_h=typical_line_h,
+                )
+                if caption_block is not None:
+                    caption_bbox = caption_block.rect
+                    full_caption_text = caption_block.text
+                else:
+                    caption_bbox = create_rect(*(ln.get("bbox", [0, 0, 0, 0])))
+                    full_caption_text = text_stripped
+
                 # 构建文件名
-                caption_for_name = text_stripped[:max_caption_chars]
+                caption_for_name = full_caption_text[:max_caption_chars]
                 basename = build_output_basename(
                     "table",
                     ident,
@@ -291,12 +332,18 @@ def extract_tables(
                 out_path = os.path.join(out_dir, basename + ".png")
                 out_path, _ = get_unique_path(out_path)
 
-                # 获取 caption 边界框
-                caption_bbox = create_rect(*(ln.get("bbox", [0, 0, 0, 0])))
+                # ============================================================
+                # 修复3: 方向判定 - 局部优先，全局锚点 tie-break
+                # ============================================================
+                local_evidence = score_local_direction(
+                    caption_bbox, page_rect,
+                    image_rects, vector_rects,
+                    clip_height=table_clip_height,
+                    margin_x=table_margin_x,
+                    caption_gap=table_caption_gap,
+                    is_table=True,
+                )
 
-                # ================================================================
-                # 方向判定：表格通常在 caption 下方
-                # ================================================================
                 direction = determine_direction(
                     caption_bbox,
                     page_rect,
@@ -306,6 +353,7 @@ def extract_tables(
                     forced_above=t_above_set,
                     is_table=True,
                     page_position_heuristic=True,
+                    local_evidence=local_evidence,
                 )
 
                 # ================================================================
@@ -315,16 +363,35 @@ def extract_tables(
                 x_right = page_rect.x1 - table_margin_x
 
                 if direction == 'below':
-                    # 表格在 caption 下方
                     y_top = caption_bbox.y1 + table_caption_gap
                     y_bottom = min(page_rect.y1, y_top + table_clip_height)
                 else:
-                    # 表格在 caption 上方
                     y_bottom = caption_bbox.y0 - table_caption_gap
                     y_top = max(page_rect.y0, y_bottom - table_clip_height)
 
                 base_clip = create_rect(x_left, y_top, x_right, y_bottom)
-                clip = create_rect(x_left, y_top, x_right, y_bottom)  # 工作副本
+                if caption_index is not None:
+                    neighbor_caption_rects = []
+                    for key, cands in caption_index.candidates.items():
+                        if not key.startswith("table_"):
+                            continue
+                        for cand in cands:
+                            if cand.page != pno or cand.score < 25.0:
+                                continue
+                            if (
+                                abs(cand.rect.y0 - caption_bbox.y0) < 2.0
+                                and abs(cand.rect.x0 - caption_bbox.x0) < 2.0
+                            ):
+                                continue
+                            neighbor_caption_rects.append(cand.rect)
+                    base_clip = limit_clip_by_neighbor_captions(
+                        base_clip,
+                        caption_bbox,
+                        direction,
+                        neighbor_caption_rects,
+                        gap=table_caption_gap,
+                    )
+                clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
 
                 # ================================================================
                 # Phase A: 文本裁切（表格模式：启用 skip_adjacent_sweep 保护表头）
@@ -347,7 +414,7 @@ def extract_tables(
                         far_side_min_dist=far_side_min_dist,
                         far_side_para_min_ratio=far_side_para_min_ratio,
                         typical_line_h=typical_line_h,
-                        skip_adjacent_sweep=True,  # 表格模式：跳过相邻扫描，保护表头
+                        skip_adjacent_sweep=True,
                         debug=debug_captions,
                     )
 
@@ -368,10 +435,28 @@ def extract_tables(
                         merge_gap=object_merge_gap,
                         near_edge_only=refine_near_edge_only,
                         use_axis_union=True,
-                        use_horizontal_union=True,  # 表格可能有并排列
+                        use_horizontal_union=True,
                     )
 
                 clip_after_B = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
+
+                # ============================================================
+                # 修复4: X 方向列感知裁剪
+                # ============================================================
+                if ident not in no_refine_set:
+                    clip = refine_clip_x_range(
+                        clip,
+                        caption_bbox,
+                        direction,
+                        image_rects,
+                        vector_rects,
+                        page_rect,
+                        layout_model=layout_model,
+                        page_num=pno,
+                        x_margin=table_margin_x,
+                        min_width_ratio=0.30,
+                        debug=debug_captions,
+                    )
 
                 # ================================================================
                 # 版式驱动裁剪（如果提供了 layout_model）
@@ -393,10 +478,8 @@ def extract_tables(
 
                 if autocrop and ident not in no_refine_set:
                     try:
-                        # 先渲染一版用于分析
                         pix_for_analysis = page.get_pixmap(dpi=dpi, clip=clip)
 
-                        # 构建文本遮罩（可选）
                         mask_rects_px: Optional[List[Tuple[int, int, int, int]]] = None
                         if autocrop_mask_text:
                             mask_rects_px = build_text_masks_px(
@@ -409,7 +492,6 @@ def extract_tables(
                                 mask_mode='auto',
                             )
 
-                        # 检测内容边界框
                         content_bbox_px = detect_content_bbox_pixels(
                             pix_for_analysis,
                             white_threshold=autocrop_white_threshold,
@@ -417,7 +499,6 @@ def extract_tables(
                             mask_rects_px=mask_rects_px,
                         )
 
-                        # 转换像素坐标回 pt 坐标
                         cx0_px, cy0_px, cx1_px, cy1_px = content_bbox_px
                         new_x0 = clip.x0 + cx0_px / scale
                         new_y0 = clip.y0 + cy0_px / scale
@@ -426,7 +507,6 @@ def extract_tables(
 
                         autocrop_clip = create_rect(new_x0, new_y0, new_x1, new_y1)
 
-                        # 单调性约束：检测远端文本证据
                         has_far_evidence, far_limit = detect_far_side_text_evidence(
                             clip, text_lines, direction,
                             edge_zone=40.0,
@@ -435,7 +515,6 @@ def extract_tables(
 
                         if has_far_evidence:
                             if direction == 'below':
-                                # 表格在下方，远端在底部，不应向下扩展
                                 autocrop_clip = create_rect(
                                     autocrop_clip.x0,
                                     autocrop_clip.y0,
@@ -443,7 +522,6 @@ def extract_tables(
                                     min(autocrop_clip.y1, far_limit)
                                 )
                             else:
-                                # 表格在上方，远端在顶部，不应向上扩展
                                 autocrop_clip = create_rect(
                                     autocrop_clip.x0,
                                     max(autocrop_clip.y0, far_limit),
@@ -451,14 +529,12 @@ def extract_tables(
                                     autocrop_clip.y1
                                 )
 
-                        # Phase D 后处理：扫描并移除远端正文
                         autocrop_clip, _ = trim_far_side_text_post_autocrop(
                             autocrop_clip, text_lines, direction,
                             typical_line_h=typical_line_h,
                             scan_lines=3,
                         )
 
-                        # 验收检查：确保 autocrop 没有过度裁切
                         autocrop_h = autocrop_clip.height
                         base_h = base_clip.height
                         min_h_px = autocrop_min_height_px / scale
@@ -471,17 +547,15 @@ def extract_tables(
                         logger.warning(f"Table {ident}: autocrop failed: {e}")
 
                 # ================================================================
-                # 验收检查与回退机制
+                # 修复6: 增强验收检查
                 # ================================================================
                 if refine_safe and ident not in no_refine_set:
-                    # 计算验收阈值（表格使用不同阈值）
                     thresholds = adaptive_acceptance_thresholds(
                         base_clip.height,
                         is_table=True,
-                        far_cov=0.0,  # 可扩展：计算实际远侧覆盖率
+                        far_cov=0.0,
                     )
 
-                    # 检查高度比
                     height_ratio = final_clip.height / max(1.0, base_clip.height)
                     area_ratio = (final_clip.width * final_clip.height) / max(1.0, base_clip.width * base_clip.height)
 
@@ -495,15 +569,31 @@ def extract_tables(
                         accepted = False
                         fallback_reason = f"area_ratio={area_ratio:.3f} < {thresholds.area_ratio:.3f}"
 
+                    # 额外质量检查：截取区域不应过窄
+                    page_w = page_rect.width
+                    if final_clip.width < page_w * 0.15:
+                        accepted = False
+                        fallback_reason = f"clip_too_narrow={final_clip.width:.0f}pt < 15% of page"
+
+                    if accepted:
+                        polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
+                        if polluted:
+                            logger.info(f"Table {ident}: rejected polluted clip ({pollution_reason})")
+                            continue
+
                     if not accepted:
                         logger.info(f"Table {ident}: refined clip rejected ({fallback_reason}), falling back")
-                        # 多级回退：先尝试 Phase A only，再回退到 baseline
                         if clip_after_A.height >= base_clip.height * thresholds.height_ratio:
                             final_clip = clip_after_A
                             logger.debug(f"Table {ident}: using Phase A clip")
                         else:
                             final_clip = base_clip
                             logger.debug(f"Table {ident}: using baseline clip")
+
+                        polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
+                        if polluted:
+                            logger.info(f"Table {ident}: rejected fallback clip ({pollution_reason})")
+                            continue
 
                 # ================================================================
                 # Debug 可视化（如果启用）
@@ -514,9 +604,8 @@ def extract_tables(
                             DebugStageInfo(stage='baseline', rect=base_clip),
                             DebugStageInfo(stage='phase_a', rect=clip_after_A),
                             DebugStageInfo(stage='phase_b', rect=clip_after_B),
-                            DebugStageInfo(stage='phase_d' if autocrop else 'final', rect=final_clip),
+                            DebugStageInfo(stage='final', rect=final_clip),
                         ]
-                        # 解析 ident 为数字（处理 S1, A1 等格式）
                         try:
                             fig_no = int(ident)
                         except ValueError:
@@ -546,7 +635,7 @@ def extract_tables(
                         kind='table',
                         ident=ident,
                         page=pno + 1,
-                        caption=text_stripped,
+                        caption=full_caption_text,
                         out_path=out_path,
                         continued=is_continued
                     ))

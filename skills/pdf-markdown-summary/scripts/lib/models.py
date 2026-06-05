@@ -194,6 +194,50 @@ class CaptionIndex:
         key = f"{kind}_{number}"
         return self.candidates.get(key, [])
 
+    def get_best_for_page(
+        self,
+        kind: str,
+        number: str,
+        page_num: int,
+        min_score: float = 25.0,
+    ) -> Optional[CaptionCandidate]:
+        """获取指定编号在指定页面的最佳候选项"""
+        candidates = self.get_candidates(kind, number)
+        on_page = [c for c in candidates if c.page == page_num]
+        if not on_page:
+            all_sorted = sorted(candidates, key=lambda c: c.score, reverse=True)
+            best = all_sorted[0] if all_sorted else None
+            if best is None or best.score < min_score:
+                return None
+            return best
+        on_page.sort(key=lambda c: c.score, reverse=True)
+        best = on_page[0]
+        if best.score < min_score:
+            return None
+        return best
+
+
+@dataclass
+class CaptionBlock:
+    """
+    合并后的图注块，可能跨越多行。
+
+    当图注为多行时（如 "Table 1: Summary of Results\\nfor All Models Tested"），
+    需要将相邻行合并为统一的 bbox 和完整文本。
+
+    Attributes:
+        rect: 合并后的边界框（所有行的 union）
+        text: 合并后的完整文本
+        first_line_rect: 首行的边界框（用于方向判定）
+        line_count: 包含的行数
+        score: 评分（来自 CaptionIndex，可选）
+    """
+    rect: Any  # fitz.Rect
+    text: str
+    first_line_rect: Any  # fitz.Rect
+    line_count: int = 1
+    score: float = 0.0
+
 
 # ============================================================================
 # V2 架构：版式驱动提取相关

@@ -22,6 +22,7 @@ QA-01 统一测试入口
 4. Golden 对比测试 (test_extraction_golden.py)
 5. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
 6. QA-04 结构化日志测试 (test_qa04_structured_log.py)
+7. QA-05 caption 锚点与正文污染测试 (test_caption_anchor_quality.py)
 """
 
 import argparse
@@ -210,6 +211,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         test_suites.append({
             "name": "QA-04 结构化日志 run.log.jsonl 测试",
             "path": TESTS_SCRIPTS_DIR / "test_qa04_structured_log.py",
+            "args": [],
+        })
+
+        test_suites.append({
+            "name": "QA-05 caption 锚点与正文污染测试",
+            "path": TESTS_SCRIPTS_DIR / "test_caption_anchor_quality.py",
             "args": [],
         })
 

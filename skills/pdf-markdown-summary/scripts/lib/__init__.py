@@ -27,6 +27,7 @@ scripts/lib/ 模块入口
 from .models import (
     AcceptanceThresholds,
     AttachmentRecord,
+    CaptionBlock,
     CaptionCandidate,
     CaptionIndex,
     DebugStageInfo,
@@ -79,9 +80,12 @@ from .refine import (
     build_text_masks_px,
     detect_content_bbox_pixels,
     detect_far_side_text_evidence,
+    detect_text_pollution,
     estimate_ink_ratio,
+    limit_clip_by_neighbor_captions,
     merge_rects,
     refine_clip_by_objects,
+    refine_clip_x_range,
     snap_clip_edges,
     trim_far_side_text_post_autocrop,
 )
@@ -94,8 +98,10 @@ from .caption_detection import (
     get_page_images,
     get_paragraph_length,
     is_bold_text,
+    is_caption_reference,
     is_likely_caption_context,
     is_likely_reference_context,
+    merge_caption_lines,
     min_distance_to_rects,
     score_caption_candidate,
     select_best_caption,
@@ -108,6 +114,14 @@ from .layout_model import (
     detect_columns,
     detect_vacant_regions,
     should_enable_layout_driven,
+)
+
+from .direction import (
+    compute_global_anchor,
+    compute_object_ratio,
+    determine_direction,
+    score_direction_for_caption,
+    score_local_direction,
 )
 
 from .text_extract import (
@@ -155,6 +169,7 @@ __all__ = [
     # models
     "AcceptanceThresholds",
     "AttachmentRecord",
+    "CaptionBlock",
     "CaptionCandidate",
     "CaptionIndex",
     "DebugStageInfo",
@@ -199,9 +214,12 @@ __all__ = [
     "build_text_masks_px",
     "detect_content_bbox_pixels",
     "detect_far_side_text_evidence",
+    "detect_text_pollution",
     "estimate_ink_ratio",
+    "limit_clip_by_neighbor_captions",
     "merge_rects",
     "refine_clip_by_objects",
+    "refine_clip_x_range",
     "snap_clip_edges",
     "trim_far_side_text_post_autocrop",
     # caption_detection
@@ -212,8 +230,10 @@ __all__ = [
     "get_page_images",
     "get_paragraph_length",
     "is_bold_text",
+    "is_caption_reference",
     "is_likely_caption_context",
     "is_likely_reference_context",
+    "merge_caption_lines",
     "min_distance_to_rects",
     "score_caption_candidate",
     "select_best_caption",
@@ -224,6 +244,12 @@ __all__ = [
     "detect_columns",
     "detect_vacant_regions",
     "should_enable_layout_driven",
+    # direction
+    "compute_global_anchor",
+    "compute_object_ratio",
+    "determine_direction",
+    "score_direction_for_caption",
+    "score_local_direction",
     # text_extract
     "extract_text_with_format",
     "gather_structured_text",

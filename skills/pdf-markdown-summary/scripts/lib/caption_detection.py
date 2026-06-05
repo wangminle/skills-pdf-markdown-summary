@@ -533,6 +533,9 @@ def select_best_caption(
 # 构建 Caption 索引
 # ============================================================================
 
+_SKIP_PATTERN = False
+
+
 def build_caption_index(
     doc: Union[PDFDocument, Any],
     figure_pattern: Optional[re.Pattern] = None,
@@ -544,8 +547,12 @@ def build_caption_index(
 
     Args:
         doc: PyMuPDF 文档对象
-        figure_pattern: Figure caption 匹配正则（可选）
-        table_pattern: Table caption 匹配正则（可选）
+        figure_pattern: Figure caption 匹配正则。
+            None 表示使用默认 Figure 正则；
+            False（布尔值）表示跳过 Figure 检测。
+        table_pattern: Table caption 匹配正则。
+            None 表示使用默认 Table 正则；
+            False（布尔值）表示跳过 Table 检测。
         debug: 是否输出调试信息
 
     Returns:
@@ -553,8 +560,10 @@ def build_caption_index(
     """
     from .models import CaptionIndex
 
-    # 默认 Figure 正则
-    if figure_pattern is None:
+    skip_figure = figure_pattern is False
+    skip_table = table_pattern is False
+
+    if not skip_figure and figure_pattern is None:
         figure_pattern = re.compile(
             r"^\s*(?P<label>Extended\s+Data\s+Figure|Supplementary\s+(?:Figure|Fig\.?)|Figure|Fig\.?|图表|附图|图)\s*"
             r"(?:(?P<s_prefix>S)\s*(?P<s_id>(?:\d+|[IVX]{1,6}))|(?P<roman>[IVX]{1,6})|(?P<num>\d+))"
@@ -563,8 +572,7 @@ def build_caption_index(
             re.IGNORECASE
         )
 
-    # 默认 Table 正则
-    if table_pattern is None:
+    if not skip_table and table_pattern is None:
         table_pattern = re.compile(
             r"^\s*(?:Extended\s+Data\s+Table|Supplementary\s+Table|Table|Tab\.?|表)\s*"
             r"(?:"
@@ -581,20 +589,22 @@ def build_caption_index(
     raw_doc = _unwrap_doc(doc)
     for pno in range(len(raw_doc)):
         page = raw_doc[pno]
+        images = get_page_images(page)
+        drawings = get_page_drawings(page)
 
-        # 查找 Figure candidates
-        if figure_pattern is not None:
+        if not skip_figure and figure_pattern is not None:
             figure_cands = find_all_caption_candidates(page, pno, figure_pattern, 'figure')
             for cand in figure_cands:
+                cand.score = score_caption_candidate(cand, images, drawings, debug=debug)
                 key = f"figure_{cand.number}"
                 if key not in all_candidates:
                     all_candidates[key] = []
                 all_candidates[key].append(cand)
 
-        # 查找 Table candidates
-        if table_pattern is not None:
+        if not skip_table and table_pattern is not None:
             table_cands = find_all_caption_candidates(page, pno, table_pattern, 'table')
             for cand in table_cands:
+                cand.score = score_caption_candidate(cand, images, drawings, debug=debug)
                 key = f"table_{cand.number}"
                 if key not in all_candidates:
                     all_candidates[key] = []
@@ -610,9 +620,159 @@ def build_caption_index(
 
 
 # ============================================================================
+# 多行 Caption 合并
+# ============================================================================
+
+def merge_caption_lines(
+    block: Dict,
+    start_line_idx: int,
+    pattern: "re.Pattern",
+    max_continuation_lines: int = 5,
+    max_y_gap_ratio: float = 0.6,
+    typical_line_h: Optional[float] = None,
+) -> Optional["CaptionBlock"]:
+    """
+    将 caption 首行与后续续行合并为统一的 CaptionBlock。
+
+    当图注为多行时（如 "Table 1: Summary of Results\\nfor All Models Tested"），
+    需要将同一 block 中相邻续行合并到统一的 bbox 和完整文本中。
+
+    合并条件：
+    1. 续行与首行在同一个 block
+    2. 续行不能匹配另一个 Figure/Table caption 正则
+    3. 续行与前一行的 y 间距 < max_y_gap_ratio × typical_line_h
+    4. 续行字号与首行相近（差值 < 3pt）
+
+    Args:
+        block: PyMuPDF 文本块字典
+        start_line_idx: 首行在 block["lines"] 中的索引
+        pattern: 当前 caption 正则（用于排除新 caption 行）
+        max_continuation_lines: 最大续行数
+        max_y_gap_ratio: y 间距与行高的最大比值
+        typical_line_h: 典型行高（None 则自动估计）
+
+    Returns:
+        CaptionBlock 或 None（如果首行索引无效）
+    """
+    from .models import CaptionBlock
+
+    lines = block.get("lines", [])
+    if not lines or start_line_idx >= len(lines):
+        return None
+
+    start_line = lines[start_line_idx]
+    start_spans = start_line.get("spans", [])
+    start_text = "".join(sp.get("text", "") for sp in start_spans).strip()
+    start_bbox = create_rect(*start_line.get("bbox", [0, 0, 0, 0]))
+
+    start_sizes = [float(sp.get("size", 10.0)) for sp in start_spans if "size" in sp]
+    avg_font_size = sum(start_sizes) / len(start_sizes) if start_sizes else 10.0
+
+    if typical_line_h is None or typical_line_h <= 0:
+        typical_line_h = max(start_bbox.height, avg_font_size * 1.2)
+
+    max_y_gap = max_y_gap_ratio * typical_line_h
+
+    merged_rect = start_bbox
+    merged_text_parts = [start_text]
+    merged_count = 1
+    prev_y1 = start_bbox.y1
+
+    for i in range(start_line_idx + 1, min(start_line_idx + max_continuation_lines + 1, len(lines))):
+        line = lines[i]
+        line_spans = line.get("spans", [])
+        line_text = "".join(sp.get("text", "") for sp in line_spans).strip()
+
+        if not line_text:
+            continue
+
+        line_bbox = create_rect(*line.get("bbox", [0, 0, 0, 0]))
+
+        if pattern.match(line_text):
+            break
+
+        y_gap = line_bbox.y0 - prev_y1
+        if y_gap > max_y_gap:
+            break
+
+        line_sizes = [float(sp.get("size", 10.0)) for sp in line_spans if "size" in sp]
+        avg_line_size = sum(line_sizes) / len(line_sizes) if line_sizes else 10.0
+
+        if abs(avg_line_size - avg_font_size) > 3.0:
+            break
+
+        merged_rect = merged_rect | line_bbox
+        merged_text_parts.append(line_text)
+        merged_count += 1
+        prev_y1 = line_bbox.y1
+
+    full_text = " ".join(merged_text_parts)
+
+    return CaptionBlock(
+        rect=merged_rect,
+        text=full_text,
+        first_line_rect=start_bbox,
+        line_count=merged_count,
+        score=0.0,
+    )
+
+
+# ============================================================================
+# Caption 引用检测
+# ============================================================================
+
+def is_caption_reference(
+    text: str,
+    block: Dict,
+    pattern: "re.Pattern",
+) -> bool:
+    """
+    判断一个 caption 正则匹配是否更像是正文引用而非真实图注。
+
+    使用启发式规则：
+    1. 上下文分析：如果包含 "see"、"as shown in" 等引用词
+    2. 块结构：如果所在 block 包含很多行（>6），可能是正文段落中的引用
+    3. 前缀分析：如果匹配文本在句子中间（前有逗号、连词等），是引用
+
+    Args:
+        text: 匹配行的完整文本
+        block: 所在文本块字典
+        pattern: caption 正则
+
+    Returns:
+        True 如果更像是正文引用
+    """
+    text_lower = text.lower()
+
+    reference_prefixes = [
+        'as shown in', 'see ', 'see figure', 'see table',
+        'shown in figure', 'shown in table', 'refer to',
+        'listed in table', 'according to figure', 'according to table',
+        'from figure', 'from table', 'in figure', 'in table',
+        'by figure', 'by table',
+    ]
+    for prefix in reference_prefixes:
+        if text_lower.startswith(prefix):
+            return True
+
+    num_lines = len(block.get("lines", []))
+    total_text_len = sum(
+        len("".join(sp.get("text", "") for sp in ln.get("spans", [])))
+        for ln in block.get("lines", [])
+    )
+
+    if num_lines > 6 and total_text_len > 300:
+        return True
+
+    if is_likely_reference_context(text):
+        return True
+
+    return False
+
+
+# ============================================================================
 # 向后兼容别名
 # ============================================================================
 
-# 这些函数可以直接从原脚本中调用
 _extract_figure_ident = extract_figure_ident
 _extract_table_ident = extract_table_ident

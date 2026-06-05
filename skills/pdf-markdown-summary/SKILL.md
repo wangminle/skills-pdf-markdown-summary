@@ -1,62 +1,62 @@
 ---
 name: pdf-markdown-summary
-description: Use this skill whenever the user wants to convert PDFs to Markdown, extract PDF figures/tables/images, generate a PDF or research-paper summary, create a Chinese or English reading summary with embedded figures, or run a complete PDF processing workflow for knowledge-base ingestion. Trigger for phrases like "PDF 转 Markdown", "转 md", "提取 PDF 内容", "总结这篇 PDF", "论文阅读摘要", "带图摘要", "资料库入库", or "处理这篇论文".
+description: Use this skill when the user wants to turn a PDF (especially a research paper or technical report) into well-structured Markdown with extracted figures/tables, or generate a reading summary with embedded images. Do NOT trigger for general PDF operations like merge, split, rotate, watermark, encrypt, or form-filling — those belong to the system pdf skill. Trigger specifically for "PDF 转 Markdown", "转 md", "提取图表", "论文摘要", "带图摘要", "阅读笔记", "论文阅读摘要", "资料库入库", "处理这篇论文", "extract figures from PDF", "paper summary with figures".
 ---
 
 # PDF Markdown Summary
 
-This skill turns PDF documents, especially research papers, into reusable Markdown and summary artifacts.
+Convert PDF documents — especially research papers and technical reports — into well-structured Markdown with extracted figure/table assets, or generate a Chinese reading summary with embedded images.
 
-It supports three workflows:
+## When to Use This Skill
 
-1. **PDF-to-Markdown**: Convert a PDF into Markdown and export related assets.
-2. **PDF Summary**: Extract text and figures, then generate a reading summary with embedded figures.
-3. **Complete Processing**: Run conversion and summary preparation together.
+**Use this skill when the user wants to:**
 
-## Choose the Workflow
+- Convert a PDF to well-structured Markdown (preserve headings, paragraphs, formulas)
+- Extract figures, tables, or diagrams from a PDF as standalone PNG images
+- Generate a reading summary of a research paper with embedded figures
+- Prepare PDF content for knowledge-base ingestion
+- Create a Chinese or English paper reading note ("阅读笔记")
 
-Use **PDF-to-Markdown** when the user asks to:
+**Do NOT use this skill when the user wants to:**
 
-- convert a PDF to Markdown or `.md`
-- prepare a PDF for a knowledge base
-- extract text, tables, and images into a Markdown document
+- Merge, split, rotate, watermark, or encrypt PDFs → use the system `pdf` skill
+- Fill PDF forms → use the system `pdf` skill
+- Create PDFs from scratch → use the system `pdf` skill
+- Basic OCR on scanned documents → use the system `pdf` skill
 
-Use **PDF Summary** when the user asks to:
+## Three Workflows
 
-- summarize a PDF
-- summarize a research paper
-- create a reading note or reading summary
-- explain figures and tables
-- generate a Chinese or English paper summary
+### 1. PDF-to-Markdown (转 Markdown)
 
-Use **Complete Processing** when the user asks to:
-
-- process a PDF end to end
-- convert to Markdown and summarize
-- ingest into a knowledge base and produce a summary
-
-## Commands
-
-### PDF-to-Markdown
+Convert a PDF into structured Markdown with extracted assets.
 
 ```bash
 python3 scripts/pdf_to_markdown.py --pdf "<paper>.pdf" --out "<paper>.md"
 ```
 
-### PDF Summary Preparation
+Outputs:
+- `{stem}.md` — structured Markdown document
+- `images/Figure_*.png`, `images/Table_*.png` — extracted assets
+- `images/index.json` — asset index with captions, pages, identifiers
+- `text/{stem}.txt` — plain text extraction
+- `text/conversion_report.json` — conversion quality report
+
+### 2. PDF Summary (论文摘要)
+
+Extract text and figure assets, then write a reading summary with embedded images.
 
 ```bash
 python3 scripts/summarize_pdf.py --pdf "<paper>.pdf" --preset robust
 ```
 
-After the preparation command, read both:
+After the command finishes:
+1. Read `text/<paper>.txt` for full paper text
+2. Read `images/index.json` and inspect all `images/*.png`
+3. Write `{paper}_阅读摘要-{date}.md` with embedded relative image links
 
-- `text/<paper>.txt`
-- `images/*.png`
+### 3. Complete Processing (完整处理)
 
-Then write the summary Markdown with embedded relative image links.
-
-### Complete Processing
+Run Markdown conversion and summary preparation together.
 
 ```bash
 python3 scripts/process_pdf.py --pdf "<paper>.pdf" --out "<paper>.md" --preset robust
@@ -64,24 +64,32 @@ python3 scripts/process_pdf.py --pdf "<paper>.pdf" --out "<paper>.md" --preset r
 
 ## Output Rules
 
-For Markdown conversion:
+**For Markdown conversion:**
+- Use relative image paths: `images/Figure_1_xxx.png`
+- Preserve headings, paragraphs, and document structure
+- If table structure extraction fails, use screenshot fallback — never drop tables
 
-- Use relative image paths such as `images/Figure_1_xxx.png`.
-- Write a conversion report when possible.
-- Preserve enough structure for knowledge-base ingestion.
-- If table structure extraction fails, prefer a table screenshot fallback rather than dropping information.
+**For summaries:**
+- Default language: Chinese (unless user requests English)
+- Target 1500-3000 Chinese characters for research-paper summaries
+- Embed all important figures and tables
+- Explain each figure/table in 1-2 concise sentences
+- Write for senior undergraduate readers in the same technical field
+- Always use BOTH text AND images — do not write summary from text alone
 
-For summaries:
+## Core Capabilities (What Makes This Skill Different)
 
-- Default language is Chinese unless the user requests otherwise.
-- Target 1500-3000 Chinese characters for research-paper reading summaries unless the user gives a different length.
-- Embed all relevant figures and tables.
-- Explain each figure or table in 1-2 concise sentences.
-- Write for senior undergraduate readers in the same technical field.
+This skill provides **intelligent figure/table extraction** beyond simple embedded-image export:
+
+- **Caption detection**: Finds "Figure 1:", "Table 2:", "Figure SIV", "图1" captions and uses them to locate assets
+- **Identifier parsing**: Supports roman numerals (I, IV), S-prefix (S1, SIV), Extended Data, Chinese labels (图/表/附图)
+- **4-phase clip refinement**: text-trim → object-align → layout-driven → autocrop
+- **Acceptance checking**: Validates extraction quality with fallback mechanism
+- **Context building**: Links figures/tables to their text references in the paper body
 
 ## References
 
-Read only the relevant reference:
+For detailed workflow instructions and advanced options, read the relevant reference:
 
-- `references/pdf-to-markdown.md` for PDF-to-Markdown workflows.
-- `references/pdf-summary.md` for summary workflows.
+- `references/pdf-to-markdown.md` — PDF-to-Markdown workflow details
+- `references/pdf-summary.md` — Summary workflow details

@@ -696,6 +696,219 @@ def adaptive_acceptance_thresholds(
 
 
 # ============================================================================
+# 正文污染检测
+# ============================================================================
+
+def detect_text_pollution(
+    clip: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    *,
+    max_wide_lines: int = 5,
+    max_wide_ratio: float = 0.60,
+    width_ratio: float = 0.70,
+    min_text_len: int = 30,
+    font_min: float = 7.0,
+    font_max: float = 16.0,
+) -> Tuple[bool, str]:
+    """
+    检测裁剪区域是否主要由正文段落构成。
+
+    如果返回 True，上层应拒绝当前候选，而不是退回 baseline 后继续保存。
+    baseline 通常仍以同一个错误 caption 为锚点，会把误截结果写入 index。
+    """
+    if fitz is None or clip.width <= 1 or clip.height <= 1:
+        return False, ""
+
+    text_in_clip = 0
+    wide_text_in_clip = 0
+
+    for (line_rect, font_size, text) in text_lines:
+        txt = text.strip()
+        if len(txt) < min_text_len:
+            continue
+        if not (font_min <= font_size <= font_max):
+            continue
+
+        inter = line_rect & clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+
+        text_in_clip += 1
+        if (inter.width / max(1.0, clip.width)) > width_ratio:
+            wide_text_in_clip += 1
+
+    if wide_text_in_clip > max_wide_lines:
+        pollution_ratio = wide_text_in_clip / max(1, text_in_clip)
+        if pollution_ratio > max_wide_ratio:
+            return True, f"text_pollution={wide_text_in_clip}/{text_in_clip} wide_lines"
+
+    return False, ""
+
+
+# ============================================================================
+# 同页相邻 caption 边界限制
+# ============================================================================
+
+def limit_clip_by_neighbor_captions(
+    clip: Any,
+    caption_rect: Any,
+    direction: str,
+    neighbor_caption_rects: List[Any],
+    *,
+    gap: float = 6.0,
+    min_height: float = 40.0,
+) -> Any:
+    """
+    使用同页相邻 caption 限制裁剪窗口的 y 范围。
+
+    连续 Figure/Table 场景中，baseline 窗口可能越过上一条或下一条 caption，
+    把相邻图表也截入当前结果。这里只收紧远离当前 caption 的一侧，不改变 x 范围。
+    """
+    if fitz is None or not neighbor_caption_rects:
+        return clip
+
+    if direction == "above":
+        previous_caps = [r for r in neighbor_caption_rects if r.y1 <= caption_rect.y0]
+        if not previous_caps:
+            return clip
+        nearest_prev = max(previous_caps, key=lambda r: r.y1)
+        limited = fitz.Rect(clip.x0, max(clip.y0, nearest_prev.y1 + gap), clip.x1, clip.y1)
+    elif direction == "below":
+        next_caps = [r for r in neighbor_caption_rects if r.y0 >= caption_rect.y1]
+        if not next_caps:
+            return clip
+        nearest_next = min(next_caps, key=lambda r: r.y0)
+        limited = fitz.Rect(clip.x0, clip.y0, clip.x1, min(clip.y1, nearest_next.y0 - gap))
+    else:
+        return clip
+
+    if limited.height < min_height:
+        return clip
+    return limited
+
+
+# ============================================================================
+# X 方向列感知裁剪
+# ============================================================================
+
+def refine_clip_x_range(
+    clip: Any,
+    caption_rect: Any,
+    direction: str,
+    image_rects: List[Any],
+    vector_rects: List[Any],
+    page_rect: Any,
+    layout_model: Optional[Any] = None,
+    page_num: int = 0,
+    *,
+    x_margin: float = 15.0,
+    min_width_ratio: float = 0.25,
+    debug: bool = False,
+) -> Any:
+    """
+    根据图注所在列和对象边界框缩小裁剪区域的 x 方向范围。
+
+    解决双栏/半栏场景下截取全页宽度导致混入另一栏正文的问题。
+
+    策略：
+    1. 如果有版式模型且检测到双栏，使用栏边界缩小 x 范围
+    2. 根据图注 x 位置确定所属列
+    3. 筛选在裁剪区域 y 范围内的对象，用其 x union 缩小范围
+    4. 确保 x 范围不小于页面宽度的 min_width_ratio
+
+    Args:
+        clip: 当前裁剪区域 (fitz.Rect)
+        caption_rect: 图注边界框
+        direction: 方向 ('above' | 'below')
+        image_rects: 图像边界框列表
+        vector_rects: 矢量对象边界框列表
+        page_rect: 页面边界框
+        layout_model: 版式模型（可选）
+        page_num: 页码（0-based）
+        x_margin: x 方向额外 padding（pt）
+        min_width_ratio: 最小宽度比（相对于页面宽度）
+        debug: 调试输出
+
+    Returns:
+        调整 x 范围后的裁剪区域
+    """
+    if fitz is None:
+        return clip
+
+    page_width = page_rect.width
+    min_width = page_width * min_width_ratio
+
+    x_left = clip.x0
+    x_right = clip.x1
+
+    # 策略1：版式模型双栏检测
+    if layout_model is not None and layout_model.num_columns >= 2:
+        page_center = page_rect.x0 + page_width / 2
+        caption_center = (caption_rect.x0 + caption_rect.x1) / 2
+
+        if caption_center < page_center:
+            col_left = layout_model.margin_left if hasattr(layout_model, 'margin_left') else page_rect.x0 + 30
+            col_right = page_center - (layout_model.column_gap / 2 if hasattr(layout_model, 'column_gap') else 10)
+            x_left = max(x_left, col_left - x_margin)
+            x_right = min(x_right, col_right + x_margin)
+        else:
+            col_left = page_center + (layout_model.column_gap / 2 if hasattr(layout_model, 'column_gap') else 10)
+            col_right = layout_model.margin_right if hasattr(layout_model, 'margin_right') else page_rect.x1 - 30
+            x_left = max(x_left, col_left - x_margin)
+            x_right = min(x_right, col_right + x_margin)
+
+    # 策略2：根据图注 x 位置判断列归属
+    caption_width = caption_rect.width
+    if caption_width > 0 and caption_width < page_width * 0.6:
+        page_center = page_rect.x0 + page_width / 2
+        if caption_rect.x1 < page_center:
+            if x_right > page_center + 20:
+                x_right = min(x_right, page_center - 5)
+        elif caption_rect.x0 > page_center:
+            if x_left < page_center - 20:
+                x_left = max(x_left, page_center + 5)
+
+    # 策略3：用裁剪区域 y 范围内的对象 x 边界缩小范围
+    objects_in_y = []
+    for r in image_rects + vector_rects:
+        inter = r & clip
+        if inter.width > 0 and inter.height > 0:
+            y_overlap = inter.height / max(1.0, r.height)
+            if y_overlap > 0.3:
+                objects_in_y.append(r)
+
+    if len(objects_in_y) >= 1:
+        obj_x0 = min(r.x0 for r in objects_in_y)
+        obj_x1 = max(r.x1 for r in objects_in_y)
+
+        obj_width = obj_x1 - obj_x0
+        if obj_width > min_width and obj_width < (x_right - x_left) * 0.95:
+            candidate_left = obj_x0 - x_margin
+            candidate_right = obj_x1 + x_margin
+
+            caption_in_candidate = (caption_rect.x0 >= candidate_left - x_margin and
+                                     caption_rect.x1 <= candidate_right + x_margin)
+            if caption_in_candidate:
+                x_left = max(x_left, candidate_left)
+                x_right = min(x_right, candidate_right)
+
+    # 确保最小宽度
+    new_width = x_right - x_left
+    if new_width < min_width:
+        center_x = (x_left + x_right) / 2
+        x_left = center_x - min_width / 2
+        x_right = center_x + min_width / 2
+
+    new_clip = fitz.Rect(x_left, clip.y0, x_right, clip.y1)
+
+    new_clip = new_clip & page_rect
+    if new_clip.width < min_width or new_clip.height < 40:
+        return clip
+
+    return new_clip
+
+
+# ============================================================================
 # 边缘对齐
 # ============================================================================
 
@@ -1404,8 +1617,12 @@ __all__ = [
     "trim_far_side_text_post_autocrop",
     # 验收阈值
     "adaptive_acceptance_thresholds",
+    "detect_text_pollution",
+    "limit_clip_by_neighbor_captions",
     # 边缘对齐
     "snap_clip_edges",
+    # X 方向列感知裁剪
+    "refine_clip_x_range",
     # 文本裁切辅助
     "is_caption_text",
     "detect_exact_n_lines_of_text",

@@ -66,3 +66,7 @@
 - 修改 Python 脚本后，至少运行一次 `compileall` 或同等语法检查。
 - 修改根目录 `scripts/` 后，同步到 Skill 目录，并检查两边差异。
 - 测试数据、测试输出放入 `tests/`，不要写入 `docs/3-ref/`。
+- 完成开发后如需进行实际 PDF 文档测试，优先使用 `tests/basic-benchmark/`（Basic Benchmark）中的 7 个 PDF 测试文件夹。
+- 实际测试输出统一写入 `tests/results/<yyyymmdd-xxx>/`，格式为日期加序号，如 `20260605-001`、`20260605-002`。
+- `tests/results/<yyyymmdd-xxx>/` 下按每个 PDF 名称建立独立结果目录，例如 `tests/results/20260605-001/<pdf-name>/`。
+- 每个 PDF 结果目录下应按输出类型分层保存：`markdown/` 存 Markdown，`assets/` 存通用资源，`images/` 存图片，`txt/` 存文本。
