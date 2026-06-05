@@ -40,7 +40,7 @@ from typing import Dict, List, Match, Optional, Set, Tuple
 # - 图1, 图 2（中文）
 
 FIGURE_LINE_RE = re.compile(
-    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Figure|Fig\.?)\s*)"
+    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Figure|Fig\.?|图表|附图|图)\s*)"
     r"(?:"
     r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6})"  # S前缀 + 数字/罗马
     r"|"
@@ -48,7 +48,8 @@ FIGURE_LINE_RE = re.compile(
     r"|"
     r"(?P<num>\d+)"                                 # 普通数字
     r")"
-    r"(?P<sublabel>[a-z])?",                        # 子图标签（可选）
+    r"(?:\s*[-–]?\s*[A-Za-z]|\s*\([A-Za-z]\))?"    # 子图标签（可选）
+    r"(?:\s*\(continued\)|\s*续|\s*接上页)?",       # 续页标记（可选）
     re.IGNORECASE,
 )
 
@@ -67,7 +68,7 @@ FIGURE_CN_RE = re.compile(
 # - 表1, 表 2（中文）
 
 TABLE_LINE_RE = re.compile(
-    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Table|Tab\.?)\s*)"
+    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Table|Tab\.?|表)\s*)"
     r"(?:"
     r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6})"  # S前缀 + 数字/罗马
     r"|"
@@ -76,7 +77,8 @@ TABLE_LINE_RE = re.compile(
     r"(?P<roman>[IVX]{1,6})"                       # 纯罗马数字
     r"|"
     r"(?P<num>\d+)"                                # 普通数字
-    r")",
+    r")"
+    r"(?:\s*\(continued\)|\s*续|\s*接上页)?",       # 续页标记（可选）
     re.IGNORECASE,
 )
 

@@ -227,8 +227,8 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     pdf_stem = os.path.splitext(os.path.basename(pdf_path))[0]
 
     out_dir = os.path.abspath(args.out_dir or os.path.join(pdf_dir, "images"))
-    text_dir = os.path.join(pdf_dir, "text")
-    out_text = os.path.abspath(args.out_text or os.path.join(text_dir, f"{pdf_stem}.txt"))
+    out_text = os.path.abspath(args.out_text or os.path.join(pdf_dir, "text", f"{pdf_stem}.txt"))
+    text_dir = os.path.dirname(out_text)
     gathered_json = os.path.join(text_dir, "gathered_text.json")
 
     index_json = os.path.abspath(args.index_json or os.path.join(out_dir, "index.json"))

@@ -1,0 +1,214 @@
+{
+  "version": "2.0",
+  "meta": {
+    "pdf": "1706.03762v7-attention_is_all_you_need.pdf",
+    "pdf_hash": "sha256:bdfaa68d8984f0dc",
+    "pages": 15,
+    "extracted_at": "2026-06-05T14:04:29.461851",
+    "extractor_version": "2.0.0",
+    "preset": "robust",
+    "run_id": "20260605-140423-9af4c2",
+    "run_log_jsonl": "run.log.jsonl"
+  },
+  "figures": [
+    {
+      "type": "figure",
+      "id": "1",
+      "page": 3,
+      "caption": "Figure 1: The Transformer - model architecture.",
+      "file": "Figure_1_The_Transformer_model_architecture.png",
+      "original_file": "Figure_1_The_Transformer_model_architecture.png",
+      "current_file": "Figure_1_The_Transformer_model_architecture.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "2",
+      "page": 4,
+      "caption": "Figure 2: (left) Scaled Dot-Product Attention. (right) Multi-Head Attention consists of several",
+      "file": "Figure_2_left_Scaled_Dot_Product_Attention_right_Multi_Head_Attention_consists.png",
+      "original_file": "Figure_2_left_Scaled_Dot_Product_Attention_right_Multi_Head_Attention_consists.png",
+      "current_file": "Figure_2_left_Scaled_Dot_Product_Attention_right_Multi_Head_Attention_consists.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "3",
+      "page": 13,
+      "caption": "Figure 3: An example of the attention mechanism following long-distance dependencies in the",
+      "file": "Figure_3_An_example_of_the_attention_mechanism_following_long_distance_dependencies.png",
+      "original_file": "Figure_3_An_example_of_the_attention_mechanism_following_long_distance_dependencies.png",
+      "current_file": "Figure_3_An_example_of_the_attention_mechanism_following_long_distance_dependencies.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "4",
+      "page": 14,
+      "caption": "Figure 4: Two attention heads, also in layer 5 of 6, apparently involved in anaphora resolution. Top:",
+      "file": "Figure_4_Two_attention_heads_also_in_layer_5_of_6_apparently.png",
+      "original_file": "Figure_4_Two_attention_heads_also_in_layer_5_of_6_apparently.png",
+      "current_file": "Figure_4_Two_attention_heads_also_in_layer_5_of_6_apparently.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "5",
+      "page": 15,
+      "caption": "Figure 5: Many of the attention heads exhibit behaviour that seems related to the structure of the",
+      "file": "Figure_5_Many_of_the_attention_heads_exhibit_behaviour_that_seems_related.png",
+      "original_file": "Figure_5_Many_of_the_attention_heads_exhibit_behaviour_that_seems_related.png",
+      "current_file": "Figure_5_Many_of_the_attention_heads_exhibit_behaviour_that_seems_related.png",
+      "continued": false
+    }
+  ],
+  "tables": [
+    {
+      "type": "table",
+      "id": "1",
+      "page": 6,
+      "caption": "Table 1: Maximum path lengths, per-layer complexity and minimum number of sequential operations",
+      "file": "Table_1_Maximum_path_lengths_per_layer_complexity_and_minimum_number_of.png",
+      "original_file": "Table_1_Maximum_path_lengths_per_layer_complexity_and_minimum_number_of.png",
+      "current_file": "Table_1_Maximum_path_lengths_per_layer_complexity_and_minimum_number_of.png",
+      "continued": false
+    },
+    {
+      "type": "table",
+      "id": "2",
+      "page": 8,
+      "caption": "Table 2: The Transformer achieves better BLEU scores than previous state-of-the-art models on the",
+      "file": "Table_2_The_Transformer_achieves_better_BLEU_scores_than_previous_state_of.png",
+      "original_file": "Table_2_The_Transformer_achieves_better_BLEU_scores_than_previous_state_of.png",
+      "current_file": "Table_2_The_Transformer_achieves_better_BLEU_scores_than_previous_state_of.png",
+      "continued": false
+    },
+    {
+      "type": "table",
+      "id": "3",
+      "page": 9,
+      "caption": "Table 3: Variations on the Transformer architecture. Unlisted values are identical to those of the base",
+      "file": "Table_3_Variations_on_the_Transformer_architecture_Unlisted_values_are_identical_to.png",
+      "original_file": "Table_3_Variations_on_the_Transformer_architecture_Unlisted_values_are_identical_to.png",
+      "current_file": "Table_3_Variations_on_the_Transformer_architecture_Unlisted_values_are_identical_to.png",
+      "continued": false
+    },
+    {
+      "type": "table",
+      "id": "4",
+      "page": 10,
+      "caption": "Table 4: The Transformer generalizes well to English constituency parsing (Results are on Section 23",
+      "file": "Table_4_The_Transformer_generalizes_well_to_English_constituency_parsing_Results_are.png",
+      "original_file": "Table_4_The_Transformer_generalizes_well_to_English_constituency_parsing_Results_are.png",
+      "current_file": "Table_4_The_Transformer_generalizes_well_to_English_constituency_parsing_Results_are.png",
+      "continued": false
+    }
+  ],
+  "layout": {
+    "columns": 2,
+    "typical_line_height": 11.02,
+    "typical_font_size": 9.76,
+    "page_size": [
+      612.0,
+      792.0
+    ]
+  },
+  "validation": {
+    "is_valid": true,
+    "has_text_layer": true,
+    "text_layer_ratio": 1.0,
+    "warnings": []
+  },
+  "items": [
+    {
+      "type": "figure",
+      "id": "1",
+      "page": 3,
+      "caption": "Figure 1: The Transformer - model architecture.",
+      "file": "Figure_1_The_Transformer_model_architecture.png",
+      "original_file": "Figure_1_The_Transformer_model_architecture.png",
+      "current_file": "Figure_1_The_Transformer_model_architecture.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "2",
+      "page": 4,
+      "caption": "Figure 2: (left) Scaled Dot-Product Attention. (right) Multi-Head Attention consists of several",
+      "file": "Figure_2_left_Scaled_Dot_Product_Attention_right_Multi_Head_Attention_consists.png",
+      "original_file": "Figure_2_left_Scaled_Dot_Product_Attention_right_Multi_Head_Attention_consists.png",
+      "current_file": "Figure_2_left_Scaled_Dot_Product_Attention_right_Multi_Head_Attention_consists.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "3",
+      "page": 13,
+      "caption": "Figure 3: An example of the attention mechanism following long-distance dependencies in the",
+      "file": "Figure_3_An_example_of_the_attention_mechanism_following_long_distance_dependencies.png",
+      "original_file": "Figure_3_An_example_of_the_attention_mechanism_following_long_distance_dependencies.png",
+      "current_file": "Figure_3_An_example_of_the_attention_mechanism_following_long_distance_dependencies.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "4",
+      "page": 14,
+      "caption": "Figure 4: Two attention heads, also in layer 5 of 6, apparently involved in anaphora resolution. Top:",
+      "file": "Figure_4_Two_attention_heads_also_in_layer_5_of_6_apparently.png",
+      "original_file": "Figure_4_Two_attention_heads_also_in_layer_5_of_6_apparently.png",
+      "current_file": "Figure_4_Two_attention_heads_also_in_layer_5_of_6_apparently.png",
+      "continued": false
+    },
+    {
+      "type": "figure",
+      "id": "5",
+      "page": 15,
+      "caption": "Figure 5: Many of the attention heads exhibit behaviour that seems related to the structure of the",
+      "file": "Figure_5_Many_of_the_attention_heads_exhibit_behaviour_that_seems_related.png",
+      "original_file": "Figure_5_Many_of_the_attention_heads_exhibit_behaviour_that_seems_related.png",
+      "current_file": "Figure_5_Many_of_the_attention_heads_exhibit_behaviour_that_seems_related.png",
+      "continued": false
+    },
+    {
+      "type": "table",
+      "id": "1",
+      "page": 6,
+      "caption": "Table 1: Maximum path lengths, per-layer complexity and minimum number of sequential operations",
+      "file": "Table_1_Maximum_path_lengths_per_layer_complexity_and_minimum_number_of.png",
+      "original_file": "Table_1_Maximum_path_lengths_per_layer_complexity_and_minimum_number_of.png",
+      "current_file": "Table_1_Maximum_path_lengths_per_layer_complexity_and_minimum_number_of.png",
+      "continued": false
+    },
+    {
+      "type": "table",
+      "id": "2",
+      "page": 8,
+      "caption": "Table 2: The Transformer achieves better BLEU scores than previous state-of-the-art models on the",
+      "file": "Table_2_The_Transformer_achieves_better_BLEU_scores_than_previous_state_of.png",
+      "original_file": "Table_2_The_Transformer_achieves_better_BLEU_scores_than_previous_state_of.png",
+      "current_file": "Table_2_The_Transformer_achieves_better_BLEU_scores_than_previous_state_of.png",
+      "continued": false
+    },
+    {
+      "type": "table",
+      "id": "3",
+      "page": 9,
+      "caption": "Table 3: Variations on the Transformer architecture. Unlisted values are identical to those of the base",
+      "file": "Table_3_Variations_on_the_Transformer_architecture_Unlisted_values_are_identical_to.png",
+      "original_file": "Table_3_Variations_on_the_Transformer_architecture_Unlisted_values_are_identical_to.png",
+      "current_file": "Table_3_Variations_on_the_Transformer_architecture_Unlisted_values_are_identical_to.png",
+      "continued": false
+    },
+    {
+      "type": "table",
+      "id": "4",
+      "page": 10,
+      "caption": "Table 4: The Transformer generalizes well to English constituency parsing (Results are on Section 23",
+      "file": "Table_4_The_Transformer_generalizes_well_to_English_constituency_parsing_Results_are.png",
+      "original_file": "Table_4_The_Transformer_generalizes_well_to_English_constituency_parsing_Results_are.png",
+      "current_file": "Table_4_The_Transformer_generalizes_well_to_English_constituency_parsing_Results_are.png",
+      "continued": false
+    }
+  ]
+}

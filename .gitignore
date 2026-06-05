@@ -57,6 +57,9 @@ cython_debug/
 # Test files and PDFs
 tests-basic-benchmark/
 
+# Test results (提取脚本输出，不上传 GitHub)
+tests/results/
+
 
 # Reference files and documents
 ref/

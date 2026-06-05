@@ -1,0 +1,1638 @@
+{
+  "page_size": [
+    612.0,
+    792.0
+  ],
+  "num_columns": 2,
+  "margins": {
+    "left": 0.0,
+    "right": 612.0,
+    "top": 0.0,
+    "bottom": 792.0
+  },
+  "column_gap": -465.9161026000977,
+  "typical_metrics": {
+    "font_size": 9.760231380514057,
+    "line_height": 11.024782836914062,
+    "line_gap": 1.2645514564000049
+  },
+  "text_units_count": {
+    "0": 56,
+    "1": 53,
+    "2": 27,
+    "3": 43,
+    "4": 56,
+    "5": 64,
+    "6": 51,
+    "7": 87,
+    "8": 149,
+    "9": 76,
+    "10": 47,
+    "11": 43,
+    "12": 72,
+    "13": 112,
+    "14": 112
+  },
+  "text_blocks_count": {
+    "0": 11,
+    "1": 9,
+    "2": 8,
+    "3": 9,
+    "4": 11,
+    "5": 10,
+    "6": 12,
+    "7": 22,
+    "8": 7,
+    "9": 9,
+    "10": 9,
+    "11": 7,
+    "12": 2,
+    "13": 1,
+    "14": 1
+  },
+  "vacant_regions_count": {
+    "0": 1,
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "7": 1,
+    "8": 1,
+    "9": 1,
+    "10": 1,
+    "11": 1,
+    "12": 1,
+    "13": 1,
+    "14": 1
+  },
+  "text_blocks": {
+    "0": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          124.31,
+          72.9,
+          487.89,
+          112.75
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "Provided proper attribution is provided, Google he reproduce the tables and figures in this paper so"
+      },
+      {
+        "type": "title_h1",
+        "bbox": [
+          211.49,
+          148.83,
+          399.89,
+          166.05
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Attention Is All You Need"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          132.91,
+          233.54,
+          497.21,
+          245.01
+        ],
+        "column": 1,
+        "units_count": 4,
+        "sample": "Ashish Vaswani∗ Noam Shazeer∗"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          139.38,
+          246.05,
+          492.88,
+          256.01
+        ],
+        "column": 1,
+        "units_count": 4,
+        "sample": "Google Brain Google Brain"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          144.29,
+          283.54,
+          459.92,
+          295.01
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "Llion Jones∗ Aidan N. Gomez∗†"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          134.55,
+          296.05,
+          451.96,
+          306.01
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "Google Research University of Toronto"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          268.81,
+          333.53,
+          346.85,
+          345.01
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Illia Polosukhin∗‡"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          283.76,
+          385.61,
+          328.24,
+          397.56
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Abstract"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          119.82,
+          413.33,
+          504.0,
+          608.0
+        ],
+        "column": 1,
+        "units_count": 16,
+        "sample": "The dominant sequence transduction models are base convolutional neural networks that include an enc"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          608.99,
+          504.31,
+          687.72
+        ],
+        "column": 0,
+        "units_count": 8,
+        "sample": "the effort to evaluate this idea. Ashish, with Ill has been crucially involved in every aspect of th"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          120.21,
+          687.95,
+          280.29,
+          709.62
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "†Work performed while at Google Brain. ‡Work performed while at Google Research."
+      }
+    ],
+    "1": [
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          72.79,
+          113.98,
+          84.74
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "1"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          125.93,
+          72.79,
+          190.81,
+          84.74
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Introduction"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          99.02,
+          505.74,
+          343.67
+        ],
+        "column": 0,
+        "units_count": 21,
+        "sample": "Recurrent neural networks, long short-term memory  in particular, have been firmly established as st"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          363.1,
+          113.98,
+          375.06
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "2"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          125.93,
+          363.1,
+          188.83,
+          375.06
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Background"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.69,
+          389.45,
+          505.66,
+          623.08
+        ],
+        "column": 0,
+        "units_count": 20,
+        "sample": "The goal of reducing sequential computation also f [16], ByteNet [18] and ConvS2S [9], all of which "
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          642.5,
+          113.98,
+          654.46
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "3"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          125.93,
+          642.5,
+          226.09,
+          654.46
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Model Architecture"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          668.81,
+          505.74,
+          722.41
+        ],
+        "column": 0,
+        "units_count": 5,
+        "sample": "Most competitive neural sequence transduction mode Here, the encoder maps an input sequence of symbo"
+      }
+    ],
+    "2": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.69,
+          436.75,
+          505.25,
+          492.95
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "The Transformer follows this overall architecture  connected layers for both the encoder and decoder"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          482.99,
+          253.01,
+          492.95
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Encoder and Decoder Stacks"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          108.0,
+          502.89,
+          148.08,
+          512.96
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "Encoder:"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          513.94,
+          505.66,
+          579.74
+        ],
+        "column": 0,
+        "units_count": 6,
+        "sample": "sub-layers. The first is a multi-head self-attenti wise fully connected feed-forward network. We emp"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          108.0,
+          591.62,
+          145.95,
+          601.48
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "Decoder:"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          602.47,
+          504.0,
+          691.43
+        ],
+        "column": 0,
+        "units_count": 7,
+        "sample": "sub-layers in each encoder layer, the decoder inse attention over the output of the encoder stack. S"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          681.47,
+          170.81,
+          691.43
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Attention"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          701.54,
+          505.25,
+          722.4
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "An attention function can be described as mapping  where the query, keys, values, and output are all"
+      }
+    ],
+    "3": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          147.78,
+          71.2,
+          450.2,
+          81.16
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "Scaled Dot-Product Attention Multi-Head Attention"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          285.37,
+          504.0,
+          361.02
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "attention layers running in parallel. of the values, where the weight assigned to each v"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          137.89,
+          351.06,
+          263.88,
+          361.02
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Scaled Dot-Product Attention"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          369.7,
+          504.17,
+          450.67
+        ],
+        "column": 0,
+        "units_count": 7,
+        "sample": "We call our particular attention \"Scaled Dot-Produ queries and keys of dimension dk, and values of d"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.69,
+          499.5,
+          505.65,
+          520.39
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "The two most commonly used attention functions are plicative) attention. Dot-product attention is id"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          534.43,
+          504.0,
+          605.11
+        ],
+        "column": 0,
+        "units_count": 6,
+        "sample": "a single hidden layer. While the two are similar i much faster and more space-efficient in practice,"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          137.89,
+          630.78,
+          230.59,
+          640.74
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Multi-Head Attention"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          649.27,
+          505.24,
+          692.8
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "Instead of performing a single attention function  we found it beneficial to linearly project the qu"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          303.51,
+          712.99,
+          503.88,
+          752.3
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "i=1 qiki, has mean 0 and variance dk. 4"
+      }
+    ],
+    "4": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          74.33,
+          504.0,
+          122.58
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "output values. These are concatenated and once aga depicted in Figure 2."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          234.14,
+          504.0,
+          290.24
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "In this work we employ h = 8 parallel attention la dk = dv = dmodel/h = 64. Due to the reduced dimen"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          137.89,
+          280.27,
+          302.86,
+          290.24
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Applications of Attention in our Model"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          143.87,
+          331.1,
+          504.35,
+          373.86
+        ],
+        "column": 1,
+        "units_count": 4,
+        "sample": "and the memory keys and values come from the outpu position in the decoder to attend over all positi"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          143.87,
+          390.6,
+          504.0,
+          422.42
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "and queries come from the same place, in this case encoder. Each position in the encoder can attend "
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          143.87,
+          439.17,
+          504.0,
+          460.06
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "all positions in the decoder up to and including t information flow in the decoder to preserve the a"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          497.36,
+          292.87,
+          507.32
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Position-wise Feed-Forward Networks"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          517.78,
+          504.34,
+          549.63
+        ],
+        "column": 0,
+        "units_count": 3,
+        "sample": "In addition to attention sub-layers, each of the l connected feed-forward network, which is applied "
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          590.24,
+          505.75,
+          623.21
+        ],
+        "column": 0,
+        "units_count": 3,
+        "sample": "While the linear transformations are the same acro from layer to layer. Another way of describing th"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          648.32,
+          240.02,
+          658.28
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Embeddings and Softmax"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          668.73,
+          505.74,
+          723.18
+        ],
+        "column": 0,
+        "units_count": 5,
+        "sample": "Similarly to other sequence transduction models, w tokens and output tokens to vectors of dimension "
+      }
+    ],
+    "5": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          81.88,
+          504.0,
+          102.98
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "for different layer types. n is the sequence lengt size of convolutions and r the size of the neighb"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          124.55,
+          116.64,
+          487.45,
+          137.51
+        ],
+        "column": 1,
+        "units_count": 5,
+        "sample": "Layer Type Complexity per Layer"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          213.79,
+          215.2,
+          223.75
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Positional Encoding"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          233.93,
+          505.25,
+          314.75
+        ],
+        "column": 0,
+        "units_count": 7,
+        "sample": "Since our model contains no recurrence and no conv order of the sequence, we must inject some inform"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          377.29,
+          504.34,
+          421.73
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "where pos is the position and i is the dimension.  corresponds to a sinusoid. The wavelengths form a"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          437.54,
+          504.0,
+          480.24
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "We also experimented with using learned positional versions produced nearly identical results (see T"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          496.89,
+          113.98,
+          508.84
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "4"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          125.93,
+          496.89,
+          225.04,
+          508.84
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Why Self-Attention"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          521.39,
+          505.65,
+          542.35
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "In this section we compare various aspects of self tional layers commonly used for mapping one varia"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          554.2,
+          504.35,
+          722.43
+        ],
+        "column": 0,
+        "units_count": 14,
+        "sample": "layer in a typical sequence transduction encoder o consider three desiderata."
+      }
+    ],
+    "6": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          74.18,
+          505.25,
+          280.78
+        ],
+        "column": 0,
+        "units_count": 18,
+        "sample": "length n is smaller than the representation dimens sentence representations used by state-of-the-art"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          299.91,
+          113.98,
+          311.87
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "5"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          125.93,
+          299.91,
+          170.23,
+          311.87
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Training"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.69,
+          326.04,
+          337.48,
+          362.69
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "This section describes the training regime for our 5.1"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          352.73,
+          249.53,
+          362.69
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Training Data and Batching"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          373.65,
+          505.65,
+          475.83
+        ],
+        "column": 0,
+        "units_count": 8,
+        "sample": "We trained on the standard WMT 2014 English-German sentence pairs. Sentences were encoded using byte"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          465.86,
+          233.04,
+          475.83
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Hardware and Schedule"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          486.78,
+          504.0,
+          567.15
+        ],
+        "column": 0,
+        "units_count": 6,
+        "sample": "We trained our models on one machine with 8 NVIDIA the hyperparameters described throughout the pape"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          557.18,
+          174.13,
+          567.15
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Optimizer"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          576.58,
+          504.0,
+          599.05
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "We used the Adam optimizer [20] with β1 = 0.9, β2  rate over the course of training, according to th"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.69,
+          642.71,
+          505.24,
+          663.84
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "This corresponds to increasing the learning rate l and decreasing it thereafter proportionally to th"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          691.45,
+          193.51,
+          701.41
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Regularization"
+      }
+    ],
+    "7": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          97.91,
+          475.32,
+          135.1
+        ],
+        "column": 1,
+        "units_count": 9,
+        "sample": "BLEU Training Cost (FLOPs)"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          136.52,
+          353.66,
+          146.48
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "Deep-Att + PosUnk [39] 39.2"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          147.9,
+          356.15,
+          157.86
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "GNMT + RL [38] 24.6"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          159.28,
+          356.15,
+          169.25
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "ConvS2S [9] 25.16"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          170.67,
+          356.15,
+          180.63
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "MoE [32] 26.03"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          183.3,
+          353.66,
+          193.27
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "Deep-Att + PosUnk Ensemble [39] 40.4"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          194.69,
+          356.15,
+          204.65
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "GNMT + RL Ensemble [38] 26.30"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          205.98,
+          356.15,
+          216.03
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "41.29 ConvS2S Ensemble [9]"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          407.34,
+          217.69,
+          450.73,
+          228.94
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "3.3 · 1018"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          219.2,
+          353.66,
+          229.17
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "Transformer (base model) 27.3"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          136.67,
+          230.49,
+          353.66,
+          240.55
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "28.4 41.8"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          108.0,
+          273.23,
+          182.94,
+          283.17
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "Residual Dropout"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          284.29,
+          504.0,
+          305.11
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "sub-layer input and normalized. In addition, we ap positional encodings in both the encoder and deco"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          108.0,
+          331.21,
+          182.47,
+          341.27
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "Label Smoothing"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          371.29,
+          113.98,
+          383.24
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "6"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          125.93,
+          371.29,
+          163.13,
+          383.24
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Results"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          397.27,
+          219.07,
+          407.23
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Machine Translation"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.64,
+          418.3,
+          505.25,
+          591.87
+        ],
+        "column": 0,
+        "units_count": 15,
+        "sample": "On the WMT 2014 English-to-German translation task in Table 2) outperforms the best previously repor"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          609.22,
+          504.0,
+          667.59
+        ],
+        "column": 0,
+        "units_count": 4,
+        "sample": "architectures from the literature. We estimate the model by multiplying the training time, the numbe"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          657.63,
+          203.94,
+          667.59
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Model Variations"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.69,
+          678.51,
+          504.0,
+          699.48
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "To evaluate the importance of different components in different ways, measuring the change in perfor"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          120.65,
+          711.66,
+          453.56,
+          752.3
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "5We used values of 2.8, 3.7, 6.0 and 9.5 TFLOPS fo 8"
+      }
+    ],
+    "8": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          82.12,
+          504.0,
+          113.89
+        ],
+        "column": 0,
+        "units_count": 3,
+        "sample": "model. All metrics are on the English-to-German tr perplexities are per-wordpiece, according to our "
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          371.14,
+          131.48,
+          502.76,
+          141.45
+        ],
+        "column": 1,
+        "units_count": 4,
+        "sample": "train PPL"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          370.31,
+          142.86,
+          459.41,
+          152.83
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "steps (dev)"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          118.41,
+          155.5,
+          495.85,
+          383.11
+        ],
+        "column": 1,
+        "units_count": 102,
+        "sample": "6 512"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          413.68,
+          505.24,
+          570.45
+        ],
+        "column": 0,
+        "units_count": 12,
+        "sample": "development set, newstest2013. We used beam search checkpoint averaging. We present these results in"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          130.42,
+          560.49,
+          255.97,
+          570.45
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "English Constituency Parsing"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          581.43,
+          505.24,
+          722.43
+        ],
+        "column": 0,
+        "units_count": 12,
+        "sample": "To evaluate if the Transformer can generalize to o constituency parsing. This task presents specific"
+      }
+    ],
+    "9": [
+      {
+        "type": "title_h3",
+        "bbox": [
+          206.76,
+          94.14,
+          460.97,
+          104.1
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "Parser Training"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          151.03,
+          105.53,
+          446.44,
+          235.5
+        ],
+        "column": 1,
+        "units_count": 36,
+        "sample": "Vinyals & Kaiser el al. (2014) [37] WSJ only, discriminative"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          261.85,
+          505.66,
+          348.46
+        ],
+        "column": 0,
+        "units_count": 7,
+        "sample": "increased the maximum output length to input lengt for both WSJ only and the semi-supervised setting"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          364.82,
+          113.98,
+          376.78
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "7"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          125.93,
+          364.82,
+          183.07,
+          376.78
+        ],
+        "column": 1,
+        "units_count": 1,
+        "sample": "Conclusion"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          107.53,
+          389.1,
+          505.61,
+          519.1
+        ],
+        "column": 0,
+        "units_count": 11,
+        "sample": "In this work, we presented the Transformer, the fi attention, replacing the recurrent layers most co"
+      },
+      {
+        "type": "title_h3",
+        "bbox": [
+          108.0,
+          558.95,
+          192.01,
+          569.01
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "Acknowledgements"
+      },
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          596.35,
+          163.54,
+          608.31
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "References"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          712.27,
+          325.11,
+          752.3
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "reading. arXiv preprint arXiv:1601.06733, 2016. 10"
+      }
+    ],
+    "10": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          85.31,
+          504.0,
+          106.19
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "and Yoshua Bengio. Learning phrase representations machine translation. CoRR, abs/1406.1078, 2014."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          218.89,
+          504.0,
+          248.67
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "tional sequence to sequence learning. arXiv prepri arXiv preprint"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          238.79,
+          430.63,
+          259.74
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "Generating sequences with recurrent neural network arXiv:1308.0850, 2013."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.27,
+          280.23,
+          504.0,
+          301.36
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "age recognition. In Proceedings of the IEEE Confer Recognition, pages 770–778, 2016."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.3,
+          383.27,
+          504.0,
+          404.4
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "across languages. In Proceedings of the 2009 Confe Language Processing, pages 832–841. ACL, August 2"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          517.18,
+          505.24,
+          538.15
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "ray Kavukcuoglu. Neural machine translation in lin 2017."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          578.56,
+          505.75,
+          608.46
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "[20] Diederik Kingma and Jimmy Ba. Adam: A method  [21] Oleksii Kuchaiev and Boris Ginsburg. Factori"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          639.86,
+          504.0,
+          660.99
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "Zhou, and Yoshua Bengio. A structured self-attenti arXiv:1703.03130, 2017."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          712.27,
+          426.1,
+          752.3
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "based neural machine translation. arXiv preprint a 11"
+      }
+    ],
+    "11": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.27,
+          119.56,
+          505.25,
+          140.58
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "Proceedings of the Human Language Technology Confe pages 152–159. ACL, June 2006."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.25,
+          233.54,
+          504.35,
+          265.57
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "and interpretable tree annotation. In Proceedings  Computational Linguistics and 44th Annual Meeting"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          358.71,
+          504.0,
+          379.66
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "and Jeff Dean. Outrageously large neural networks: layer. arXiv preprint arXiv:1701.06538, 2017."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.3,
+          403.86,
+          504.0,
+          424.96
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "nov. Dropout: a simple way to prevent neural netwo Learning Research, 15(1):1929–1958, 2014."
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          128.97,
+          449.32,
+          505.25,
+          481.17
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "networks. In C. Cortes, N. D. Lawrence, D. D. Lee, Advances in Neural Information Processing Systems"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          129.58,
+          608.85,
+          504.0,
+          640.56
+        ],
+        "column": 1,
+        "units_count": 3,
+        "sample": "Macherey, Maxim Krikun, Yuan Cao, Qin Gao, Klaus M translation system: Bridging the gap between huma"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          128.83,
+          699.28,
+          504.0,
+          720.25
+        ],
+        "column": 1,
+        "units_count": 2,
+        "sample": "shift-reduce constituent parsing. In Proceedings o 1: Long Papers), pages 434–443. ACL, August 2013."
+      }
+    ],
+    "12": [
+      {
+        "type": "title_h2",
+        "bbox": [
+          108.0,
+          72.79,
+          230.77,
+          84.74
+        ],
+        "column": 0,
+        "units_count": 1,
+        "sample": "Attention Visualizations"
+      },
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          323.29,
+          504.17,
+          355.08
+        ],
+        "column": 0,
+        "units_count": 3,
+        "sample": "encoder self-attention in layer 5 of 6. Many of th the verb ‘making’, completing the phrase ‘making."
+      }
+    ],
+    "13": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          625.16,
+          504.0,
+          646.06
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "Full attentions for head 5. Bottom: Isolated atten and 6. Note that the attentions are very sharp fo"
+      }
+    ],
+    "14": [
+      {
+        "type": "paragraph_group",
+        "bbox": [
+          108.0,
+          613.38,
+          504.0,
+          634.18
+        ],
+        "column": 0,
+        "units_count": 2,
+        "sample": "sentence. We give two such examples above, from tw at layer 5 of 6. The heads clearly learned to per"
+      }
+    ]
+  }
+}

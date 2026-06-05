@@ -15,6 +15,7 @@
 - `docs/`：项目文档目录。
 - `skills/`：核心工作目录，正式 Skill 存放处。
 - `tests/`：测试数据、测试脚本、测试结果目录。
+  - `tests/results/`：提取脚本输出结果，不上传 GitHub（已加入 .gitignore）。
 - `old-version/`：历史代码归档目录，仅供参考。
 - `task-list.md`：后续用于记录所有操作、修改和测试。
 
