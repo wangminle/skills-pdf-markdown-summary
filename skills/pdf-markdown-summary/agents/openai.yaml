@@ -1,0 +1,4 @@
+interface:
+  display_name: "PDF Markdown Summary"
+  short_description: "Convert PDFs to Markdown and figure-aware summaries"
+  default_prompt: "Use $pdf-markdown-summary to convert this PDF to Markdown and prepare a figure-aware summary."

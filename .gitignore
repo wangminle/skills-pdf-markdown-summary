@@ -45,7 +45,9 @@ coverage.xml
 .cursorignore
 .cursorindexingignore
 .pypirc
-.DS_Store
+.claude/
+node_modules/
+**/.DS_Store
 
 # Project specific
 docs/_build/
