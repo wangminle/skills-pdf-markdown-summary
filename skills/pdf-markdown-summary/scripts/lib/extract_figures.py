@@ -58,7 +58,7 @@ from .extract_helpers import (
 )
 from .direction import compute_global_anchor, determine_direction, score_local_direction
 from .layout_model import adjust_clip_with_layout
-from .debug_visual import save_debug_visualization
+from .debug_visual import create_debug_stage, save_debug_visualization
 from .models import DebugStageInfo, CaptionBlock
 from .output import get_unique_path
 
@@ -604,15 +604,16 @@ def extract_figures(
                 # ================================================================
                 # Debug 可视化（如果启用）
                 # ================================================================
+                debug_artifacts: List[str] = []
                 if debug_visual:
                     try:
                         stages: List[DebugStageInfo] = [
-                            DebugStageInfo(stage='baseline', rect=base_clip),
-                            DebugStageInfo(stage='phase_a', rect=clip_after_A),
-                            DebugStageInfo(stage='phase_b', rect=clip_after_B),
-                            DebugStageInfo(stage='final', rect=final_clip),
+                            create_debug_stage('baseline', base_clip),
+                            create_debug_stage('phase_a', clip_after_A),
+                            create_debug_stage('phase_b', clip_after_B),
+                            create_debug_stage('final', final_clip),
                         ]
-                        save_debug_visualization(
+                        debug_artifacts = save_debug_visualization(
                             page,
                             out_dir,
                             int(ident) if ident.isdigit() else hash(ident) % 1000,
@@ -621,7 +622,7 @@ def extract_figures(
                             caption_rect=caption_bbox,
                             kind='figure',
                             layout_model=layout_model,
-                        )
+                        ) or []
                     except Exception as e:
                         logger.debug(f"Failed to save debug visualization for Figure {ident}: {e}")
 
@@ -638,7 +639,8 @@ def extract_figures(
                         page=pno + 1,
                         caption=full_caption_text,
                         out_path=out_path,
-                        continued=is_continued
+                        continued=is_continued,
+                        debug_artifacts=debug_artifacts,
                     ))
 
                     logger.info(f"Extracted Figure {ident} from page {pno + 1}: {out_path}")

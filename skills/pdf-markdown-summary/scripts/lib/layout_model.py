@@ -624,7 +624,7 @@ def adjust_clip_with_layout(
             if inter.is_empty:
                 continue
             w_ratio = inter.width / max(1.0, adjusted_clip.width)
-            if w_ratio >= 0.35:
+            if b.block_type.startswith('title_') or w_ratio >= 0.35:
                 candidate_blocks.append((b, w_ratio))
         if candidate_blocks:
             new_y0 = max(b.bbox.y1 for (b, _) in candidate_blocks) + 6.0
@@ -638,7 +638,7 @@ def adjust_clip_with_layout(
             if inter.is_empty:
                 continue
             w_ratio = inter.width / max(1.0, adjusted_clip.width)
-            if w_ratio >= 0.35:
+            if b.block_type.startswith('title_') or w_ratio >= 0.35:
                 candidate_blocks.append((b, w_ratio))
         if candidate_blocks:
             new_y1 = min(b.bbox.y0 for (b, _) in candidate_blocks) - 6.0
@@ -653,7 +653,7 @@ def adjust_clip_with_layout(
         return clip_rect
 
     # 验证调整后的窗口
-    if adjusted_clip.height < 0.5 * clip_rect.height or adjusted_clip.height < 80:
+    if adjusted_clip.height < 0.5 * clip_rect.height or adjusted_clip.height < 40:
         return clip_rect
 
     return adjusted_clip

@@ -220,6 +220,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             "args": [],
         })
 
+        test_suites.append({
+            "name": "QA-06 PDF-to-Markdown CLI 输出路径测试",
+            "path": TESTS_SCRIPTS_DIR / "test_pdf_to_markdown_cli.py",
+            "args": [],
+        })
+
     if not args.skip_regex:
         test_suites.append({
             "name": "正则表达式测试",

@@ -186,6 +186,8 @@ def is_likely_reference_context(text: str) -> bool:
     reference_patterns = [
         r'as shown in', r'see (figure|table)', r'refer to',
         r'shown in (figure|table)', r'listed in (table)',
+        r'^table\s+[A-Z]?\d+\s+appendix\b',
+        r'^table\s+[A-Z]?\d+\s*,\s*(?:we|this|the)\b',
         r'如.*所示', r'见.*图', r'参见', r'如.*表.*所示',
         r'according to', r'based on', r'from (figure|table)',
     ]
@@ -435,7 +437,7 @@ def score_caption_candidate(
         context_score += 10.0
         details['context'] = 'caption'
     elif is_likely_reference_context(candidate.text):
-        context_score -= 15.0
+        context_score -= 20.0
         details['context'] = 'reference'
     else:
         context_score += 0.0

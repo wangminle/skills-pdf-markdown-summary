@@ -42,12 +42,13 @@ def _resolve_outputs(args: argparse.Namespace) -> Dict[str, str]:
     pdf_path = os.path.abspath(args.pdf)
     pdf_dir = os.path.dirname(pdf_path)
     stem = os.path.splitext(os.path.basename(pdf_path))[0]
-    text_dir = os.path.join(pdf_dir, "text")
 
     out_md = os.path.abspath(args.out or os.path.join(pdf_dir, f"{stem}.md"))
+    out_dir = os.path.dirname(out_md)
+    text_dir = os.path.join(out_dir, "text")
     asset_dir = args.asset_dir
     if not os.path.isabs(asset_dir):
-        asset_dir = os.path.join(pdf_dir, asset_dir)
+        asset_dir = os.path.join(out_dir, asset_dir)
     asset_dir = os.path.abspath(asset_dir)
 
     return {
@@ -110,6 +111,8 @@ def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Di
         paths["pdf_path"],
         "--out-dir",
         paths["asset_dir"],
+        "--out-text",
+        os.path.join(paths["text_dir"], f"{paths['stem']}.txt"),
         "--preset",
         args.preset,
     ]
@@ -166,7 +169,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 1
 
     os.makedirs(os.path.dirname(paths["out_md"]), exist_ok=True)
+    os.makedirs(paths["asset_dir"], exist_ok=True)
     os.makedirs(paths["text_dir"], exist_ok=True)
+    os.makedirs(os.path.dirname(paths["blocks_json"]), exist_ok=True)
+    os.makedirs(os.path.dirname(paths["report_json"]), exist_ok=True)
 
     document = _paragraphs_to_document(paths["pdf_path"], paths["stem"])
     asset_result = _run_asset_extraction(args, paths)

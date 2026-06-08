@@ -14,6 +14,7 @@ V0.4.0 新增：从 extract_pdf_assets.py 迁移的方向判定逻辑
 from __future__ import annotations
 
 import logging
+import math
 import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
@@ -103,7 +104,7 @@ def score_direction_for_caption(
 
     # 计算 above 得分
     try:
-        pix_above = page.get_pixmap(matrix=fitz.Matrix(1, 1), clip=clip_above, alpha=False)
+        pix_above = page.get_pixmap(dpi=72, clip=clip_above, alpha=False)
         ink_above = estimate_ink_ratio(pix_above)
     except Exception:
         ink_above = 0.0
@@ -112,7 +113,7 @@ def score_direction_for_caption(
 
     # 计算 below 得分
     try:
-        pix_below = page.get_pixmap(matrix=fitz.Matrix(1, 1), clip=clip_below, alpha=False)
+        pix_below = page.get_pixmap(dpi=72, clip=clip_below, alpha=False)
         ink_below = estimate_ink_ratio(pix_below)
     except Exception:
         ink_below = 0.0
@@ -253,6 +254,7 @@ def score_local_direction(
     margin_x: float = 20.0,
     caption_gap: float = 3.0,
     is_table: bool = False,
+    text_lines: Optional[List[Tuple["fitz.Rect", float, str]]] = None,
 ) -> Tuple[str, float]:
     """
     基于局部对象密度评估单个 caption 的方向。
@@ -280,6 +282,96 @@ def score_local_direction(
 
     if _fitz is None:
         return ('below' if is_table else 'above', 0.5)
+
+    if is_table and text_lines:
+        search_height = min(300.0, max(160.0, clip_height * 0.5))
+        page_width = max(1.0, page_rect.width)
+
+        def table_text_score(side: str) -> float:
+            if side == 'above':
+                nearby = [
+                    line for line in text_lines
+                    if line[0].y1 <= caption_bbox.y0 - 2.0
+                    and line[0].y0 >= caption_bbox.y0 - search_height
+                ]
+                gaps = [caption_bbox.y0 - line[0].y1 for line in nearby]
+            else:
+                nearby = [
+                    line for line in text_lines
+                    if line[0].y0 >= caption_bbox.y1 + 2.0
+                    and line[0].y1 <= caption_bbox.y1 + search_height
+                ]
+                gaps = [line[0].y0 - caption_bbox.y1 for line in nearby]
+
+            nearby = [
+                line for line in nearby
+                if not re.match(
+                    r"^\s*(?:table|tab\.?|figure|fig\.?)\s*[A-Z]?\d+\b",
+                    line[2].strip(),
+                    re.IGNORECASE,
+                )
+                and not (
+                    line[0].width < page_width * 0.08
+                    and len(line[2].strip()) <= 8
+                    and line[0].y0 >= page_rect.y1 - max(80.0, page_rect.height * 0.10)
+                )
+            ]
+
+            if not nearby:
+                return 0.0
+
+            rows: List[List[Tuple["fitz.Rect", float, str]]] = []
+            row_centers: List[float] = []
+            for line in sorted(nearby, key=lambda item: (item[0].y0, item[0].x0)):
+                center = (line[0].y0 + line[0].y1) / 2.0
+                if rows and abs(center - row_centers[-1]) <= 3.0:
+                    rows[-1].append(line)
+                    row_centers[-1] = sum(
+                        (item[0].y0 + item[0].y1) / 2.0 for item in rows[-1]
+                    ) / len(rows[-1])
+                else:
+                    rows.append([line])
+                    row_centers.append(center)
+
+            structured_gaps: List[float] = []
+            for row in rows:
+                row_rect = row[0][0]
+                for line_rect, _font_size, _text in row[1:]:
+                    row_rect = row_rect | line_rect
+                if len(row) >= 3 or (len(row) >= 2 and row_rect.width >= page_width * 0.35):
+                    if side == "above":
+                        structured_gaps.append(caption_bbox.y0 - row_rect.y1)
+                    else:
+                        structured_gaps.append(row_rect.y0 - caption_bbox.y1)
+
+            short_like = 0
+            wide_long = 0
+            for line_rect, _font_size, text in nearby:
+                text_len = len(text.strip())
+                if text_len <= 40 or line_rect.width < page_width * 0.55:
+                    short_like += 1
+                if text_len >= 40 and line_rect.width >= page_width * 0.55:
+                    wide_long += 1
+
+            short_ratio = short_like / len(nearby)
+            wide_long_ratio = wide_long / len(nearby)
+            nearest_gap = min(structured_gaps) if structured_gaps else min(gaps)
+            proximity = math.exp(-nearest_gap / 20.0)
+            structure_bonus = min(1.0, len(structured_gaps) / 4.0)
+            return (
+                0.20 * short_ratio
+                + 0.15 * (1.0 - wide_long_ratio)
+                + 0.50 * proximity
+                + 0.15 * structure_bonus
+            )
+
+        above_text_score = table_text_score('above')
+        below_text_score = table_text_score('below')
+        score_diff = abs(above_text_score - below_text_score)
+        if score_diff >= 0.03:
+            direction = 'above' if above_text_score > below_text_score else 'below'
+            confidence = min(0.95, 0.60 + score_diff * 2.0)
+            return direction, confidence
 
     x_left = page_rect.x0 + margin_x
     x_right = page_rect.x1 - margin_x

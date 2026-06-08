@@ -40,7 +40,9 @@ from .refine import (
     detect_content_bbox_pixels,
     adaptive_acceptance_thresholds,
     detect_far_side_text_evidence,
-    trim_far_side_text_post_autocrop,
+    trim_far_side_text_iterative,
+    refine_clip_to_table_band,
+    restore_table_clip_width,
     trim_clip_head_by_text_v2,
     merge_rects,
     build_text_masks_px,
@@ -48,6 +50,7 @@ from .refine import (
     estimate_ink_ratio,
     refine_clip_x_range,
     detect_text_pollution,
+    looks_like_table_text,
     limit_clip_by_neighbor_captions,
 )
 from .extract_helpers import (
@@ -60,7 +63,7 @@ from .extract_helpers import (
 )
 from .direction import compute_global_anchor, determine_direction, score_local_direction
 from .layout_model import adjust_clip_with_layout
-from .debug_visual import save_debug_visualization
+from .debug_visual import create_debug_stage, save_debug_visualization
 from .models import DebugStageInfo, CaptionBlock
 from .output import get_unique_path
 
@@ -274,6 +277,8 @@ def extract_tables(
                 match = TABLE_LINE_RE.match(text_stripped)
                 if not match:
                     continue
+                if is_caption_reference(text_stripped, blk, TABLE_LINE_RE):
+                    continue
 
                 # 提取 Table 编号
                 ident = extract_table_ident(match)
@@ -342,6 +347,7 @@ def extract_tables(
                     margin_x=table_margin_x,
                     caption_gap=table_caption_gap,
                     is_table=True,
+                    text_lines=text_lines,
                 )
 
                 direction = determine_direction(
@@ -471,6 +477,23 @@ def extract_tables(
                         debug=debug_captions,
                     )
 
+                table_band_changed = False
+                if ident not in no_refine_set:
+                    table_band_clip, table_band_changed = refine_clip_to_table_band(
+                        base_clip,
+                        caption_bbox,
+                        text_lines,
+                        direction,
+                        typical_line_h=typical_line_h,
+                    )
+                    if table_band_changed:
+                        clip = create_rect(
+                            clip.x0,
+                            table_band_clip.y0,
+                            clip.x1,
+                            table_band_clip.y1,
+                        )
+
                 # ================================================================
                 # Phase D: Autocrop（白边自动裁切）
                 # ================================================================
@@ -513,7 +536,7 @@ def extract_tables(
                             min_width_ratio=0.30,
                         )
 
-                        if has_far_evidence:
+                        if has_far_evidence and not table_band_changed:
                             if direction == 'below':
                                 autocrop_clip = create_rect(
                                     autocrop_clip.x0,
@@ -529,22 +552,69 @@ def extract_tables(
                                     autocrop_clip.y1
                                 )
 
-                        autocrop_clip, _ = trim_far_side_text_post_autocrop(
-                            autocrop_clip, text_lines, direction,
-                            typical_line_h=typical_line_h,
-                            scan_lines=3,
-                        )
+                        if not table_band_changed:
+                            autocrop_clip, _ = trim_far_side_text_iterative(
+                                autocrop_clip, text_lines, direction,
+                                typical_line_h=typical_line_h,
+                            )
 
                         autocrop_h = autocrop_clip.height
                         base_h = base_clip.height
                         min_h_px = autocrop_min_height_px / scale
 
-                        if autocrop_h >= min_h_px and autocrop_h >= base_h * autocrop_shrink_limit:
+                        table_band_is_valid = (
+                            table_band_changed
+                            and looks_like_table_text(autocrop_clip, text_lines)
+                        )
+                        if autocrop_h >= min_h_px and (
+                            autocrop_h >= base_h * autocrop_shrink_limit
+                            or table_band_is_valid
+                        ):
                             final_clip = autocrop_clip
                         else:
                             logger.debug(f"Table {ident}: autocrop rejected (h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})")
                     except Exception as e:
                         logger.warning(f"Table {ident}: autocrop failed: {e}")
+
+                final_clip = restore_table_clip_width(
+                    final_clip,
+                    base_clip,
+                    table_band_changed=table_band_changed,
+                )
+
+                def save_current_debug(
+                    *,
+                    rejected_reason: str = "",
+                ) -> List[str]:
+                    if not debug_visual:
+                        return []
+
+                    stages: List[DebugStageInfo] = [
+                        create_debug_stage('baseline', base_clip),
+                        create_debug_stage('phase_a', clip_after_A),
+                        create_debug_stage('phase_b', clip_after_B),
+                        create_debug_stage(
+                            'rejected' if rejected_reason else 'final',
+                            final_clip,
+                            rejected_reason or None,
+                        ),
+                    ]
+                    try:
+                        fig_no = int(ident)
+                    except ValueError:
+                        fig_no = hash(ident) % 1000
+
+                    return save_debug_visualization(
+                        page,
+                        out_dir,
+                        fig_no,
+                        pno + 1,
+                        stages=stages,
+                        caption_rect=caption_bbox,
+                        kind='table',
+                        layout_model=layout_model,
+                        file_suffix='rejected' if rejected_reason else 'stages',
+                    ) or []
 
                 # ================================================================
                 # 修复6: 增强验收检查
@@ -561,6 +631,7 @@ def extract_tables(
 
                     accepted = True
                     fallback_reason = ""
+                    hard_reject = False
 
                     if height_ratio < thresholds.height_ratio:
                         accepted = False
@@ -573,54 +644,43 @@ def extract_tables(
                     page_w = page_rect.width
                     if final_clip.width < page_w * 0.15:
                         accepted = False
+                        hard_reject = True
                         fallback_reason = f"clip_too_narrow={final_clip.width:.0f}pt < 15% of page"
 
+                    table_like_refined = looks_like_table_text(final_clip, text_lines)
+                    polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
+
                     if accepted:
-                        polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
-                        if polluted:
+                        if polluted and not table_like_refined:
                             logger.info(f"Table {ident}: rejected polluted clip ({pollution_reason})")
+                            save_current_debug(rejected_reason=pollution_reason)
                             continue
 
                     if not accepted:
-                        logger.info(f"Table {ident}: refined clip rejected ({fallback_reason}), falling back")
-                        if clip_after_A.height >= base_clip.height * thresholds.height_ratio:
-                            final_clip = clip_after_A
-                            logger.debug(f"Table {ident}: using Phase A clip")
+                        if table_like_refined and not hard_reject:
+                            logger.info(f"Table {ident}: keeping low-ratio table-like refined clip ({fallback_reason})")
                         else:
-                            final_clip = base_clip
-                            logger.debug(f"Table {ident}: using baseline clip")
+                            logger.info(f"Table {ident}: refined clip rejected ({fallback_reason}), falling back")
+                            if clip_after_A.height >= base_clip.height * thresholds.height_ratio:
+                                final_clip = clip_after_A
+                                logger.debug(f"Table {ident}: using Phase A clip")
+                            else:
+                                final_clip = base_clip
+                                logger.debug(f"Table {ident}: using baseline clip")
 
-                        polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
-                        if polluted:
-                            logger.info(f"Table {ident}: rejected fallback clip ({pollution_reason})")
-                            continue
+                            polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
+                            if polluted and not looks_like_table_text(final_clip, text_lines):
+                                logger.info(f"Table {ident}: rejected fallback clip ({pollution_reason})")
+                                save_current_debug(rejected_reason=pollution_reason)
+                                continue
 
                 # ================================================================
                 # Debug 可视化（如果启用）
                 # ================================================================
+                debug_artifacts: List[str] = []
                 if debug_visual:
                     try:
-                        stages: List[DebugStageInfo] = [
-                            DebugStageInfo(stage='baseline', rect=base_clip),
-                            DebugStageInfo(stage='phase_a', rect=clip_after_A),
-                            DebugStageInfo(stage='phase_b', rect=clip_after_B),
-                            DebugStageInfo(stage='final', rect=final_clip),
-                        ]
-                        try:
-                            fig_no = int(ident)
-                        except ValueError:
-                            fig_no = hash(ident) % 1000
-
-                        save_debug_visualization(
-                            page,
-                            out_dir,
-                            fig_no,
-                            pno + 1,
-                            stages=stages,
-                            caption_rect=caption_bbox,
-                            kind='table',
-                            layout_model=layout_model,
-                        )
+                        debug_artifacts = save_current_debug()
                     except Exception as e:
                         logger.debug(f"Failed to save debug visualization for Table {ident}: {e}")
 
@@ -637,7 +697,8 @@ def extract_tables(
                         page=pno + 1,
                         caption=full_caption_text,
                         out_path=out_path,
-                        continued=is_continued
+                        continued=is_continued,
+                        debug_artifacts=debug_artifacts,
                     ))
 
                     logger.info(f"Extracted Table {ident} from page {pno + 1}: {out_path}")

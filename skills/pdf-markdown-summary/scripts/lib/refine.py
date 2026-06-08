@@ -26,6 +26,7 @@ V0.4.0 更新：迁移完整的文本裁切逻辑 (Phase A/B/C)
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 # 尝试导入 fitz
@@ -621,6 +622,199 @@ def trim_far_side_text_post_autocrop(
     return new_clip, was_trimmed
 
 
+def trim_far_side_text_iterative(
+    clip: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    direction: str,
+    *,
+    typical_line_h: Optional[float] = None,
+    max_passes: int = 8,
+) -> Tuple[Any, bool]:
+    """有限迭代清理远端连续正文，遇到非正文内容后停止。"""
+    current = clip
+    changed = False
+
+    for _ in range(max_passes):
+        next_clip, was_trimmed = trim_far_side_text_post_autocrop(
+            current,
+            text_lines,
+            direction,
+            typical_line_h=typical_line_h,
+            scan_lines=3,
+        )
+        if not was_trimmed or next_clip == current:
+            break
+        current = next_clip
+        changed = True
+
+    return current, changed
+
+
+def refine_clip_to_table_band(
+    clip: Any,
+    caption_rect: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    direction: str,
+    *,
+    typical_line_h: Optional[float] = None,
+    min_cells_per_row: int = 2,
+    pad: float = 6.0,
+) -> Tuple[Any, bool]:
+    """从图注一侧识别连续多单元格行带，并收紧表格远端边界。"""
+    if fitz is None or clip.width <= 1 or clip.height <= 1:
+        return clip, False
+
+    row_tolerance = max(2.0, (typical_line_h or 10.0) * 0.45)
+    candidates: List[Tuple[Any, str]] = []
+    for line_rect, _font_size, text in text_lines:
+        txt = text.strip()
+        inter = line_rect & clip
+        if not txt or inter.width <= 0 or inter.height <= 0:
+            continue
+        candidates.append((inter, txt))
+
+    if not candidates:
+        return clip, False
+
+    candidates.sort(key=lambda item: (item[0].y0, item[0].x0))
+    rows: List[List[Tuple[Any, str]]] = []
+    row_centers: List[float] = []
+    for item in candidates:
+        center = (item[0].y0 + item[0].y1) / 2.0
+        if rows and abs(center - row_centers[-1]) <= row_tolerance:
+            rows[-1].append(item)
+            row_centers[-1] = sum((r.y0 + r.y1) / 2.0 for r, _ in rows[-1]) / len(rows[-1])
+        else:
+            rows.append([item])
+            row_centers.append(center)
+
+    def classify_table_row(row: List[Tuple[Any, str]]) -> str:
+        distinct_cells = []
+        for rect, text in sorted(row, key=lambda item: item[0].x0):
+            if distinct_cells and rect.x0 <= distinct_cells[-1][0].x1 + 2.0:
+                previous_rect, previous_text = distinct_cells[-1]
+                distinct_cells[-1] = (previous_rect | rect, previous_text + " " + text)
+            else:
+                distinct_cells.append((rect, text))
+        if len(distinct_cells) > min_cells_per_row:
+            return "strong"
+        row_rect = distinct_cells[0][0]
+        row_text = distinct_cells[0][1]
+        for rect, _text in distinct_cells[1:]:
+            row_rect = row_rect | rect
+            row_text += " " + _text
+        if len(distinct_cells) == min_cells_per_row:
+            if row_rect.width >= clip.width * 0.55:
+                return "strong"
+            if row_rect.width >= clip.width * 0.20 and len(row_text) <= 160:
+                return "weak"
+            return "none"
+        if len(distinct_cells) == 1:
+            word_count = len(row_text.split())
+            sentence_like = (
+                len(row_text) > 100
+                or word_count > 18
+                or (len(row_text) > 70 and row_text.rstrip().endswith((".", "。", "!", "?", "；", ";")))
+            )
+            if (
+                not sentence_like
+                and clip.width * 0.12 <= row_rect.width <= clip.width * 0.92
+            ):
+                return "weak"
+        return "none"
+
+    row_kinds = [classify_table_row(row) for row in rows]
+    use_weak_rows = not any(kind == "strong" for kind in row_kinds)
+    if direction == "above":
+        ordered_indices = list(range(len(rows) - 1, -1, -1))
+    else:
+        ordered_indices = list(range(len(rows)))
+
+    selected: List[int] = []
+    started = False
+    sparse_rows = 0
+    strong_rows = 0
+    weak_rows = 0
+    max_row_gap = max(18.0, (typical_line_h or 10.0) * 2.25)
+    for idx in ordered_indices:
+        if use_weak_rows and started and selected:
+            previous_idx = selected[-1]
+            if direction == "above":
+                gap = min(r.y0 for r, _ in rows[previous_idx]) - max(r.y1 for r, _ in rows[idx])
+            else:
+                gap = min(r.y0 for r, _ in rows[idx]) - max(r.y1 for r, _ in rows[previous_idx])
+            if gap > max_row_gap:
+                break
+
+        if row_kinds[idx] == "strong" or (use_weak_rows and row_kinds[idx] == "weak"):
+            selected.append(idx)
+            started = True
+            sparse_rows = 0
+            if row_kinds[idx] == "strong":
+                strong_rows += 1
+            else:
+                weak_rows += 1
+            continue
+        if started:
+            row_rect = None
+            row_text = ""
+            for rect, text in rows[idx]:
+                row_rect = fitz.Rect(rect) if row_rect is None else row_rect | rect
+                row_text += " " + text
+            is_sparse_label = (
+                row_rect is not None
+                and row_rect.width < clip.width * 0.35
+                and len(row_text.strip()) <= 30
+                and not re.match(r"^\s*\d+(?:\.\d+)+\s+\S", row_text)
+                and sparse_rows < 2
+            )
+            if is_sparse_label:
+                selected.append(idx)
+                sparse_rows += 1
+                continue
+            break
+
+    if len(selected) < 2 or (strong_rows == 0 and weak_rows < 3):
+        return clip, False
+
+    table_rect = None
+    for idx in selected:
+        for rect, _text in rows[idx]:
+            table_rect = fitz.Rect(rect) if table_rect is None else table_rect | rect
+
+    if table_rect is None:
+        return clip, False
+
+    new_clip = fitz.Rect(clip)
+    if direction == "above":
+        new_y0 = max(clip.y0, table_rect.y0 - pad)
+        if new_y0 >= caption_rect.y0 or new_y0 <= clip.y0 + 0.5:
+            return clip, False
+        new_clip = fitz.Rect(clip.x0, new_y0, clip.x1, clip.y1)
+    elif direction == "below":
+        new_y1 = min(clip.y1, table_rect.y1 + pad)
+        if new_y1 <= caption_rect.y1 or new_y1 >= clip.y1 - 0.5:
+            return clip, False
+        new_clip = fitz.Rect(clip.x0, clip.y0, clip.x1, new_y1)
+
+    return new_clip, new_clip != clip
+
+
+def restore_table_clip_width(
+    clip: Any,
+    base_clip: Any,
+    *,
+    table_band_changed: bool,
+    min_width_ratio: float = 0.40,
+) -> Any:
+    """可靠表格行带成立时，恢复被对象裁切误缩成局部列的 X 范围。"""
+    if fitz is None or not table_band_changed or base_clip.width <= 1:
+        return clip
+    if clip.width >= base_clip.width * min_width_ratio:
+        return clip
+    return fitz.Rect(base_clip.x0, clip.y0, base_clip.x1, clip.y1)
+
+
 # ============================================================================
 # 动态验收阈值
 # ============================================================================
@@ -743,6 +937,58 @@ def detect_text_pollution(
             return True, f"text_pollution={wide_text_in_clip}/{text_in_clip} wide_lines"
 
     return False, ""
+
+
+def looks_like_table_text(
+    clip: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    *,
+    min_lines: int = 8,
+    min_short_ratio: float = 0.65,
+    max_wide_long_ratio: float = 0.25,
+    short_text_len: int = 40,
+    wide_ratio: float = 0.55,
+) -> bool:
+    """判断候选框是否以短单元格文本为主，而不是连续正文段落。"""
+    if fitz is None or clip.width <= 1 or clip.height <= 1:
+        return False
+
+    lines_in_clip: List[Tuple[Any, str]] = []
+    for line_rect, _font_size, text in text_lines:
+        txt = text.strip()
+        if not txt:
+            continue
+        inter = line_rect & clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        lines_in_clip.append((inter, txt))
+
+    if len(lines_in_clip) < 3:
+        return False
+
+    short_like = 0
+    wide_long = 0
+    for line_rect, text in lines_in_clip:
+        if len(text) <= short_text_len or line_rect.width < clip.width * wide_ratio:
+            short_like += 1
+        if len(text) > short_text_len and line_rect.width >= clip.width * wide_ratio:
+            wide_long += 1
+
+    short_ratio = short_like / len(lines_in_clip)
+    wide_long_ratio = wide_long / len(lines_in_clip)
+    if len(lines_in_clip) < min_lines:
+        compact_rows = sum(
+            1
+            for line_rect, text in lines_in_clip
+            if (
+                len(text) <= 100
+                and len(text.split()) <= 18
+                and line_rect.width <= clip.width * 0.92
+                and not text.rstrip().endswith((".", "。", "!", "?", "；", ";"))
+            )
+        )
+        return compact_rows >= 3
+    return short_ratio >= min_short_ratio and wide_long_ratio <= max_wide_long_ratio
 
 
 # ============================================================================
@@ -1618,11 +1864,14 @@ __all__ = [
     # 验收阈值
     "adaptive_acceptance_thresholds",
     "detect_text_pollution",
+    "looks_like_table_text",
     "limit_clip_by_neighbor_captions",
     # 边缘对齐
     "snap_clip_edges",
     # X 方向列感知裁剪
     "refine_clip_x_range",
+    "refine_clip_to_table_band",
+    "restore_table_clip_width",
     # 文本裁切辅助
     "is_caption_text",
     "detect_exact_n_lines_of_text",

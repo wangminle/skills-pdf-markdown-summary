@@ -41,11 +41,35 @@ STAGE_COLORS = {
     'phase_a': (0, 200, 0),         # 绿色 - 文本裁切后
     'phase_b': (255, 165, 0),       # 橙色 - 对象对齐后
     'phase_d': (255, 0, 0),         # 红色 - Autocrop 最终窗口
+    'final': (255, 0, 0),           # 红色 - 最终采用窗口
     'fallback': (255, 255, 0),      # 黄色 - 验收失败回退
+    'rejected': (255, 0, 255),      # 洋红 - 最终拒绝窗口
     'caption': (148, 0, 211),       # 紫色 - 图注位置
     'title': (255, 105, 180),       # 粉红 - 章节标题
     'paragraph': (255, 105, 180),   # 粉红 - 正文段落
 }
+
+STAGE_DESCRIPTIONS = {
+    'baseline': 'Caption 锚点生成的原始窗口',
+    'phase_a': '文本裁切后的窗口',
+    'phase_b': '对象边界对齐后的窗口',
+    'phase_d': 'Autocrop 后的窗口',
+    'final': '最终采用的截图窗口',
+    'fallback': '验收失败后的回退窗口',
+    'rejected': '最终拒绝的截图窗口',
+}
+
+
+def create_debug_stage(name: str, bbox: Any, description: Optional[str] = None) -> "DebugStageInfo":
+    """创建字段完整的调试阶段对象，避免调用方重复维护颜色和描述。"""
+    from .models import DebugStageInfo
+
+    return DebugStageInfo(
+        name=name,
+        bbox=bbox,
+        color=STAGE_COLORS.get(name, STAGE_COLORS['final']),
+        description=description or STAGE_DESCRIPTIONS.get(name, name),
+    )
 
 
 # ============================================================================
@@ -182,6 +206,7 @@ def save_debug_visualization(
     kind: str = 'figure',
     layout_model: Optional["DocumentLayoutModel"] = None,
     run_id: Optional[str] = None,
+    file_suffix: str = "stages",
 ) -> Optional[List[str]]:
     """
     保存带多色线框的调试可视化图片。
@@ -213,13 +238,12 @@ def save_debug_visualization(
         os.makedirs(debug_dir, exist_ok=True)
 
         # 创建临时 PDF 文档用于绘图
-        src_doc = page.parent
         temp_doc = fitz.open()
         temp_page = temp_doc.new_page(width=page.rect.width, height=page.rect.height)
 
         # 先渲染原始页面内容（2x 分辨率）
         scale_render = 2.0
-        pix = page.get_pixmap(matrix=fitz.Matrix(scale_render, scale_render), alpha=False)
+        pix = page.get_pixmap(dpi=int(72 * scale_render), alpha=False)
 
         # 在临时页面上插入原始页面的图像
         temp_page.insert_image(temp_page.rect, pixmap=pix)
@@ -267,14 +291,14 @@ def save_debug_visualization(
 
         # 保存可视化图片
         prefix = kind.capitalize()
-        vis_path = os.path.join(debug_dir, f"{prefix}_{fig_no}_p{page_num}_debug_stages.png")
+        vis_path = os.path.join(debug_dir, f"{prefix}_{fig_no}_p{page_num}_debug_{file_suffix}.png")
         final_pix.save(vis_path)
 
         # 关闭临时文档
         temp_doc.close()
 
         # 生成文字图例
-        legend_path = os.path.join(debug_dir, f"{prefix}_{fig_no}_p{page_num}_legend.txt")
+        legend_path = os.path.join(debug_dir, f"{prefix}_{fig_no}_p{page_num}_{file_suffix}_legend.txt")
         _write_legend_file(
             legend_path,
             prefix,
