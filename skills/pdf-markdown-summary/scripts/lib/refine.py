@@ -730,14 +730,52 @@ def refine_clip_to_table_band(
     else:
         ordered_indices = list(range(len(rows)))
 
+    def summarize_row(idx: int) -> Tuple[Any, str]:
+        row_rect = None
+        row_text = ""
+        for rect, text in sorted(rows[idx], key=lambda item: item[0].x0):
+            row_rect = fitz.Rect(rect) if row_rect is None else row_rect | rect
+            row_text += " " + text
+        return row_rect, row_text.strip()
+
+    row_summaries = [summarize_row(idx) for idx in range(len(rows))]
+    max_bridge_gap = max(80.0, (typical_line_h or 10.0) * 7.0)
+
+    def has_future_table_evidence(position: int) -> bool:
+        current_idx = ordered_indices[position]
+        current_rect, _current_text = row_summaries[current_idx]
+        if current_rect is None:
+            return False
+        for future_position in range(position + 1, min(len(ordered_indices), position + 9)):
+            future_idx = ordered_indices[future_position]
+            future_rect, future_text = row_summaries[future_idx]
+            if future_rect is None:
+                continue
+            if direction == "above":
+                distance = current_rect.y0 - future_rect.y1
+            else:
+                distance = future_rect.y0 - current_rect.y1
+            if distance > max_bridge_gap:
+                break
+            if (
+                row_kinds[future_idx] == "strong"
+                or (
+                    row_kinds[future_idx] == "weak"
+                    and bool(re.search(r"\d", future_text))
+                    and future_rect.width <= clip.width * 0.70
+                )
+            ):
+                return True
+        return False
+
     selected: List[int] = []
     started = False
     sparse_rows = 0
     strong_rows = 0
     weak_rows = 0
     max_row_gap = max(18.0, (typical_line_h or 10.0) * 2.25)
-    for idx in ordered_indices:
-        if use_weak_rows and started and selected:
+    for position, idx in enumerate(ordered_indices):
+        if started and selected:
             previous_idx = selected[-1]
             if direction == "above":
                 gap = min(r.y0 for r, _ in rows[previous_idx]) - max(r.y1 for r, _ in rows[idx])
@@ -746,7 +784,23 @@ def refine_clip_to_table_band(
             if gap > max_row_gap:
                 break
 
-        if row_kinds[idx] == "strong" or (use_weak_rows and row_kinds[idx] == "weak"):
+        row_rect, row_text = row_summaries[idx]
+        is_numbered_section = bool(re.match(r"^\s*\d+(?:\.\d+)+\s+\S", row_text))
+        has_numeric_evidence = bool(re.search(r"\d", row_text))
+        weak_has_table_evidence = (
+            row_kinds[idx] == "weak"
+            and not is_numbered_section
+            and (
+                use_weak_rows
+                or (
+                    has_numeric_evidence
+                    and row_rect is not None
+                    and row_rect.width <= clip.width * 0.70
+                )
+                or has_future_table_evidence(position)
+            )
+        )
+        if row_kinds[idx] == "strong" or weak_has_table_evidence:
             selected.append(idx)
             started = True
             sparse_rows = 0
@@ -756,17 +810,13 @@ def refine_clip_to_table_band(
                 weak_rows += 1
             continue
         if started:
-            row_rect = None
-            row_text = ""
-            for rect, text in rows[idx]:
-                row_rect = fitz.Rect(rect) if row_rect is None else row_rect | rect
-                row_text += " " + text
             is_sparse_label = (
                 row_rect is not None
                 and row_rect.width < clip.width * 0.35
-                and len(row_text.strip()) <= 30
-                and not re.match(r"^\s*\d+(?:\.\d+)+\s+\S", row_text)
+                and len(row_text) <= 30
+                and not is_numbered_section
                 and sparse_rows < 2
+                and has_future_table_evidence(position)
             )
             if is_sparse_label:
                 selected.append(idx)
@@ -994,6 +1044,176 @@ def looks_like_table_text(
 # ============================================================================
 # 同页相邻 caption 边界限制
 # ============================================================================
+
+def limit_clip_by_text_blocks(
+    clip: Any,
+    caption_rect: Any,
+    direction: str,
+    text_block_rects: List[Any],
+    *,
+    gap: float = 6.0,
+    min_height: float = 40.0,
+    min_near_distance: float = 80.0,
+) -> Any:
+    """
+    使用远离当前 caption 一侧的正文/标题文本块限制 baseline 高度。
+
+    baseline 由 caption + 固定 clip_height 生成时，容易越过目标图表后继续吞入
+    下一节标题、正文段落或下一张表的 caption。相邻 caption 限制只能处理已识别为
+    Figure/Table caption 的块；这里补充普通版式文本块边界。
+
+    只收紧远离 caption 的一侧：
+    - direction == below：目标在 caption 下方，限制 clip.y1
+    - direction == above：目标在 caption 上方，限制 clip.y0
+
+    min_near_distance 用来跳过 caption 附近的目标图表文本行/表格行带，避免把真实内容
+    当作边界；min_height 防止裁剪窗口被压得过小。
+    """
+    if fitz is None or not text_block_rects:
+        return clip
+
+    def _rect(item: Any) -> Any:
+        return getattr(item, "bbox", item)
+
+    def _text(item: Any) -> str:
+        units = getattr(item, "units", None) or []
+        if units:
+            return " ".join((getattr(u, "text", "") or "").strip() for u in units).strip()
+        return ""
+
+    def _block_type(item: Any) -> str:
+        return getattr(item, "block_type", "") or ""
+
+    def _looks_like_content_block(item: Any) -> bool:
+        r = _rect(item)
+        text = _text(item)
+        words = text.split()
+        word_count = len(words)
+        width_ratio = r.width / max(1.0, clip.width)
+        numeric_count = len(re.findall(r"\d+(?:\.\d+)?%?|[-–]|/", text))
+        has_sentence_end = bool(re.search(r"[.!?。！？；;:,，]$", text.strip()))
+        block_type = _block_type(item)
+        if not text and not block_type:
+            return False
+
+        # 表格/图内部的行带常表现为较短、较窄、多数字或无句末标点；
+        # layout_model 可能把表头误标成 title_h3，因此短标题也先作为内容簇保护，
+        # 后续遇到远端正文/章节标题再收紧。
+        if numeric_count >= 2:
+            return True
+        if word_count <= 10 and not has_sentence_end:
+            return True
+        if width_ratio <= 0.75 and word_count <= 16 and not has_sentence_end:
+            return True
+        if block_type.startswith("title_") and word_count <= 6:
+            return True
+        return False
+
+    def _looks_like_blocker(item: Any) -> bool:
+        r = _rect(item)
+        text = _text(item)
+        words = text.split()
+        word_count = len(words)
+        width_ratio = r.width / max(1.0, clip.width)
+        numeric_count = len(re.findall(r"\d+(?:\.\d+)?%?|[-–]|/", text))
+        block_type = _block_type(item)
+        if not text and not block_type:
+            return True
+        if numeric_count >= 2 and width_ratio <= 0.75:
+            return False
+        if block_type.startswith("title_") and not _looks_like_content_block(item):
+            return True
+        if width_ratio >= 0.55 and word_count >= 8:
+            return True
+        return False
+
+    def _is_supported_short_title(candidates: List[Any], position: int) -> bool:
+        item = candidates[position]
+        if not _block_type(item).startswith("title_") or not _looks_like_content_block(item):
+            return False
+        current = _rect(item)
+        nearby_short_titles = 0
+        for other in candidates:
+            if other is item or not _block_type(other).startswith("title_"):
+                continue
+            other_rect = _rect(other)
+            vertical_gap = max(0.0, current.y0 - other_rect.y1, other_rect.y0 - current.y1)
+            if vertical_gap <= 60.0 and _looks_like_content_block(other):
+                nearby_short_titles += 1
+        if nearby_short_titles >= 2:
+            return True
+        if direction == "below":
+            supporting_candidates = candidates[position + 1:position + 3]
+        else:
+            supporting_candidates = candidates[max(0, position - 2):position]
+        for future in supporting_candidates:
+            future_rect = _rect(future)
+            if direction == "below":
+                distance = future_rect.y0 - current.y1
+            else:
+                distance = future_rect.y0 - current.y1
+            if distance > min_near_distance:
+                continue
+            if (
+                not _block_type(future).startswith("title_")
+                and _looks_like_content_block(future)
+                and not _looks_like_blocker(future)
+            ):
+                return True
+        return False
+
+    if direction == "below":
+        candidates = [
+            item for item in text_block_rects
+            if _rect(item).y0 > clip.y0 and _rect(item).y0 < clip.y1
+        ]
+        candidates.sort(key=lambda item: _rect(item).y0)
+        blocker = None
+        for position, item in enumerate(candidates):
+            r = _rect(item)
+            if r.y0 < caption_rect.y1 + min_near_distance:
+                continue
+            if _block_type(item).startswith("title_") and not _is_supported_short_title(candidates, position):
+                blocker = r
+                break
+            if _looks_like_content_block(item) and not _looks_like_blocker(item):
+                continue
+            if _looks_like_blocker(item):
+                blocker = r
+                break
+        if blocker is None:
+            return clip
+        limited = fitz.Rect(clip.x0, clip.y0, clip.x1, blocker.y0 - gap)
+    elif direction == "above":
+        candidates = [
+            item for item in text_block_rects
+            if _rect(item).y1 > clip.y0 and _rect(item).y1 < clip.y1
+        ]
+        candidates.sort(key=lambda item: _rect(item).y1, reverse=True)
+        blocker = None
+        for position, item in enumerate(candidates):
+            r = _rect(item)
+            if r.y1 > caption_rect.y0 - min_near_distance:
+                continue
+            if _block_type(item).startswith("title_") and not _is_supported_short_title(candidates, position):
+                blocker = r
+                break
+            if _looks_like_content_block(item) and not _looks_like_blocker(item):
+                continue
+            if _looks_like_blocker(item):
+                blocker = r
+                break
+        if blocker is None:
+            return clip
+        limited = fitz.Rect(clip.x0, blocker.y1 + gap, clip.x1, clip.y1)
+    else:
+        return clip
+
+    if limited.height < min_height:
+        return clip
+    return limited
+
+
 
 def limit_clip_by_neighbor_captions(
     clip: Any,
@@ -1865,6 +2085,7 @@ __all__ = [
     "adaptive_acceptance_thresholds",
     "detect_text_pollution",
     "looks_like_table_text",
+    "limit_clip_by_text_blocks",
     "limit_clip_by_neighbor_captions",
     # 边缘对齐
     "snap_clip_edges",

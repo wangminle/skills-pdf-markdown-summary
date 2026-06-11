@@ -757,6 +757,11 @@ def is_caption_reference(
         if text_lower.startswith(prefix):
             return True
 
+    # 明确的冒号 caption 可能与前一段正文被 PDF 编码在同一个大文本块中；
+    # 其语法本身比块行数更可靠，不能因长块上下文被误判成正文引用。
+    if re.match(r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*[:：]", text, re.IGNORECASE):
+        return False
+
     num_lines = len(block.get("lines", []))
     total_text_len = sum(
         len("".join(sp.get("text", "") for sp in ln.get("spans", [])))

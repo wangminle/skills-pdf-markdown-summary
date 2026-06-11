@@ -24,6 +24,9 @@
 | BUG-012 | 修复 | GPT-5 System Card 的短表、单文本块表格被拒绝，部分表格被对象裁切缩成局部列 | 2026-06-06 | 已修复 | 表格行带增加弱结构模式；短表支持三行结构验收；可靠行带成立且最终 X 范围异常窄时恢复 baseline 宽度 |
 | BUG-013 | 修复 | 表格方向评分把短数字单元格误当页脚，并被相邻 Figure、下一张表和章节标题干扰 | 2026-06-06 | 已修复 | 页脚过滤限定到页面底部；方向评分改用最近结构化多单元格行；编号式章节标题不再作为稀疏表格尾行 |
 | BUG-014 | 修复 | Gemini 正文句子 `Table 4, we compare...` 被当作图注，真实 Table 4 未提取 | 2026-06-06 | 已修复 | 新增该类正文引用模式，并在 Table 扫描入口实际调用 `is_caption_reference()` 跳过引用候选 |
+| BUG-015 | 修复 | Qwen 显式 `Table N:` caption 位于长文本块时被正文引用逻辑误拒绝，导致 Table 9 缺失 | 2026-06-11 | 已修复 | 显式冒号 caption 不再仅因文本块较长被拒绝，同时保留普通正文引用过滤 |
+| BUG-016 | 修复 | Qwen 多个表格的分组标题和紧凑数字行未进入连续表格行带，导致 Tables 10 至 13 截断 | 2026-06-11 | 已修复 | 连续行带支持具有后续表格证据的桥接行和紧凑数字弱表格行，并限制弱行宽度以避免正文污染 |
+| BUG-017 | 修复 | 通用正文边界阻断把图内短标签和紧凑数字块误判为正文，放宽后又造成 DeepSeek 回归 | 2026-06-11 | 已修复 | 改为方向感知的短标题判定，保护邻近短标签聚类和非全宽紧凑数字块，同时继续阻断孤立标题、正文和全宽数字段落 |
 
 ## 调整事项
 
@@ -65,6 +68,7 @@
 | TST-003 | 检查 | 实测 PDF-to-Markdown 导出功能并补充 CLI 输出路径回归测试 | 2026-06-06 | 已完成 | 新增 `tests/scripts/test_pdf_to_markdown_cli.py` 并接入 `run_all.py`；`run_all.py --skip-golden` 当前 149 通过、0 失败；DeepSeek Markdown 导出产物位于 `tests/results/20260606/DeepSeek_V3_2_markdown_export_fixed2/` |
 | TST-004 | 检查 | 反复对照画线输出验证 DeepSeek_V3_2 与 FunAudio-ASR 截图区域 | 2026-06-06 | 已完成 | 最终输出位于 `tests/results/20260606-012/`；逐图核对 DeepSeek 4 图 + 1 表、FunAudio 4 图 + 8 表均完整且未混入正文/章节标题；`run_all.py --skip-golden` 为 158 通过、0 失败 |
 | TST-005 | 检查 | 使用 GPT-5 System Card、Gemini 2.5 Report 扩展验证截图算法，并确保 DeepSeek/FunAudio 不退化 | 2026-06-06 | 已完成 | 最终输出位于 `tests/results/20260606-022/`；GPT-5 为 31 图 + 26 表，Gemini 为 14 图 + 12 表；画线与总览目视确认 GPT Table 7/8、Gemini Table 3/4/11 等关键边界正确；DeepSeek 4 图 + 1 表、FunAudio 4 图 + 8 表与 `20260606-012` 逐图 SHA-256 完全一致；`run_all.py --skip-golden` 为 166 通过、0 失败 |
+| TST-006 | 检查 | 使用 Attention、Qwen3-Omni、HFT Risk Books 扩展画线调试，并回归既有四份 PDF | 2026-06-11 | 已完成 | 最终输出位于 `tests/results/20260611-007/`；新增三份分别为 5 图 + 4 表、3 图 + 18 表、8 图 + 1 表；既有四份无图表缺失或已知视觉退化；FunAudio 逐图哈希完全一致；完整测试 178 通过、0 失败 |
 
 ## 文档维护
 
@@ -84,6 +88,7 @@
 | DOC-012 | 文档 | 在 `AGENTS.md` 中新增 Basic Benchmark 实测输出目录规则 | 2026-06-05 | 已完成 | 实际 PDF 文档测试优先使用 `tests/basic-benchmark/`，输出写入 `tests/results/<YYYYMMDD>/<pdf-name>/`，并按 `markdown/`、`assets/`、`images/`、`txt/` 分层保存 |
 | DOC-013 | 文档 | 记录 DeepSeek_V3_2 与 FunAudio-ASR 截图区域调优和修复完整过程 | 2026-06-06 | 已完成 | 新增 `docs/PDF图表截图区域调优与修复完整记录-20260606.md`，记录初始问题、逐轮调优、根因、最终流程、代码改动、验证结果和后续建议；已核对文档关键记录并通过 `git diff --check` |
 | DOC-014 | 文档 | 补充 GPT-5 System Card 与 Gemini 2.5 Report 扩展调优全过程 | 2026-06-06 | 已完成 | 在 `docs/PDF图表截图区域调优与修复完整记录-20260606.md` 增补批次 `20260606-013` 至 `20260606-022`、新增根因、最终结果和回归结论 |
+| DOC-015 | 文档 | 记录新增三份 PDF 调优与既有四份 PDF 回归验证全过程 | 2026-06-11 | 已完成 | 新增 `docs/PDF图表截图区域调优与修复完整记录-20260611.md`，记录问题分类、算法调整、测试覆盖、七份 PDF 最终结果和不回退判定方法 |
 
 ## 功能开发
 

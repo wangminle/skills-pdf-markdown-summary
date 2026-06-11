@@ -49,6 +49,7 @@ from .refine import (
     refine_clip_x_range,
     detect_text_pollution,
     limit_clip_by_neighbor_captions,
+    limit_clip_by_text_blocks,
 )
 from .extract_helpers import (
     collect_draw_items,
@@ -390,6 +391,21 @@ def extract_figures(
                         caption_bbox,
                         direction,
                         neighbor_caption_rects,
+                        gap=caption_gap,
+                    )
+
+                if layout_model is not None:
+                    text_blocks_for_limit = [
+                        block
+                        for block in layout_model.text_blocks.get(pno, [])
+                        if block.block_type in ['paragraph_group', 'list_group']
+                        or block.block_type.startswith('title_')
+                    ]
+                    base_clip = limit_clip_by_text_blocks(
+                        base_clip,
+                        caption_bbox,
+                        direction,
+                        text_blocks_for_limit,
                         gap=caption_gap,
                     )
                 clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)

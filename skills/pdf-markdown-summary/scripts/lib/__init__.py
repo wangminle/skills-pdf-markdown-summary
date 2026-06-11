@@ -83,6 +83,7 @@ from .refine import (
     detect_text_pollution,
     estimate_ink_ratio,
     limit_clip_by_neighbor_captions,
+    limit_clip_by_text_blocks,
     merge_rects,
     refine_clip_by_objects,
     refine_clip_x_range,

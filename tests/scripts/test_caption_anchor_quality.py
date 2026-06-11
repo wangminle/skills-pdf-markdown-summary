@@ -34,10 +34,38 @@ from lib.models import DocumentLayoutModel, EnhancedTextUnit, TextBlock
 from lib.refine import (
     detect_text_pollution,
     limit_clip_by_neighbor_captions,
+    limit_clip_by_text_blocks,
     looks_like_table_text,
     refine_clip_to_table_band,
     trim_far_side_text_iterative,
 )
+
+
+def _make_text_block(
+    rect: "fitz.Rect",
+    text: str,
+    block_type: str = "paragraph_group",
+    column: int = 0,
+) -> TextBlock:
+    text_type = block_type if block_type.startswith("title_") else "paragraph"
+    unit = EnhancedTextUnit(
+        bbox=rect,
+        text=text,
+        page=0,
+        font_name="Test",
+        font_size=10.0,
+        font_weight="regular",
+        font_flags=0,
+        color=(0, 0, 0),
+        text_type=text_type,
+        confidence=1.0,
+        column=column,
+        indent=rect.x0,
+        block_idx=0,
+        line_idx=0,
+    )
+    return TextBlock(rect, [unit], block_type, 0, column)
+
 
 
 def _make_caption_test_pdf(path: Path) -> None:
@@ -187,6 +215,269 @@ def test_table_band_removes_body_and_keeps_full_table() -> None:
     assert refined.y1 == clip.y1
 
 
+def test_baseline_clip_stops_before_far_section_title_below_caption() -> None:
+    clip = fitz.Rect(26, 98, 586, 618)
+    caption = fitz.Rect(108, 71, 504, 92)
+    text_blocks = [
+        # 真实表格内容，位于 caption 附近，不能作为远端边界。
+        fitz.Rect(136, 98, 475, 240),
+        # 下一个章节标题，应该把 below 方向 baseline 底部夹到它之前。
+        fitz.Rect(108, 371, 163, 383),
+        fitz.Rect(108, 418, 505, 592),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "below",
+        text_blocks,
+        gap=6,
+        min_near_distance=120,
+    )
+
+    assert limited.y0 == clip.y0
+    assert 360 <= limited.y1 <= 365, limited
+
+
+def test_baseline_clip_stops_after_far_body_above_caption() -> None:
+    clip = fitz.Rect(26, 0, 586, 494)
+    caption = fitz.Rect(134, 500, 478, 511)
+    text_blocks = [
+        fitz.Rect(86, 197, 526, 289),
+        fitz.Rect(86, 302, 526, 398),
+        # 真实表格标题和内容，位于 caption 附近。
+        fitz.Rect(198, 409, 468, 420),
+        fitz.Rect(144, 423, 423, 488),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "above",
+        text_blocks,
+        gap=6,
+        min_near_distance=100,
+    )
+
+    assert limited.y1 == clip.y1
+    assert 403 <= limited.y0 <= 416, limited
+
+
+def test_baseline_clip_preserves_near_table_cluster_before_far_body() -> None:
+    clip = fitz.Rect(26, 98, 569, 508)
+    caption = fitz.Rect(70, 71, 525, 92)
+    blocks = [
+        _make_text_block(fitz.Rect(160, 104, 435, 114), "Module Architecture", "title_h3", 1),
+        _make_text_block(fitz.Rect(160, 120, 413, 141), "Audio Encoder AuT", "paragraph_group", 1),
+        _make_text_block(fitz.Rect(160, 142, 375, 152), "Thinker MoE Transformer", "paragraph_group", 1),
+        _make_text_block(
+            fitz.Rect(70, 225, 525, 301),
+            "asynchronous prefilling: when Thinker completes prefilling the current chunk, the next body paragraph starts.",
+            "paragraph_group",
+            0,
+        ),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "below",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert 215 <= limited.y1 <= 220, limited
+
+
+def test_baseline_clip_preserves_table_header_above_caption() -> None:
+    clip = fitz.Rect(26, 0, 586, 494)
+    caption = fitz.Rect(134, 500, 478, 511)
+    blocks = [
+        _make_text_block(
+            fitz.Rect(86, 302, 526, 398),
+            "(v, t) augmented with various subsets of the order book features described above.",
+            "paragraph_group",
+            0,
+        ),
+        _make_text_block(
+            fitz.Rect(198, 409, 468, 420),
+            "Feature(s) Added Reduction in Trading Cost",
+            "title_h3",
+            1,
+        ),
+        _make_text_block(
+            fitz.Rect(144, 423, 423, 488),
+            "Bid-Ask Spread 7.97% Bid-Ask Volume 8.54%",
+            "paragraph_group",
+            1,
+        ),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "above",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert 400 <= limited.y0 <= 409, limited
+    assert limited.y1 == clip.y1
+
+
+def test_baseline_clip_preserves_wide_numeric_table_blocks() -> None:
+    clip = fitz.Rect(26, 0, 586, 326)
+    caption = fitz.Rect(70, 332, 526, 412)
+    blocks = [
+        _make_text_block(
+            fitz.Rect(120, 90, 519, 101),
+            "Benchmark Metric DeepSeek-V3.1-Terminus DeepSeek-V3.2-Exp",
+            "title_h3",
+            1,
+        ),
+        _make_text_block(
+            fitz.Rect(120, 109, 479, 166),
+            "MMLU-Pro 85.0 85.0 GPQA-Diamond 80.7 79.9 Humanity 21.7 19.8",
+            "paragraph_group",
+            1,
+        ),
+        _make_text_block(
+            fitz.Rect(120, 182, 479, 258),
+            "SimpleQA 96.8 97.1 Codeforces 2046 2121 Aider 76.1 74.5",
+            "paragraph_group",
+            1,
+        ),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "above",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert limited == clip
+
+
+def test_baseline_clip_preserves_clustered_diagram_labels() -> None:
+    clip = fitz.Rect(26, 0, 569, 314)
+    caption = fitz.Rect(70, 320, 526, 345)
+    blocks = [
+        _make_text_block(fitz.Rect(296, 170, 361, 186), "Top-k Selector", "title_h3", 1),
+        _make_text_block(fitz.Rect(421, 194, 463, 209), "Lightning", "title_h3", 1),
+        _make_text_block(fitz.Rect(425, 207, 459, 222), "Indexer", "title_h3", 1),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "above",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert limited == clip
+
+
+def test_baseline_clip_stops_at_wide_numeric_body_block() -> None:
+    clip = fitz.Rect(26, 100, 569, 500)
+    caption = fitz.Rect(70, 71, 525, 92)
+    blocks = [
+        _make_text_block(
+            fitz.Rect(70, 280, 526, 360),
+            "Qwen3 has 234 values and 547 parameters in this full width body paragraph.",
+            "paragraph_group",
+            0,
+        ),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "below",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert 270 <= limited.y1 <= 276, limited
+
+
+def test_baseline_clip_stops_before_far_short_title_followed_by_body() -> None:
+    clip = fitz.Rect(26, 521, 569, 842)
+    caption = fitz.Rect(70, 493, 524, 515)
+    blocks = [
+        _make_text_block(fitz.Rect(169, 529, 520, 546), "Best Specialist GPT-4o", "title_h3", 1),
+        _make_text_block(fitz.Rect(181, 570, 490, 589), "75.5 74.9", "paragraph_group", 1),
+        _make_text_block(fitz.Rect(274, 674, 490, 693), "87.3 86.1", "paragraph_group", 1),
+        _make_text_block(
+            fitz.Rect(93, 699, 362, 709),
+            "Qualitative Results from Qwen3-Omni-30B-A3B-Captioner",
+            "title_h3",
+            1,
+        ),
+        _make_text_block(
+            fitz.Rect(71, 720, 525, 774),
+            "In this section, we illustrate the performance of our finetuned Qwen3 model.",
+            "paragraph_group",
+            0,
+        ),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "below",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert 690 <= limited.y1 <= 695, limited
+
+
+def test_baseline_clip_stops_after_isolated_far_title_above_caption() -> None:
+    clip = fitz.Rect(26, 0, 586, 306)
+    caption = fitz.Rect(108, 312, 504, 355)
+    blocks = [
+        _make_text_block(fitz.Rect(108, 73, 231, 85), "Attention Visualizations", "title_h2", 0),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "above",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert 90 <= limited.y0 <= 92, limited
+
+
+def test_baseline_clip_keeps_original_when_limit_would_be_too_short() -> None:
+    clip = fitz.Rect(26, 98, 586, 160)
+    caption = fitz.Rect(108, 71, 504, 92)
+    text_blocks = [fitz.Rect(108, 120, 500, 132)]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "below",
+        text_blocks,
+        gap=6,
+        min_height=40,
+        min_near_distance=20,
+    )
+
+    assert limited == clip
+
+
 def test_table_band_excludes_narrow_two_part_section_heading() -> None:
     clip = fitz.Rect(50, 50, 550, 400)
     caption = fitz.Rect(80, 405, 520, 425)
@@ -234,6 +525,39 @@ def test_table_band_excludes_numbered_section_heading_after_table() -> None:
     )
     assert changed
     assert refined.y1 < 170, refined
+
+
+def test_table_band_keeps_category_row_and_following_data_rows() -> None:
+    clip = fitz.Rect(50, 50, 550, 430)
+    caption = fitz.Rect(80, 35, 520, 45)
+    text_lines = [
+        (fitz.Rect(80, 70, 170, 80), 8.0, "Datasets"),
+        (fitz.Rect(210, 70, 340, 80), 8.0, "Model"),
+        (fitz.Rect(390, 70, 500, 80), 8.0, "Performance"),
+        (fitz.Rect(80, 90, 230, 100), 8.0, "Content Consistency"),
+        (fitz.Rect(80, 110, 500, 120), 8.0, "Seed-TTS Qwen3-Omni 2.14 3.02 0.91"),
+        (fitz.Rect(80, 130, 245, 140), 8.0, "test-zh Qwen3-Omni"),
+        (fitz.Rect(390, 130, 500, 140), 8.0, "2.08 3.17 0.92"),
+        (fitz.Rect(80, 150, 245, 160), 8.0, "test-en Qwen3-Omni"),
+        (fitz.Rect(390, 150, 500, 160), 8.0, "1.96 3.28 0.93"),
+    ]
+    for row in range(6):
+        y0 = 230 + row * 16
+        text_lines.append((
+            fitz.Rect(60, y0, 540, y0 + 10),
+            10.0,
+            "Qwen3 is a long body paragraph line after the structured table.",
+        ))
+
+    refined, changed = refine_clip_to_table_band(
+        clip,
+        caption,
+        text_lines,
+        "below",
+        typical_line_h=12,
+    )
+    assert changed
+    assert 164 <= refined.y1 <= 172, refined
 
 
 def test_table_band_recognizes_compact_single_block_rows() -> None:
@@ -398,6 +722,20 @@ def test_table_appendix_reference_is_not_caption_context() -> None:
     )
 
 
+def test_colon_caption_is_not_reference_even_inside_long_text_block() -> None:
+    long_block = {
+        "lines": [
+            {"spans": [{"text": "A long body paragraph line before the caption."}]}
+            for _ in range(8)
+        ],
+    }
+    assert not is_caption_reference(
+        "Table 9: Vision to Text performance of Qwen3-Omni.",
+        long_block,
+        re.compile(r"^Table\s+\d+"),
+    )
+
+
 def test_limit_clip_by_neighbor_captions_bounds_same_page_items() -> None:
     clip_above = fitz.Rect(50, 50, 550, 500)
     current_caption = fitz.Rect(80, 505, 520, 525)
@@ -541,6 +879,17 @@ def main() -> int:
         test_table_band_removes_body_and_keeps_full_table,
         test_table_band_excludes_narrow_two_part_section_heading,
         test_table_band_excludes_numbered_section_heading_after_table,
+        test_table_band_keeps_category_row_and_following_data_rows,
+        test_baseline_clip_stops_before_far_section_title_below_caption,
+        test_baseline_clip_stops_after_far_body_above_caption,
+        test_baseline_clip_preserves_near_table_cluster_before_far_body,
+        test_baseline_clip_preserves_table_header_above_caption,
+        test_baseline_clip_preserves_wide_numeric_table_blocks,
+        test_baseline_clip_preserves_clustered_diagram_labels,
+        test_baseline_clip_stops_at_wide_numeric_body_block,
+        test_baseline_clip_stops_before_far_short_title_followed_by_body,
+        test_baseline_clip_stops_after_isolated_far_title_above_caption,
+        test_baseline_clip_keeps_original_when_limit_would_be_too_short,
         test_table_band_recognizes_compact_single_block_rows,
         test_looks_like_table_text_accepts_short_compact_table,
         test_restore_table_clip_width_recovers_over_narrow_structured_table,
@@ -548,6 +897,7 @@ def main() -> int:
         test_table_direction_keeps_short_numeric_cells_as_evidence,
         test_table_direction_prefers_nearest_structured_rows_over_chart_labels,
         test_table_appendix_reference_is_not_caption_context,
+        test_colon_caption_is_not_reference_even_inside_long_text_block,
         test_limit_clip_by_neighbor_captions_bounds_same_page_items,
         test_table_direction_uses_text_structure_above_caption,
         test_table_direction_uses_text_structure_below_caption,
