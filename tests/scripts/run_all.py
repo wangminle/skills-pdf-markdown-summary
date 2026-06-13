@@ -226,6 +226,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             "args": [],
         })
 
+        test_suites.append({
+            "name": "健壮性与一致性修复测试",
+            "path": TESTS_SCRIPTS_DIR / "test_maintenance_fixes.py",
+            "args": [],
+        })
+
     if not args.skip_regex:
         test_suites.append({
             "name": "正则表达式测试",

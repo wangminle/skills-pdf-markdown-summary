@@ -23,6 +23,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--preset", default="robust", choices=["robust"])
     parser.add_argument("--allow-continued", action="store_true", default=False)
     parser.add_argument("--out-dir", default=None, help="Output image directory")
+    parser.add_argument("--text-path", default=None, help="Prepared plain-text path")
+    parser.add_argument(
+        "--reuse-existing",
+        action="store_true",
+        help="Reuse an existing index.json and text file instead of extracting again",
+    )
     return parser.parse_args(argv)
 
 
@@ -33,24 +39,40 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"PDF not found: {pdf_path}", file=sys.stderr)
         return 1
 
-    from core.extract_pdf_assets import main as extract_main
-
-    extraction_args = ["--pdf", pdf_path, "--preset", args.preset]
-    if args.out_dir:
-        extraction_args.extend(["--out-dir", args.out_dir])
-    if args.allow_continued:
-        extraction_args.append("--allow-continued")
-
-    exit_code = extract_main(extraction_args)
-    if exit_code != 0:
-        return exit_code
-
     pdf_dir = os.path.dirname(pdf_path)
     stem = os.path.splitext(os.path.basename(pdf_path))[0]
+    out_dir = os.path.abspath(args.out_dir or os.path.join(pdf_dir, "images"))
+    text_path = os.path.abspath(args.text_path or os.path.join(pdf_dir, "text", stem + ".txt"))
+
+    if args.reuse_existing:
+        missing = [
+            path
+            for path in (os.path.join(out_dir, "index.json"), text_path)
+            if not os.path.exists(path)
+        ]
+        if missing:
+            print(f"Cannot reuse summary assets; missing: {', '.join(missing)}", file=sys.stderr)
+            return 1
+    else:
+        from core.extract_pdf_assets import main as extract_main
+
+        extraction_args = [
+            "--pdf", pdf_path,
+            "--preset", args.preset,
+            "--out-dir", out_dir,
+            "--out-text", text_path,
+        ]
+        if args.allow_continued:
+            extraction_args.append("--allow-continued")
+
+        exit_code = extract_main(extraction_args)
+        if exit_code != 0:
+            return exit_code
+
     today = datetime.now().strftime("%Y%m%d")
     print("Summary assets prepared.")
-    print(f"Read text: {os.path.join(pdf_dir, 'text', stem + '.txt')}")
-    print(f"Inspect images: {os.path.join(pdf_dir, 'images')}")
+    print(f"Read text: {text_path}")
+    print(f"Inspect images: {out_dir}")
     print(f"Suggested summary: {os.path.join(pdf_dir, stem + '_阅读摘要-' + today + '.md')}")
     return 0
 

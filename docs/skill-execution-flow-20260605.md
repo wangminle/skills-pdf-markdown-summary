@@ -1,6 +1,6 @@
 # pdf-markdown-summary Skill 执行流程图
 
-> 生成日期: 2025-06-05
+> 生成日期: 2026-06-05（2026-06-13 更新：Step B 复用机制）
 
 ## 整体架构
 
@@ -45,12 +45,13 @@
      |
      v
  +----+------------------------+
- | Step B: 摘要准备            |
- |   summarize_pdf.py         |
+ | Step B: 摘要准备 (--reuse-existing) |
+ |   summarize_pdf.py                   |
  +----+------------------------+
      |
-     |--[B1] extract_pdf_assets.main() -> images/ + text/
-     |--[B2] 打印摘要建议路径
+     |--[B1] 复用 Step A 产物: 命中 index.json + text/ 则跳过提取 (BUG-019/M2)
+     |--[B2] 未命中时才 extract_pdf_assets.main() -> images/ + text/
+     |--[B3] 打印摘要建议路径
      |
      v
  输出: {stem}.md + images/ + text/ + 摘要提示

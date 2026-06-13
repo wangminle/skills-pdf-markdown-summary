@@ -775,6 +775,7 @@ def refine_clip_to_table_band(
     weak_rows = 0
     max_row_gap = max(18.0, (typical_line_h or 10.0) * 2.25)
     for position, idx in enumerate(ordered_indices):
+        row_rect, row_text = row_summaries[idx]
         if started and selected:
             previous_idx = selected[-1]
             if direction == "above":
@@ -782,9 +783,22 @@ def refine_clip_to_table_band(
             else:
                 gap = min(r.y0 for r, _ in rows[idx]) - max(r.y1 for r, _ in rows[previous_idx])
             if gap > max_row_gap:
-                break
+                word_count = len(row_text.split())
+                numeric_count = len(re.findall(r"\d+(?:\.\d+)?%?", row_text))
+                sentence_like = (
+                    len(row_text) > 100
+                    or word_count > 18
+                    or (word_count >= 12 and numeric_count < 2)
+                )
+                bridges_strong_group = (
+                    gap <= max_bridge_gap
+                    and row_kinds[previous_idx] == "strong"
+                    and row_kinds[idx] == "strong"
+                    and not sentence_like
+                )
+                if not bridges_strong_group:
+                    break
 
-        row_rect, row_text = row_summaries[idx]
         is_numbered_section = bool(re.match(r"^\s*\d+(?:\.\d+)+\s+\S", row_text))
         has_numeric_evidence = bool(re.search(r"\d", row_text))
         weak_has_table_evidence = (
@@ -1084,6 +1098,44 @@ def limit_clip_by_text_blocks(
     def _block_type(item: Any) -> str:
         return getattr(item, "block_type", "") or ""
 
+    caption_center = (caption_rect.x0 + caption_rect.x1) / 2.0
+    clip_center = (clip.x0 + clip.x1) / 2.0
+    caption_column_guess = 0 if caption_center <= clip_center else 1
+    caption_is_narrow = caption_rect.width <= clip.width * 0.65
+    column_band_pad = max(24.0, min(72.0, caption_rect.width * 0.35))
+    caption_band_x0 = max(clip.x0, caption_rect.x0 - column_band_pad)
+    caption_band_x1 = min(clip.x1, caption_rect.x1 + column_band_pad)
+
+    def _item_column(item: Any) -> Optional[int]:
+        column = getattr(item, "column", None)
+        if isinstance(column, int):
+            return column
+        units = getattr(item, "units", None) or []
+        unit_columns = {
+            getattr(unit, "column", None)
+            for unit in units
+            if isinstance(getattr(unit, "column", None), int)
+        }
+        if len(unit_columns) == 1:
+            return next(iter(unit_columns))
+        return None
+
+    def _shares_caption_column(item: Any) -> bool:
+        if not caption_is_narrow:
+            return True
+
+        item_column = _item_column(item)
+        if item_column in (0, 1):
+            return item_column == caption_column_guess
+        if item_column == -1:
+            return True
+
+        r = _rect(item)
+        overlap = min(r.x1, caption_band_x1) - max(r.x0, caption_band_x0)
+        if overlap > 0:
+            return True
+        return r.x0 <= caption_center <= r.x1
+
     def _looks_like_content_block(item: Any) -> bool:
         r = _rect(item)
         text = _text(item)
@@ -1165,7 +1217,7 @@ def limit_clip_by_text_blocks(
     if direction == "below":
         candidates = [
             item for item in text_block_rects
-            if _rect(item).y0 > clip.y0 and _rect(item).y0 < clip.y1
+            if _rect(item).y0 > clip.y0 and _rect(item).y0 < clip.y1 and _shares_caption_column(item)
         ]
         candidates.sort(key=lambda item: _rect(item).y0)
         blocker = None
@@ -1187,7 +1239,7 @@ def limit_clip_by_text_blocks(
     elif direction == "above":
         candidates = [
             item for item in text_block_rects
-            if _rect(item).y1 > clip.y0 and _rect(item).y1 < clip.y1
+            if _rect(item).y1 > clip.y0 and _rect(item).y1 < clip.y1 and _shares_caption_column(item)
         ]
         candidates.sort(key=lambda item: _rect(item).y1, reverse=True)
         blocker = None

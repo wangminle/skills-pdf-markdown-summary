@@ -460,6 +460,25 @@ def test_baseline_clip_stops_after_isolated_far_title_above_caption() -> None:
     assert 90 <= limited.y0 <= 92, limited
 
 
+def test_baseline_clip_ignores_other_column_title_above_caption() -> None:
+    clip = fitz.Rect(26, 0, 586, 306)
+    caption = fitz.Rect(108, 312, 250, 355)
+    blocks = [
+        _make_text_block(fitz.Rect(330, 73, 520, 85), "Attention Visualizations", "title_h2", 1),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "above",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert limited == clip
+
+
 def test_baseline_clip_keeps_original_when_limit_would_be_too_short() -> None:
     clip = fitz.Rect(26, 98, 586, 160)
     caption = fitz.Rect(108, 71, 504, 92)
@@ -558,6 +577,58 @@ def test_table_band_keeps_category_row_and_following_data_rows() -> None:
     )
     assert changed
     assert 164 <= refined.y1 <= 172, refined
+
+
+def test_table_band_keeps_strong_rows_across_group_spacing() -> None:
+    clip = fitz.Rect(50, 50, 550, 220)
+    caption = fitz.Rect(80, 35, 520, 45)
+    text_lines = []
+    for y0 in (70, 90, 130):
+        for col in range(3):
+            x0 = 80 + col * 140
+            text_lines.append((fitz.Rect(x0, y0, x0 + 80, y0 + 10), 8.0, f"{y0}-{col}"))
+
+    refined, changed = refine_clip_to_table_band(
+        clip,
+        caption,
+        text_lines,
+        "below",
+        typical_line_h=12,
+    )
+    assert changed
+    assert 144 <= refined.y1 <= 146, refined
+
+
+def test_table_band_stops_before_sentence_like_strong_row_after_gap() -> None:
+    clip = fitz.Rect(50, 50, 550, 260)
+    caption = fitz.Rect(80, 35, 520, 45)
+    text_lines = []
+    for y0 in (70, 90, 110):
+        for col in range(3):
+            x0 = 80 + col * 140
+            text_lines.append((fitz.Rect(x0, y0, x0 + 80, y0 + 10), 8.0, f"{y0}-{col}"))
+    text_lines.extend([
+        (
+            fitz.Rect(70, 160, 300, 170),
+            10.0,
+            "This wide body sentence is split into two horizontal blocks and must not",
+        ),
+        (
+            fitz.Rect(310, 160, 530, 170),
+            10.0,
+            "be bridged into the structured table after a large vertical gap.",
+        ),
+    ])
+
+    refined, changed = refine_clip_to_table_band(
+        clip,
+        caption,
+        text_lines,
+        "below",
+        typical_line_h=12,
+    )
+    assert changed
+    assert 124 <= refined.y1 <= 126, refined
 
 
 def test_table_band_recognizes_compact_single_block_rows() -> None:
@@ -880,6 +951,8 @@ def main() -> int:
         test_table_band_excludes_narrow_two_part_section_heading,
         test_table_band_excludes_numbered_section_heading_after_table,
         test_table_band_keeps_category_row_and_following_data_rows,
+        test_table_band_keeps_strong_rows_across_group_spacing,
+        test_table_band_stops_before_sentence_like_strong_row_after_gap,
         test_baseline_clip_stops_before_far_section_title_below_caption,
         test_baseline_clip_stops_after_far_body_above_caption,
         test_baseline_clip_preserves_near_table_cluster_before_far_body,
@@ -889,6 +962,7 @@ def main() -> int:
         test_baseline_clip_stops_at_wide_numeric_body_block,
         test_baseline_clip_stops_before_far_short_title_followed_by_body,
         test_baseline_clip_stops_after_isolated_far_title_above_caption,
+        test_baseline_clip_ignores_other_column_title_above_caption,
         test_baseline_clip_keeps_original_when_limit_would_be_too_short,
         test_table_band_recognizes_compact_single_block_rows,
         test_looks_like_table_text_accepts_short_compact_table,

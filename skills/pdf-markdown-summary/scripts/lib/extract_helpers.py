@@ -111,11 +111,18 @@ def collect_draw_items(page: "fitz.Page") -> List[DrawItem]:
         for dr in page.get_drawings():
             r = dr.get("rect")
             if r is None:
-                # 回退：尝试通过项的边界框联合来近似
+                # 回退：drawing item 的第 0 项是命令名，几何对象位于后续字段。
                 union: Optional[fitz.Rect] = None
                 for it in dr.get("items", []):
-                    rb = it[0] if it and isinstance(it[0], fitz.Rect) else None
-                    if rb:
+                    for geometry in it[1:]:
+                        if isinstance(geometry, fitz.Rect):
+                            rb = fitz.Rect(geometry)
+                        elif isinstance(geometry, fitz.Quad):
+                            rb = geometry.rect
+                        elif isinstance(geometry, fitz.Point):
+                            rb = fitz.Rect(geometry.x, geometry.y, geometry.x, geometry.y)
+                        else:
+                            continue
                         union = rb if union is None else (union | rb)
                 if union is None:
                     continue

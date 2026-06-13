@@ -27,6 +27,8 @@
 | BUG-015 | 修复 | Qwen 显式 `Table N:` caption 位于长文本块时被正文引用逻辑误拒绝，导致 Table 9 缺失 | 2026-06-11 | 已修复 | 显式冒号 caption 不再仅因文本块较长被拒绝，同时保留普通正文引用过滤 |
 | BUG-016 | 修复 | Qwen 多个表格的分组标题和紧凑数字行未进入连续表格行带，导致 Tables 10 至 13 截断 | 2026-06-11 | 已修复 | 连续行带支持具有后续表格证据的桥接行和紧凑数字弱表格行，并限制弱行宽度以避免正文污染 |
 | BUG-017 | 修复 | 通用正文边界阻断把图内短标签和紧凑数字块误判为正文，放宽后又造成 DeepSeek 回归 | 2026-06-11 | 已修复 | 改为方向感知的短标题判定，保护邻近短标签聚类和非全宽紧凑数字块，同时继续阻断孤立标题、正文和全宽数字段落 |
+| BUG-018 | 修复 | 双栏跨栏标题误终止裁剪 + 强结构表格分组行带被行距上限截断 | 2026-06-13 | 已修复 | 窄栏 caption 的正文 blocker 候选按 `TextBlock.column` 或水平重叠过滤；强结构行仅在非句子型且仍处于桥接距离内时允许跨越较大分组间距，避免表格截断和正文误并入 |
+| BUG-019 | 修复 | 复核并修复图表提取资源泄漏、完整流程重复提取、无对象 caption 反向加分、Figure 正文引用漏过滤及低优先级一致性问题 | 2026-06-13 | 已修复 | 共 12 项：M1 PDF 句柄泄漏→统一 `@managed_pdf_document` 上下文管理并在异常路径关闭、`PDFDocument.close` 幂等、`pre_validate_pdf` 改 try/finally；M2 `process_pdf` 复用首次提取产物（`--reuse-existing`）；M3 无对象位置分改为 0；M4 Figure 扫描补 `is_caption_reference` 过滤正文引用；L1 Figure/Table 共用 idents 主正则；L2 删除死变量 `_SKIP_PATTERN`；L3 `get_unique_path` 改 `logger.warning`；L4 `stable_debug_number`(sha256) 取代 `hash`；L5 裸 except 改 `except Exception`+finally；L6 `fitz.open` 改回 `open_pdf`；L7 drawing 回退按 item 几何类型(Rect/Quad/Point)处理；L8 Supplementary 上下文命名组匹配并补 S 前缀 |
 
 ## 调整事项
 
@@ -58,6 +60,7 @@
 | CHK-011 | 检查 | 清理 `main` 历史中的重复提交与空 merge | 2026-06-05 | 已完成 | 已保留备份分支 `codex-main-before-rebase-20260605`；删除重复 patch `760a1d1`、`a02a33c` 和空 merge `dc38520`；保留非空 merge 内容为普通提交；新旧树内容一致 |
 | CHK-012 | 检查 | 将 `V0.2.1` 的三次提交压缩为单个提交 | 2026-06-05 | 已完成 | 已保留备份分支 `codex-main-before-v021-squash-20260605`；将 `c9b8737`、`8a353c2`、`5031fe7` 重写为单个 `aef4f25`；新旧 `main` 顶端树内容一致 |
 | CHK-013 | 检查 | 逐张检查 `tests/results/20250605` 下 140 张图表截图效果 | 2026-06-05 | 已完成 | 结论为代码有修复入口但实际输出未达标，主要问题是 caption 索引未评分和污染结果仍被保存 |
+| CHK-014 | 检查 | 按 skill-creator 规范复检 skill 包合规性 | 2026-06-13 | 已完成 | 9 项全部通过：name 与目录一致（kebab-case）、description 598 字符含触发条件、frontmatter 仅标准字段、顶层仅标准目录、references 3 个全被引用无孤立、无运行产物入库、无 README 辅助文档、agents/openai.yaml 齐全、渐进式披露合理；git 层面完全符合；唯一提示 scripts/ 下 __pycache__ 物理存在（运行产物，已 gitignore 隔离） |
 
 ## 测试数据
 
@@ -69,14 +72,16 @@
 | TST-004 | 检查 | 反复对照画线输出验证 DeepSeek_V3_2 与 FunAudio-ASR 截图区域 | 2026-06-06 | 已完成 | 最终输出位于 `tests/results/20260606-012/`；逐图核对 DeepSeek 4 图 + 1 表、FunAudio 4 图 + 8 表均完整且未混入正文/章节标题；`run_all.py --skip-golden` 为 158 通过、0 失败 |
 | TST-005 | 检查 | 使用 GPT-5 System Card、Gemini 2.5 Report 扩展验证截图算法，并确保 DeepSeek/FunAudio 不退化 | 2026-06-06 | 已完成 | 最终输出位于 `tests/results/20260606-022/`；GPT-5 为 31 图 + 26 表，Gemini 为 14 图 + 12 表；画线与总览目视确认 GPT Table 7/8、Gemini Table 3/4/11 等关键边界正确；DeepSeek 4 图 + 1 表、FunAudio 4 图 + 8 表与 `20260606-012` 逐图 SHA-256 完全一致；`run_all.py --skip-golden` 为 166 通过、0 失败 |
 | TST-006 | 检查 | 使用 Attention、Qwen3-Omni、HFT Risk Books 扩展画线调试，并回归既有四份 PDF | 2026-06-11 | 已完成 | 最终输出位于 `tests/results/20260611-007/`；新增三份分别为 5 图 + 4 表、3 图 + 18 表、8 图 + 1 表；既有四份无图表缺失或已知视觉退化；FunAudio 逐图哈希完全一致；完整测试 178 通过、0 失败 |
+| TST-007 | 检查 | 使用 Attention 真实双栏 PDF 画线验证 BUG-018 修复并补充回归测试 | 2026-06-13 | 已完成 | 最终输出位于 `tests/results/20260613-004/1706.03762v7-attention_is_all_you_need/`；5 图 + 4 表均完整，Table 2/3 最终边界停在正文前，9 张最终截图与 `20260611-007` 逐图 SHA-256 完全一致；新增 3 条回归测试；`run_all.py --skip-golden` 为 181 通过、0 失败，`compileall` 与三个入口 `--help` 通过 |
+| TST-008 | 检查 | 验证 BUG-019 健壮性与一致性修复 | 2026-06-13 | 已完成 | 新增 `test_maintenance_fixes.py` 覆盖异常关闭、无对象评分、Figure 引用过滤、完整流程复用、共享正则、drawing 回退、确定性编号和 Supplementary 上下文；`run_all.py --skip-golden` 为 190 通过、0 失败，`compileall`、三个入口 `--help` 与 `git diff --check` 通过；完整 `run_all.py` 的 3 项 Golden 因 Basic Benchmark 目录缺少 `images/index.json` 失败，与本次代码无关 |
 
 ## 文档维护
 
 | ID | 动作 | 事项 | 完成日期 | 状态 | 备注 |
 | --- | --- | --- | --- | --- | --- |
 | DOC-001 | 文档 | 写入 PDF-to-Markdown 重构出发点与五步实施路径 | 2026-06-05 | 已完成 | 文档位于 `docs/PDF-to-Markdown重构出发点与实施路径-20260605.md` |
-| DOC-002 | 文档 | 新增 PDF Markdown Summary Skill 设计文档 | 2026-06-05 | 已完成 | 文档位于 `docs/2-plans/2026-06-05-pdf-summary-agent-skill-design.md` |
-| DOC-003 | 文档 | 新增 PDF Markdown Summary Skill 实施计划 | 2026-06-05 | 已完成 | 文档位于 `docs/2-plans/2026-06-05-pdf-summary-agent-skill-implementation-plan.md` |
+| DOC-002 | 文档 | 新增 PDF Markdown Summary Skill 设计文档 | 2026-06-05 | 已完成 | 原位于 `docs/2-plans/`，重构完成后于 DOC-019 归档至 `docs/1-archive/skill-refactor-plans-20260605/2026-06-05-pdf-summary-agent-skill-design.md` |
+| DOC-003 | 文档 | 新增 PDF Markdown Summary Skill 实施计划 | 2026-06-05 | 已完成 | 原位于 `docs/2-plans/`，重构完成后于 DOC-019 归档至 `docs/1-archive/skill-refactor-plans-20260605/2026-06-05-pdf-summary-agent-skill-implementation-plan.md` |
 | DOC-004 | 文档 | 重写根目录 `README.md` | 2026-06-05 | 已完成 | 中文在前、英文在后，简要说明 Skill 作用、效果、安装和使用方法 |
 | DOC-005 | 文档 | 更新根目录 `AGENTS.md` | 2026-06-05 | 已完成 | 记录目录职责、`old-version/` 规则、`docs/3-ref/` 只读规则和 `task-list.md` 规则 |
 | DOC-006 | 文档 | 整理 `docs/` 下历史文档 | 2026-06-05 | 已完成 | 与当前重构无关的旧文档已移动到 `docs/1-archive/legacy-docs-before-skill-refactor-20260605/` |
@@ -89,6 +94,10 @@
 | DOC-013 | 文档 | 记录 DeepSeek_V3_2 与 FunAudio-ASR 截图区域调优和修复完整过程 | 2026-06-06 | 已完成 | 新增 `docs/PDF图表截图区域调优与修复完整记录-20260606.md`，记录初始问题、逐轮调优、根因、最终流程、代码改动、验证结果和后续建议；已核对文档关键记录并通过 `git diff --check` |
 | DOC-014 | 文档 | 补充 GPT-5 System Card 与 Gemini 2.5 Report 扩展调优全过程 | 2026-06-06 | 已完成 | 在 `docs/PDF图表截图区域调优与修复完整记录-20260606.md` 增补批次 `20260606-013` 至 `20260606-022`、新增根因、最终结果和回归结论 |
 | DOC-015 | 文档 | 记录新增三份 PDF 调优与既有四份 PDF 回归验证全过程 | 2026-06-11 | 已完成 | 新增 `docs/PDF图表截图区域调优与修复完整记录-20260611.md`，记录问题分类、算法调整、测试覆盖、七份 PDF 最终结果和不回退判定方法 |
+| DOC-016 | 文档 | 记录 BUG-018 双栏 blocker 与强结构表格分组行带修复过程 | 2026-06-13 | 已完成 | 新增 `docs/PDF双栏与强结构表格裁剪调优记录-20260613.md`，记录 review 结论、真实 Attention 画线验证、中间回归、最终规则和测试结果 |
+| DOC-017 | 文档 | 按 skill-creator 规范补全 CLI 参数参考文档 | 2026-06-13 | 已完成 | 新增 `skills/pdf-markdown-summary/references/cli-options.md`，覆盖 4 个入口全部参数（pdf_to_markdown/summarize_pdf/process_pdf 高层入口 + extract_pdf_assets 调参引擎按功能分组、常用调参场景、roadmap 预留参数）；SKILL.md References 段新增引用；两个现有 reference 各加 `cli-options.md` 交叉引用，确认 references 无孤立文件，`git diff --check` 通过 |
+| DOC-018 | 文档 | 文档审查并更新过期内容 | 2026-06-13 | 已完成 | 核实 README 输出文件清单与 roadmap 项均准确（gathered_text/figure_contexts/layout_model.json 仍产出；图片按 caption 位置插入仍为 roadmap）。更新 README：目录树补 `cli-options.md`、使用方法加调参提示、已完成列表补智能 caption 检测/四阶段精裁/双栏感知/复用机制/CLI 参考文档（中英两处对齐）。更新 `docs/skill-execution-flow-20260605.md`：修正日期笔误 2025→2026，Step B 反映 BUG-019/M2 的 `--reuse-existing` 复用机制；`git diff --check` 通过 |
+| DOC-019 | 文档 | 归档已完成的 skill 重构计划文档 | 2026-06-13 | 已完成 | 将 `docs/2-plans/` 下两个重构期文档（设计 + 实施计划）`git mv` 至 `docs/1-archive/skill-refactor-plans-20260605/`（保留 rename 历史），删除空的 `docs/2-plans/` 目录；同步更新 AGENTS.md 第 4 节 `docs/2-plans/` 描述与 task-list DOC-002/003 路径 |
 
 ## 功能开发
 
@@ -99,3 +108,9 @@
 | DEV-003 | 开发 | 新增 PDF 带图摘要素材准备入口能力 | 2026-06-05 | 已完成 | 入口脚本为 `skills/pdf-markdown-summary/scripts/summarize_pdf.py`，复用现有图表提取与摘要业务逻辑 |
 | DEV-004 | 开发 | 新增完整处理流程入口能力 | 2026-06-05 | 已完成 | 入口脚本为 `skills/pdf-markdown-summary/scripts/process_pdf.py`，用于串联 Markdown 转换和摘要素材准备 |
 | DEV-005 | 开发 | 补充 Skill 参考文档与示例说明 | 2026-06-05 | 已完成 | 包含 `references/pdf-to-markdown.md`、`references/pdf-summary.md`、`examples/README.md` |
+
+## 配置运维
+
+| ID | 动作 | 事项 | 完成日期 | 状态 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| OPS-001 | 运维 | 检查并维护 .gitignore，符合 Windows 开发现状 | 2026-06-13 | 已完成 | 删除无效规则 `tests-basic-benchmark/`（笔误，实际输入目录 `tests/basic-benchmark/` 需跟踪）与 `ref/`（无对应目录）；新增 Windows 系统缓存（Thumbs.db/ehthumbs.db/desktop.ini）、编辑器临时文件（\*.swp/\*.swo/\*~）、环境密钥（.env/.env.*）；保留 `__pycache__/`、`tests/results/` 等现有规则；经 `git check-ignore` 验证 tests/results 仍忽略、tests/basic-benchmark 未被误伤，`git diff --check` 通过 |

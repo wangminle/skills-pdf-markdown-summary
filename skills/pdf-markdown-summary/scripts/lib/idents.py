@@ -21,6 +21,7 @@ P1-08: 正则表达式覆盖扩展
 
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 from typing import Dict, List, Match, Optional, Set, Tuple
@@ -86,6 +87,14 @@ TABLE_LINE_RE = re.compile(
 TABLE_CN_RE = re.compile(
     r"表\s*(?P<num>\d+)",
 )
+
+
+def stable_debug_number(ident: str, modulo: int = 1000) -> int:
+    """生成跨进程稳定的调试文件编号。"""
+    if ident.isdigit():
+        return int(ident)
+    digest = hashlib.sha256(ident.encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big") % modulo
 
 
 # ============================================================================

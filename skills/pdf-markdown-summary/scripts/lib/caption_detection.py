@@ -26,7 +26,12 @@ if TYPE_CHECKING:
     from .models import CaptionCandidate, CaptionIndex
 
 # 导入标识符提取函数
-from .idents import extract_figure_ident, extract_table_ident
+from .idents import (
+    FIGURE_LINE_RE as DEFAULT_FIGURE_LINE_RE,
+    TABLE_LINE_RE as DEFAULT_TABLE_LINE_RE,
+    extract_figure_ident,
+    extract_table_ident,
+)
 
 # 模块日志器
 logger = logging.getLogger(__name__)
@@ -350,7 +355,7 @@ def score_caption_candidate(
     elif min_dist < float('inf'):
         position_score = max(0, 5.0 - min_dist / 50.0)
     else:
-        position_score = 15.0
+        position_score = 0.0
 
     score += position_score
     details['position'] = position_score
@@ -535,9 +540,6 @@ def select_best_caption(
 # 构建 Caption 索引
 # ============================================================================
 
-_SKIP_PATTERN = False
-
-
 def build_caption_index(
     doc: Union[PDFDocument, Any],
     figure_pattern: Optional[re.Pattern] = None,
@@ -566,25 +568,10 @@ def build_caption_index(
     skip_table = table_pattern is False
 
     if not skip_figure and figure_pattern is None:
-        figure_pattern = re.compile(
-            r"^\s*(?P<label>Extended\s+Data\s+Figure|Supplementary\s+(?:Figure|Fig\.?)|Figure|Fig\.?|图表|附图|图)\s*"
-            r"(?:(?P<s_prefix>S)\s*(?P<s_id>(?:\d+|[IVX]{1,6}))|(?P<roman>[IVX]{1,6})|(?P<num>\d+))"
-            r"(?:\s*[-–]?\s*[A-Za-z]|\s*\([A-Za-z]\))?"
-            r"(?:\s*\(continued\)|\s*续|\s*接上页)?",
-            re.IGNORECASE
-        )
+        figure_pattern = DEFAULT_FIGURE_LINE_RE
 
     if not skip_table and table_pattern is None:
-        table_pattern = re.compile(
-            r"^\s*(?:Extended\s+Data\s+Table|Supplementary\s+Table|Table|Tab\.?|表)\s*"
-            r"(?:"
-            r"(S?\d+|[A-Z]\d+)|"
-            r"([IVX]{1,6})|"
-            r"(\d+)"
-            r")"
-            r"(?:\s*\(continued\)|\s*续|\s*接上页)?",
-            re.IGNORECASE
-        )
+        table_pattern = DEFAULT_TABLE_LINE_RE
 
     all_candidates: Dict[str, List["CaptionCandidate"]] = {}
 

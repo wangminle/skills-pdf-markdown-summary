@@ -93,3 +93,4 @@ For detailed workflow instructions and advanced options, read the relevant refer
 
 - `references/pdf-to-markdown.md` — PDF-to-Markdown workflow details
 - `references/pdf-summary.md` — Summary workflow details
+- `references/cli-options.md` — Complete CLI options reference for all entry points

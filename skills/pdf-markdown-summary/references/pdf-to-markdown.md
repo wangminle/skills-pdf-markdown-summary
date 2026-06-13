@@ -2,6 +2,8 @@
 
 Use this workflow when the user asks to convert a PDF into Markdown or prepare a PDF for knowledge-base ingestion.
 
+For the full list of command-line flags, see `cli-options.md`.
+
 ## Preferred Flow
 
 1. Run `scripts/pdf_to_markdown.py`.

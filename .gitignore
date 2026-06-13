@@ -49,17 +49,26 @@ coverage.xml
 node_modules/
 **/.DS_Store
 
+# Windows 系统缓存
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# 编辑器临时/备份文件
+*.swp
+*.swo
+*~
+
+# 环境变量与密钥（避免泄露）
+.env
+.env.*
+
 # Project specific
 docs/_build/
 __pypackages__/
 cython_debug/
 
-# Test files and PDFs
-tests-basic-benchmark/
-
 # Test results (提取脚本输出，不上传 GitHub)
 tests/results/
 
-
-# Reference files and documents
-ref/
+# Benchmark 输入数据 (tests/basic-benchmark/) 为测试输入 PDF，已纳入版本控制，不忽略

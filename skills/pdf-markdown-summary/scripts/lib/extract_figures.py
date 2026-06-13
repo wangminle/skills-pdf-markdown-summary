@@ -23,14 +23,13 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
-from .pdf_backend import create_rect, open_pdf
+from .pdf_backend import PDFDocument, create_rect, managed_pdf_document
 
 # 导入本地模块
 from .models import AttachmentRecord, CaptionBlock, CaptionIndex, DocumentLayoutModel
-from .idents import build_output_basename, extract_figure_ident
+from .idents import FIGURE_LINE_RE, build_output_basename, extract_figure_ident, stable_debug_number
 from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
     merge_caption_lines, is_caption_reference,
@@ -70,16 +69,7 @@ if TYPE_CHECKING:
 # 模块日志器
 logger = logging.getLogger(__name__)
 
-# Figure 正则表达式（支持多种格式）
-FIGURE_LINE_RE = re.compile(
-    r"^\s*(?P<label>Extended\s+Data\s+Figure|Supplementary\s+(?:Figure|Fig\.?)|Figure|Fig\.?|图表|附图|图)\s*"
-    r"(?:(?P<s_prefix>S)\s*(?P<s_id>(?:\d+|[IVX]{1,6}))|(?P<roman>[IVX]{1,6})|(?P<num>\d+))"
-    r"(?:\s*[-–]?\s*[A-Za-z]|\s*\([A-Za-z]\))?"  # 可选的子图标签
-    r"(?:\s*\(continued\)|\s*续|\s*接上页)?",  # 可选的续页标记
-    re.IGNORECASE,
-)
-
-
+@managed_pdf_document
 def extract_figures(
     pdf_path: str,
     out_dir: str,
@@ -142,6 +132,7 @@ def extract_figures(
     # Global anchor
     global_anchor: Optional[str] = None,
     global_anchor_margin: float = 0.02,
+    _doc: Optional[PDFDocument] = None,
 ) -> List[AttachmentRecord]:
     """
     从 PDF 中提取 Figure 图像。
@@ -173,7 +164,8 @@ def extract_figures(
     """
     # 基础实现框架
     pdf_name = os.path.basename(pdf_path)
-    doc = open_pdf(pdf_path)
+    assert _doc is not None
+    doc = _doc
     os.makedirs(out_dir, exist_ok=True)
 
     records: List[AttachmentRecord] = []
@@ -267,6 +259,8 @@ def extract_figures(
 
                 match = FIGURE_LINE_RE.match(text_stripped)
                 if not match:
+                    continue
+                if is_caption_reference(text_stripped, blk, FIGURE_LINE_RE):
                     continue
 
                 # 提取 Figure 编号
@@ -632,7 +626,7 @@ def extract_figures(
                         debug_artifacts = save_debug_visualization(
                             page,
                             out_dir,
-                            int(ident) if ident.isdigit() else hash(ident) % 1000,
+                            stable_debug_number(ident),
                             pno + 1,
                             stages=stages,
                             caption_rect=caption_bbox,
@@ -662,8 +656,6 @@ def extract_figures(
                     logger.info(f"Extracted Figure {ident} from page {pno + 1}: {out_path}")
                 except Exception as e:
                     logger.warning(f"Failed to extract Figure {ident}: {e}")
-
-    doc.close()
 
     logger.info(f"Extracted {len(records)} figures from {pdf_name}")
     return records

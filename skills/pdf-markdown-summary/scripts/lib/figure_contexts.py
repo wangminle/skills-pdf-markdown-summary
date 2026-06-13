@@ -78,11 +78,15 @@ def build_figure_contexts(
     # 以及罗马数字：Figure I, Figure II
     mention_patterns = {
         'figure': re.compile(
-            r"(?:Figure|Fig\.?|图|附图)\s*(S(?:\d+|[IVX]{1,6})|\d+|[IVX]{1,6})",
+            r"(?P<supplementary>Supplementary\s+)?(?:Extended\s+Data\s+)?"
+            r"(?:Figure|Fig\.?|图|附图)\s*"
+            r"(?P<ident>S(?:\d+|[IVX]{1,6})|\d+|[IVX]{1,6})",
             re.IGNORECASE
         ),
         'table': re.compile(
-            r"(?:Table|Tab\.?|表)\s*(S(?:\d+|[IVX]{1,6})|\d+|[A-Z]\d+|[IVX]{1,6})",
+            r"(?P<supplementary>Supplementary\s+)?(?:Extended\s+Data\s+)?"
+            r"(?:Table|Tab\.?|表)\s*"
+            r"(?P<ident>S(?:\d+|[IVX]{1,6})|\d+|[A-Z]\d+|[IVX]{1,6})",
             re.IGNORECASE
         )
     }
@@ -113,10 +117,11 @@ def build_figure_contexts(
                 continue
 
             # 搜索提及
-            matches = pattern.findall(para.text)
-            for match in matches:
+            for match in pattern.finditer(para.text):
                 # 标准化标识符进行比较
-                match_ident = match.upper().strip()
+                match_ident = match.group("ident").upper().strip()
+                if match.group("supplementary") and not match_ident.startswith("S"):
+                    match_ident = "S" + match_ident
                 rec_ident = ident.upper().strip()
 
                 # 检查是否匹配当前图表

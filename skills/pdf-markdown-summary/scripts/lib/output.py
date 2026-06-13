@@ -178,7 +178,11 @@ def get_unique_path(base_path: str) -> Tuple[str, bool]:
     while os.path.exists(f"{stem}_{counter}{ext}"):
         counter += 1
     unique_path = f"{stem}_{counter}{ext}"
-    print(f"[WARN] Filename collision detected: {os.path.basename(base_path)} -> {os.path.basename(unique_path)}")
+    logger.warning(
+        "Filename collision detected: %s -> %s",
+        os.path.basename(base_path),
+        os.path.basename(unique_path),
+    )
     return unique_path, True
 
 

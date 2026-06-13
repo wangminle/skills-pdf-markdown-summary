@@ -2,6 +2,8 @@
 
 Use this workflow when the user asks for a PDF summary, paper reading note, or figure-aware summary.
 
+For the full list of command-line flags, see `cli-options.md`.
+
 ## Preferred Flow
 
 1. Run `scripts/summarize_pdf.py` to prepare text and image assets.

@@ -32,7 +32,8 @@ skills/pdf-markdown-summary/
 │   └── openai.yaml             # OpenAI/Codex Agent 配置
 ├── references/
 │   ├── pdf-to-markdown.md      # PDF 转 Markdown 说明
-│   └── pdf-summary.md          # PDF 摘要说明
+│   ├── pdf-summary.md          # PDF 摘要说明
+│   └── cli-options.md          # 全部入口 CLI 参数参考
 └── scripts/
     ├── pdf_to_markdown.py      # PDF -> Markdown
     ├── summarize_pdf.py        # 摘要素材准备
@@ -95,6 +96,8 @@ python3 -m pip install --user pdfplumber
 后续 OCR 能力会通过可选依赖接入。
 
 ### 使用方法
+
+> 各入口的全部命令行参数（含图表裁剪、表格、版式驱动等调参选项）见 `skills/pdf-markdown-summary/references/cli-options.md`。
 
 #### 1. PDF 转 Markdown
 
@@ -160,6 +163,10 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 摘要素材准备入口。
 - 完整处理入口。
 - Markdown block JSON 与 conversion report 输出。
+- 智能 caption 检测（位置/格式/结构/上下文评分）与四阶段图表精裁（text-trim / 对象对齐 / 版式驱动 / autocrop）。
+- 双栏版式感知与强结构表格行带识别。
+- 完整流程复用首次提取产物，避免重复解析 PDF。
+- 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
 - 旧版 scripts 快照归档。
 
 继续改进方向：
@@ -247,6 +254,8 @@ python3 -m pip install --user pdfplumber
 
 ### Usage
 
+> For the full list of command-line flags across all entry points (figure clipping, tables, layout-driven tuning), see `skills/pdf-markdown-summary/references/cli-options.md`.
+
 #### PDF to Markdown
 
 ```bash
@@ -321,6 +330,10 @@ Implemented:
 - Summary preparation CLI.
 - Combined processing CLI.
 - Markdown block JSON and conversion report.
+- Smart caption detection (position/format/structure/context scoring) and 4-phase clip refinement (text-trim / object-align / layout-driven / autocrop).
+- Double-column layout awareness and strong-structure table band detection.
+- Full pipeline reuses the first extraction to avoid re-parsing the PDF.
+- Complete CLI options reference (`references/cli-options.md`).
 - Archived previous root-level scripts snapshot.
 
 Planned:

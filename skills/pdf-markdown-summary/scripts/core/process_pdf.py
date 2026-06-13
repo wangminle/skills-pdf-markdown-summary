@@ -61,7 +61,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     if markdown_exit != 0:
         return markdown_exit
 
-    summary_args = ["--pdf", pdf_path, "--preset", args.preset]
+    pdf_dir = os.path.dirname(pdf_path)
+    stem = os.path.splitext(os.path.basename(pdf_path))[0]
+    out_md = os.path.abspath(args.out or os.path.join(pdf_dir, f"{stem}.md"))
+    out_dir = os.path.dirname(out_md)
+    asset_dir = args.asset_dir
+    if not os.path.isabs(asset_dir):
+        asset_dir = os.path.join(out_dir, asset_dir)
+
+    summary_args = [
+        "--pdf", pdf_path,
+        "--preset", args.preset,
+        "--out-dir", os.path.abspath(asset_dir),
+        "--text-path", os.path.join(out_dir, "text", f"{stem}.txt"),
+        "--reuse-existing",
+    ]
     if args.allow_continued:
         summary_args.append("--allow-continued")
 

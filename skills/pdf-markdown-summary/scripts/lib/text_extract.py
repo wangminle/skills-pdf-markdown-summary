@@ -22,7 +22,7 @@ import re
 from collections import Counter
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from .pdf_backend import PDFDocument, open_pdf, create_rect
+from .pdf_backend import PDFDocument, create_rect, managed_pdf_document, open_pdf
 
 # 避免循环导入
 if TYPE_CHECKING:
@@ -173,8 +173,6 @@ def pre_validate_pdf(pdf_path: str) -> "PDFValidationResult":
         if file_size_mb > 50:
             warnings.append(f"Large file ({file_size_mb:.1f} MB), processing may be slow")
 
-        doc.close()
-
         is_valid = len(errors) == 0
 
         return PDFValidationResult(
@@ -190,25 +188,28 @@ def pre_validate_pdf(pdf_path: str) -> "PDFValidationResult":
         )
 
     except Exception as e:
-        try:
-            doc.close()
-        except Exception as close_e:
-            logger.warning(f"Failed to close PDF after validation error: {close_e}", extra={'stage': 'pre_validate_pdf'})
         return PDFValidationResult(
             is_valid=False, page_count=0, has_text_layer=False,
             text_layer_ratio=0.0, is_encrypted=False, pdf_version="",
             file_size_mb=file_size_mb, warnings=[], errors=[f"Validation error: {e}"]
         )
+    finally:
+        try:
+            doc.close()
+        except Exception as close_e:
+            logger.warning(f"Failed to close PDF after validation error: {close_e}", extra={'stage': 'pre_validate_pdf'})
 
 
 # ============================================================================
 # 结构化文本提取
 # ============================================================================
 
+@managed_pdf_document
 def gather_structured_text(
     pdf_path: str,
     out_json: Optional[str] = None,
-    debug: bool = False
+    debug: bool = False,
+    _doc: Optional[PDFDocument] = None,
 ) -> "GatheredText":
     """
     结构化文本提取（Gathering 阶段）。
@@ -228,7 +229,8 @@ def gather_structured_text(
     """
     from .models import GatheredParagraph, GatheredText
 
-    doc: PDFDocument = open_pdf(pdf_path)
+    assert _doc is not None
+    doc = _doc
     page_count = doc.page_count
 
     all_blocks: List[Dict[str, Any]] = []
@@ -339,8 +341,6 @@ def gather_structured_text(
 
     paragraphs.sort(key=lambda p: (p.page, 0 if is_dual_column and (p.bbox[0] + p.bbox[2]) / 2 < doc[0].rect.width * 0.5 else 1, p.bbox[1]))
 
-    doc.close()
-
     result = GatheredText(
         version="1.0",
         is_dual_column=is_dual_column,
@@ -390,11 +390,13 @@ from .figure_contexts import build_figure_contexts
 # 带格式文本提取（版式模型构建）
 # ============================================================================
 
+@managed_pdf_document
 def extract_text_with_format(
     pdf_path: str,
     out_json: Optional[str] = None,
     sample_pages: Optional[int] = None,
-    debug: bool = False
+    debug: bool = False,
+    _doc: Optional[PDFDocument] = None,
 ) -> "DocumentLayoutModel":
     """
     提取文本并保留完整格式信息，构建版式模型。
@@ -421,7 +423,8 @@ def extract_text_with_format(
         print("LAYOUT-DRIVEN EXTRACTION: Building Document Layout Model")
         print("=" * 70)
 
-    doc = open_pdf(pdf_path)
+    assert _doc is not None
+    doc = _doc
 
     page_rect = doc[0].rect
     page_size = (page_rect.width, page_rect.height)
@@ -541,8 +544,6 @@ def extract_text_with_format(
             json.dump(layout_model.to_dict(), f, indent=2, ensure_ascii=False)
         if debug:
             print(f"\n[INFO] Saved layout model to: {out_json}")
-
-    doc.close()
 
     if debug:
         print("\n[SUMMARY] Layout Model Built Successfully")

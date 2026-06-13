@@ -23,14 +23,13 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
-from .pdf_backend import create_rect, open_pdf
+from .pdf_backend import PDFDocument, create_rect, managed_pdf_document
 
 # 导入本地模块
 from .models import AttachmentRecord, CaptionBlock, CaptionIndex, DocumentLayoutModel
-from .idents import build_output_basename, extract_table_ident
+from .idents import TABLE_LINE_RE, build_output_basename, extract_table_ident, stable_debug_number
 from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
     merge_caption_lines, is_caption_reference,
@@ -75,15 +74,7 @@ if TYPE_CHECKING:
 # 模块日志器
 logger = logging.getLogger(__name__)
 
-# Table 正则表达式（支持多种格式）
-TABLE_LINE_RE = re.compile(
-    r"^\s*(?P<label>Extended\s+Data\s+Table|Supplementary\s+Table|Table|Tab\.?|表)\s*"
-    r"(?:(?P<s_prefix>S)\s*(?P<s_id>(?:\d+|[IVX]{1,6}))|(?P<letter_id>[A-Z]\d+)|(?P<roman>[IVX]{1,6})|(?P<num>\d+))"
-    r"(?:\s*\(continued\)|\s*续|\s*接上页)?",
-    re.IGNORECASE,
-)
-
-
+@managed_pdf_document
 def extract_tables(
     pdf_path: str,
     out_dir: str,
@@ -144,6 +135,7 @@ def extract_tables(
     # Global anchor
     global_anchor_table: Optional[str] = None,
     global_anchor_table_margin: float = 0.03,
+    _doc: Optional[PDFDocument] = None,
 ) -> List[AttachmentRecord]:
     """
     从 PDF 中提取 Table 图像。
@@ -175,7 +167,8 @@ def extract_tables(
     """
     # 基础实现框架
     pdf_name = os.path.basename(pdf_path)
-    doc = open_pdf(pdf_path)
+    assert _doc is not None
+    doc = _doc
     os.makedirs(out_dir, exist_ok=True)
 
     records: List[AttachmentRecord] = []
@@ -616,9 +609,9 @@ def extract_tables(
                         ),
                     ]
                     try:
-                        fig_no = int(ident)
-                    except ValueError:
-                        fig_no = hash(ident) % 1000
+                        fig_no = stable_debug_number(ident)
+                    except (TypeError, ValueError):
+                        fig_no = 0
 
                     return save_debug_visualization(
                         page,
@@ -720,8 +713,6 @@ def extract_tables(
                     logger.info(f"Extracted Table {ident} from page {pno + 1}: {out_path}")
                 except Exception as e:
                     logger.warning(f"Failed to extract Table {ident}: {e}")
-
-    doc.close()
 
     logger.info(f"Extracted {len(records)} tables from {pdf_name}")
     return records

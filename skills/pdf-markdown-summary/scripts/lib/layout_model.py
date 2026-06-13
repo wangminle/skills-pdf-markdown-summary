@@ -20,6 +20,8 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from .pdf_backend import open_pdf
+
 # 尝试导入 fitz
 try:
     import fitz
@@ -683,7 +685,7 @@ def should_enable_layout_driven(pdf_path: str, debug: bool = False) -> Tuple[boo
         return False, "PyMuPDF not available"
 
     try:
-        doc = fitz.open(pdf_path)
+        doc = open_pdf(pdf_path)
     except Exception as e:
         return False, f"cannot open PDF: {e}"
 
@@ -750,8 +752,6 @@ def should_enable_layout_driven(pdf_path: str, debug: bool = False) -> Tuple[boo
             if images and text_density > 0.3:
                 figure_with_dense_text += 1
 
-        doc.close()
-
         if dual_column_pages >= sample_count * 0.5:
             return True, f"dual-column layout detected ({dual_column_pages}/{sample_count} pages)"
 
@@ -764,11 +764,12 @@ def should_enable_layout_driven(pdf_path: str, debug: bool = False) -> Tuple[boo
         return False, "simple layout, layout-driven not needed"
 
     except Exception as e:
+        return False, f"detection error: {e}"
+    finally:
         try:
             doc.close()
-        except:
-            pass
-        return False, f"detection error: {e}"
+        except Exception as close_e:
+            logger.warning(f"Failed to close PDF after layout detection: {close_e}")
 
 
 # ============================================================================

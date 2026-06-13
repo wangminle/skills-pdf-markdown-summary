@@ -34,6 +34,7 @@ Commit 01B: PDF 后端适配层（薄适配 + 可选 pdfplumber）
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import wraps
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from pathlib import Path
 
@@ -99,7 +100,8 @@ class PDFDocument:
 
     def close(self) -> None:
         """关闭文档"""
-        self.raw.close()
+        if not getattr(self.raw, "is_closed", False):
+            self.raw.close()
 
     def __enter__(self) -> "PDFDocument":
         return self
@@ -308,6 +310,16 @@ def open_pdf(pdf_path: Union[str, Path]) -> PDFDocument:
         raise RuntimeError(f"Failed to open PDF: {path_str}") from e
 
     return PDFDocument(raw=raw_doc, path=path_str)
+
+
+def managed_pdf_document(func):
+    """为接收 ``pdf_path`` 的函数注入并可靠关闭 PDFDocument。"""
+    @wraps(func)
+    def wrapper(pdf_path, *args, **kwargs):
+        with open_pdf(pdf_path) as doc:
+            return func(pdf_path, *args, _doc=doc, **kwargs)
+
+    return wrapper
 
 
 # ============================================================================

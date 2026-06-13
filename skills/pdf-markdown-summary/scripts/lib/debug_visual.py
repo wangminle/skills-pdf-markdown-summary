@@ -163,6 +163,7 @@ def dump_page_candidates(
         logger.warning("PyMuPDF not available, skipping candidate dump")
         return None
 
+    temp_doc = None
     try:
         scale = 1.0
         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
@@ -294,9 +295,6 @@ def save_debug_visualization(
         vis_path = os.path.join(debug_dir, f"{prefix}_{fig_no}_p{page_num}_debug_{file_suffix}.png")
         final_pix.save(vis_path)
 
-        # 关闭临时文档
-        temp_doc.close()
-
         # 生成文字图例
         legend_path = os.path.join(debug_dir, f"{prefix}_{fig_no}_p{page_num}_{file_suffix}_legend.txt")
         _write_legend_file(
@@ -322,6 +320,12 @@ def save_debug_visualization(
         import traceback
         traceback.print_exc()
         return None
+    finally:
+        if temp_doc is not None:
+            try:
+                temp_doc.close()
+            except Exception as close_e:
+                logger.warning(f"Failed to close debug visualization document: {close_e}")
 
 
 def _write_legend_file(
