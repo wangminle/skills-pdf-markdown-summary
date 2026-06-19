@@ -43,6 +43,27 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _looks_like_short_figure_label(text: str) -> bool:
+    """Return True for short in-figure labels that should not trim crop edges."""
+    txt = text.strip()
+    if not txt:
+        return False
+
+    # Numbered section headings such as "3.2.1 Scaled Dot-Product Attention"
+    # are document structure, not figure-internal labels.
+    if re.match(r"^\d+(?:\.\d+)+\s+\S+", txt):
+        return False
+
+    tokens = re.findall(r"[A-Za-z]+(?:[-'][A-Za-z]+)*|\d+(?:\.\d+)?", txt)
+    if len(tokens) > 8:
+        return False
+
+    if re.search(r"[.!?。！？；;:,，]$", txt):
+        return False
+
+    return True
+
+
 # ============================================================================
 # 像素级内容检测
 # ============================================================================
@@ -226,6 +247,195 @@ def merge_rects(rects: List[Any], merge_gap: float = 6.0) -> List[Any]:
     return expanded
 
 
+def _has_small_object_band_near_trimmed_edge(
+    clip: Any,
+    raw_rects: List[Any],
+    *,
+    direction: str,
+    proposed_edge: float,
+    min_area_ratio: float,
+    min_count: int = 8,
+    edge_tolerance: float = 12.0,
+) -> bool:
+    """Detect dense small-object bands that would be lost by near-edge trimming."""
+    if fitz is None:
+        return False
+
+    trimmed = (clip.y1 - proposed_edge) if direction == "above" else (proposed_edge - clip.y0)
+    if trimmed < max(12.0, 0.08 * clip.height):
+        return False
+
+    area = max(1.0, clip.width * clip.height)
+    band_rect = (
+        fitz.Rect(clip.x0, proposed_edge, clip.x1, clip.y1)
+        if direction == "above"
+        else fitz.Rect(clip.x0, clip.y0, clip.x1, proposed_edge)
+    )
+    smalls: List[Any] = []
+    for r in raw_rects:
+        inter = (r & clip) & band_rect
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        full_inter = r & clip
+        if full_inter.width <= 0 or full_inter.height <= 0:
+            continue
+        if (full_inter.width * full_inter.height) / area >= min_area_ratio:
+            continue
+        smalls.append(full_inter)
+
+    if len(smalls) < min_count:
+        return False
+
+    union = smalls[0]
+    for r in smalls[1:]:
+        union = union | r
+
+    if union.width < 0.30 * clip.width:
+        return False
+    if union.height < max(20.0, 0.12 * clip.height):
+        return False
+    if direction == "above":
+        return union.y1 >= clip.y1 - edge_tolerance
+    return union.y0 <= clip.y0 + edge_tolerance
+
+
+def _has_text_label_band_near_trimmed_edge(
+    clip: Any,
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    *,
+    direction: str,
+    proposed_edge: float,
+    min_count: int = 8,
+    edge_tolerance: float = 12.0,
+) -> bool:
+    """Detect rows of narrow figure-internal text labels cut by near-edge trimming."""
+    if fitz is None or not text_lines:
+        return False
+
+    trimmed = (clip.y1 - proposed_edge) if direction == "above" else (proposed_edge - clip.y0)
+    if trimmed < max(10.0, 0.04 * clip.height):
+        return False
+
+    band_rect = (
+        fitz.Rect(clip.x0, proposed_edge, clip.x1, clip.y1)
+        if direction == "above"
+        else fitz.Rect(clip.x0, clip.y0, clip.x1, proposed_edge)
+    )
+    labels: List[Any] = []
+    for lb, _fs, text in text_lines:
+        txt = text.strip()
+        if not txt:
+            continue
+        full_inter = lb & clip
+        if full_inter.width <= 0 or full_inter.height <= 0:
+            continue
+        cut_inter = full_inter & band_rect
+        if cut_inter.width <= 0 or cut_inter.height <= 0:
+            continue
+        if full_inter.width > max(36.0, 0.08 * clip.width):
+            continue
+        labels.append(full_inter)
+
+    if len(labels) < min_count:
+        return False
+
+    union = labels[0]
+    for r in labels[1:]:
+        union = union | r
+
+    y0_span = max(r.y0 for r in labels) - min(r.y0 for r in labels)
+    y1_span = max(r.y1 for r in labels) - min(r.y1 for r in labels)
+    if min(y0_span, y1_span) > max(12.0, 0.04 * clip.height):
+        return False
+    if union.width < 0.30 * clip.width:
+        return False
+    if union.height < max(18.0, 0.06 * clip.height):
+        return False
+    if direction == "above":
+        return union.y1 >= clip.y1 - edge_tolerance
+    return union.y0 <= clip.y0 + edge_tolerance
+
+
+def expand_clip_to_rendered_horizontal_rule(
+    clip: Any,
+    page: Any,
+    caption_rect: Any,
+    direction: str,
+    *,
+    scale: float = 4.0,
+    search_gap: float = 12.0,
+    pad: float = 1.0,
+    dark_threshold: int = 80,
+    min_dark_fraction: float = 0.35,
+) -> Any:
+    """Expand the near caption edge to include a rendered horizontal table rule."""
+    if fitz is None or clip.width <= 1 or clip.height <= 1:
+        return clip
+
+    page_rect = getattr(page, "rect", None)
+    if page_rect is None:
+        return clip
+
+    if direction == "below":
+        search_y0 = max(page_rect.y0, caption_rect.y1 + 0.25)
+        search_y1 = min(page_rect.y1, clip.y0 + 1.5, caption_rect.y1 + search_gap)
+    elif direction == "above":
+        search_y0 = max(page_rect.y0, clip.y1 - 1.5, caption_rect.y0 - search_gap)
+        search_y1 = min(page_rect.y1, caption_rect.y0 - 0.25)
+    else:
+        return clip
+
+    if search_y1 <= search_y0:
+        return clip
+
+    render_clip = fitz.Rect(clip.x0, search_y0, clip.x1, search_y1) & page_rect
+    if render_clip.width <= 1 or render_clip.height <= 0.5:
+        return clip
+
+    try:
+        matrix = fitz.Matrix(scale, scale)
+        raw_page = getattr(page, "raw", page)
+        pix = raw_page.get_pixmap(matrix=matrix, clip=render_clip, alpha=False)
+    except Exception:
+        return clip
+
+    if pix.width <= 0 or pix.height <= 0:
+        return clip
+
+    samples = memoryview(pix.samples)
+    n = pix.n
+    stride = pix.stride
+    qualifying_rows: List[int] = []
+    for y in range(pix.height):
+        row = samples[y * stride:(y + 1) * stride]
+        dark = 0
+        for x in range(pix.width):
+            off = x * n
+            r = row[off]
+            g = row[off + 1] if n > 1 else r
+            b = row[off + 2] if n > 2 else r
+            if (r + g + b) / 3.0 <= dark_threshold:
+                dark += 1
+        if dark / max(1.0, float(pix.width)) >= min_dark_fraction:
+            qualifying_rows.append(y)
+
+    if not qualifying_rows:
+        return clip
+
+    if direction == "below":
+        rule_y = render_clip.y0 + min(qualifying_rows) / scale
+        new_y0 = max(page_rect.y0, min(clip.y0, rule_y - pad))
+        if new_y0 < clip.y0 - 0.25 and new_y0 > caption_rect.y1:
+            return fitz.Rect(clip.x0, new_y0, clip.x1, clip.y1)
+    else:
+        rule_y = render_clip.y0 + max(qualifying_rows) / scale
+        new_y1 = min(page_rect.y1, max(clip.y1, rule_y + pad))
+        if new_y1 > clip.y1 + 0.25 and new_y1 < caption_rect.y0:
+            return fitz.Rect(clip.x0, clip.y0, clip.x1, new_y1)
+
+    return clip
+
+
 # ============================================================================
 # 基于对象的裁剪优化
 # ============================================================================
@@ -243,6 +453,7 @@ def refine_clip_by_objects(
     near_edge_only: bool = True,
     use_axis_union: bool = True,
     use_horizontal_union: bool = False,
+    text_lines: Optional[List[Tuple[Any, float, str]]] = None,
 ) -> Any:
     """
     使用对象组件优化裁剪区域。
@@ -259,6 +470,7 @@ def refine_clip_by_objects(
         near_edge_only: 是否只调整靠近图注的边界
         use_axis_union: 是否使用垂直轴联合
         use_horizontal_union: 是否使用水平轴联合
+        text_lines: 可选文本行列表，用于保护竖排标签等图内文字
 
     Returns:
         优化后的裁剪区域
@@ -329,9 +541,37 @@ def refine_clip_by_objects(
     result = fitz.Rect(clip)
     if near_edge_only:
         if direction == 'above':
-            result.y1 = min(clip.y1, max(chosen.y1, clip.y0 + 40.0))
+            proposed_y1 = min(clip.y1, max(chosen.y1, clip.y0 + 40.0))
+            if _has_small_object_band_near_trimmed_edge(
+                clip,
+                image_rects + vector_rects,
+                direction=direction,
+                proposed_edge=proposed_y1,
+                min_area_ratio=min_area_ratio,
+            ) or _has_text_label_band_near_trimmed_edge(
+                clip,
+                text_lines,
+                direction=direction,
+                proposed_edge=proposed_y1,
+            ):
+                proposed_y1 = clip.y1
+            result.y1 = proposed_y1
         else:
-            result.y0 = max(clip.y0, min(chosen.y0, clip.y1 - 40.0))
+            proposed_y0 = max(clip.y0, min(chosen.y0, clip.y1 - 40.0))
+            if _has_small_object_band_near_trimmed_edge(
+                clip,
+                image_rects + vector_rects,
+                direction=direction,
+                proposed_edge=proposed_y0,
+                min_area_ratio=min_area_ratio,
+            ) or _has_text_label_band_near_trimmed_edge(
+                clip,
+                text_lines,
+                direction=direction,
+                proposed_edge=proposed_y0,
+            ):
+                proposed_y0 = clip.y0
+            result.y0 = proposed_y0
         result.x0 = min(result.x0, chosen.x0)
         result.x1 = max(result.x1, chosen.x1)
         result = result & clip
@@ -513,6 +753,9 @@ def detect_far_side_text_evidence(
         if len(txt) < 10:
             continue
 
+        if _looks_like_short_figure_label(txt):
+            continue
+
         if far_is_top:
             dist_to_far_edge = lb.y0 - clip.y0
             if dist_to_far_edge < edge_zone:
@@ -592,6 +835,8 @@ def trim_far_side_text_post_autocrop(
         if len(txt) < min_text_len:
             continue
         if not (font_min <= fs <= font_max):
+            continue
+        if _looks_like_short_figure_label(txt):
             continue
 
         if far_is_top:
@@ -2128,6 +2373,7 @@ __all__ = [
     "merge_rects",
     # 对象裁剪优化
     "refine_clip_by_objects",
+    "expand_clip_to_rendered_horizontal_rule",
     # 文本遮罩
     "build_text_masks_px",
     # 远端正文检测

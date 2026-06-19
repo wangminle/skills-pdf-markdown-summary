@@ -23,7 +23,13 @@ from lib.extract_tables import TABLE_LINE_RE as EXTRACT_TABLE_LINE_RE
 from lib.figure_contexts import build_figure_contexts
 from lib.idents import stable_debug_number
 from lib.models import AttachmentRecord, CaptionCandidate, GatheredParagraph, GatheredText
-from lib.pdf_backend import managed_pdf_document
+from lib.pdf_backend import managed_pdf_document, open_pdf
+from lib.refine import (
+    detect_far_side_text_evidence,
+    expand_clip_to_rendered_horizontal_rule,
+    refine_clip_by_objects,
+    trim_far_side_text_post_autocrop,
+)
 
 
 def _make_pdf(path: Path) -> None:
@@ -221,6 +227,128 @@ def test_figure_contexts_find_supplementary_mentions() -> None:
     assert [len(ctx.all_mentions) for ctx in contexts] == [1, 1]
 
 
+def test_far_side_text_detection_ignores_short_figure_internal_title() -> None:
+    clip = fitz.Rect(141, 57, 473, 245)
+    figure_title = (fitz.Rect(148, 71, 450, 81), 10.0, "Scaled Dot-Product Attention Multi-Head Attention")
+
+    has_evidence, _ = detect_far_side_text_evidence(
+        clip,
+        [figure_title],
+        "above",
+        edge_zone=40.0,
+        min_width_ratio=0.30,
+    )
+    trimmed, was_trimmed = trim_far_side_text_post_autocrop(
+        clip,
+        [figure_title],
+        "above",
+        typical_line_h=12.0,
+        scan_lines=3,
+    )
+
+    assert not has_evidence
+    assert not was_trimmed
+    assert trimmed == clip
+
+
+def test_object_refinement_preserves_near_edge_when_many_small_objects_would_be_cut() -> None:
+    clip = fitz.Rect(26.0, 90.7, 586.0, 306.3)
+    caption = fitz.Rect(108.0, 312.3, 504.2, 355.1)
+    large_component = fitz.Rect(282.9, 156.0, 434.9, 245.8)
+    small_label_band = [
+        fitz.Rect(120.0, 240.0, 132.0, 302.0),
+        fitz.Rect(150.0, 239.0, 162.0, 301.0),
+        fitz.Rect(180.0, 241.0, 192.0, 300.0),
+        fitz.Rect(210.0, 242.0, 222.0, 302.1),
+        fitz.Rect(270.0, 244.0, 282.0, 299.5),
+        fitz.Rect(330.0, 243.0, 342.0, 301.5),
+        fitz.Rect(390.0, 241.5, 402.0, 300.5),
+        fitz.Rect(450.0, 240.5, 462.0, 302.0),
+        fitz.Rect(492.0, 242.0, 504.0, 301.0),
+    ]
+
+    refined = refine_clip_by_objects(
+        clip,
+        caption,
+        "above",
+        image_rects=[],
+        vector_rects=[large_component] + small_label_band,
+        object_pad=8.0,
+        min_area_ratio=0.012,
+        merge_gap=6.0,
+        near_edge_only=True,
+        use_axis_union=True,
+        use_horizontal_union=False,
+    )
+
+    assert abs(refined.y1 - clip.y1) < 0.01
+
+
+def test_object_refinement_preserves_near_edge_when_vertical_text_labels_would_be_cut() -> None:
+    clip = fitz.Rect(26.0, 76.3, 586.0, 596.3)
+    caption = fitz.Rect(108.0, 602.3, 504.0, 634.2)
+    upper_component = fitz.Rect(122.0, 226.0, 484.0, 331.0)
+    lower_component = fitz.Rect(150.0, 444.0, 470.0, 549.4)
+    label_words = [
+        "The", "Law", "will", "never", "be", "perfect", ",", "but", "its",
+        "application", "should", "be", "just", "-", "this", "is", "what",
+        "we", "are", "missing", ",", "in", "my", "opinion", ".", "<EOS>", "<pad>",
+    ]
+    text_labels = [
+        (fitz.Rect(120.0 + idx * 14.0, 545.0, 132.0 + idx * 14.0, 560.0 + (idx % 5) * 7.0), 9.3, word)
+        for idx, word in enumerate(label_words)
+    ]
+    text_labels[9] = (fitz.Rect(246.0, 545.0, 258.0, 590.0), 9.3, "application")
+    text_labels[19] = (fitz.Rect(386.0, 545.0, 398.0, 577.0), 9.3, "missing")
+
+    refined = refine_clip_by_objects(
+        clip,
+        caption,
+        "above",
+        image_rects=[],
+        vector_rects=[upper_component, lower_component],
+        object_pad=8.0,
+        min_area_ratio=0.012,
+        merge_gap=6.0,
+        near_edge_only=True,
+        use_axis_union=True,
+        use_horizontal_union=False,
+        text_lines=text_labels,
+    )
+
+    assert abs(refined.y1 - clip.y1) < 0.01
+
+
+def test_table_clip_expands_to_rendered_horizontal_rule_between_caption_and_header() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        pdf_path = Path(td) / "table-rule.pdf"
+        with fitz.open() as doc:
+            page = doc.new_page(width=300, height=220)
+            page.insert_textbox(
+                fitz.Rect(40, 35, 260, 52),
+                "Table 1: Caption",
+                fontsize=10,
+            )
+            page.draw_line(fitz.Point(60, 56), fitz.Point(240, 56), color=(0, 0, 0), width=1.0)
+            page.insert_textbox(fitz.Rect(75, 60, 230, 82), "Header A     Header B", fontsize=10)
+            doc.save(pdf_path)
+
+        with open_pdf(pdf_path) as doc:
+            page = doc[0]
+            caption = fitz.Rect(40, 35, 260, 52)
+            clip = fitz.Rect(30, 60, 270, 130)
+            expanded = expand_clip_to_rendered_horizontal_rule(
+                clip,
+                page,
+                caption,
+                "below",
+                scale=4.0,
+            )
+
+    assert expanded.y0 < 56.0
+    assert expanded.y1 == clip.y1
+
+
 def main() -> int:
     tests = [
         test_managed_pdf_document_closes_on_exception,
@@ -232,6 +360,10 @@ def main() -> int:
         test_shared_patterns_and_stable_debug_number,
         test_collect_draw_items_uses_item_geometry_fallback,
         test_figure_contexts_find_supplementary_mentions,
+        test_far_side_text_detection_ignores_short_figure_internal_title,
+        test_object_refinement_preserves_near_edge_when_many_small_objects_would_be_cut,
+        test_object_refinement_preserves_near_edge_when_vertical_text_labels_would_be_cut,
+        test_table_clip_expands_to_rendered_horizontal_rule_between_caption_and_header,
     ]
     passed = 0
     failed = 0

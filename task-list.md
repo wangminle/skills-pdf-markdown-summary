@@ -29,6 +29,10 @@
 | BUG-017 | 修复 | 通用正文边界阻断把图内短标签和紧凑数字块误判为正文，放宽后又造成 DeepSeek 回归 | 2026-06-11 | 已修复 | 改为方向感知的短标题判定，保护邻近短标签聚类和非全宽紧凑数字块，同时继续阻断孤立标题、正文和全宽数字段落 |
 | BUG-018 | 修复 | 双栏跨栏标题误终止裁剪 + 强结构表格分组行带被行距上限截断 | 2026-06-13 | 已修复 | 窄栏 caption 的正文 blocker 候选按 `TextBlock.column` 或水平重叠过滤；强结构行仅在非句子型且仍处于桥接距离内时允许跨越较大分组间距，避免表格截断和正文误并入 |
 | BUG-019 | 修复 | 复核并修复图表提取资源泄漏、完整流程重复提取、无对象 caption 反向加分、Figure 正文引用漏过滤及低优先级一致性问题 | 2026-06-13 | 已修复 | 共 12 项：M1 PDF 句柄泄漏→统一 `@managed_pdf_document` 上下文管理并在异常路径关闭、`PDFDocument.close` 幂等、`pre_validate_pdf` 改 try/finally；M2 `process_pdf` 复用首次提取产物（`--reuse-existing`）；M3 无对象位置分改为 0；M4 Figure 扫描补 `is_caption_reference` 过滤正文引用；L1 Figure/Table 共用 idents 主正则；L2 删除死变量 `_SKIP_PATTERN`；L3 `get_unique_path` 改 `logger.warning`；L4 `stable_debug_number`(sha256) 取代 `hash`；L5 裸 except 改 `except Exception`+finally；L6 `fitz.open` 改回 `open_pdf`；L7 drawing 回退按 item 几何类型(Rect/Quad/Point)处理；L8 Supplementary 上下文命名组匹配并补 S 前缀 |
+| BUG-020 | 修复 | Figure 顶部短图内标签被 far-side 正文检测误判，导致 autocrop 后红色最终边界漏掉说明文字 | 2026-06-18 | 已修复 | `detect_far_side_text_evidence()` 与 `trim_far_side_text_post_autocrop()` 跳过短、无句末标点、非编号章节标题的图内标签；Attention Figure 2 重跑后 final y0=64.6，已覆盖 y=71.2 的图内标题 |
+| BUG-021 | 修复 | Attention visualization / dense label figure 的大量小对象被 Phase B 单对象面积阈值过滤，导致黄线和红线切掉下半部分 | 2026-06-18 | 已修复 | 新增 `_has_small_object_band_near_trimmed_edge()`；当 near-edge 收缩会丢掉横向覆盖广、纵向跨度足且延伸到原 near edge 的小对象带时，保留 phase_a 的 y 范围并继续允许后续 x 收窄；Attention Figure 3 重跑后 phase_b y1=306.3、final y1=306.5 |
+| BUG-022 | 修复 | Attention Figure 5 的下方竖排文字由 text lines 表示，未进入 Phase B 对象证据，导致黄线和红线切掉文字下半部分 | 2026-06-18 | 已修复 | 新增 `_has_text_label_band_near_trimmed_edge()`，`refine_clip_by_objects()` 支持可选 `text_lines`；Figure 路径传入当前页文本行，当 near-edge 收缩会切掉一整排窄文本标签时保留 phase_a 的 y 范围；Figure 5 重跑后 phase_b y1=596.3、final y1=596.4 |
+| BUG-023 | 修复 | Attention Table 2 的顶部横向分界线未被 PyMuPDF drawing 暴露，baseline 从 caption 固定 gap 后开始导致红黄框压到表头 | 2026-06-19 | 已修复 | 新增 `expand_clip_to_rendered_horizontal_rule()`，Table baseline 在 caption 与 near edge 的窄搜索带内用渲染像素补回横向分界线；兼容项目 `PDFPage.raw` 包装；Table 2 重跑后 baseline/phase_b/final y0 从 98.1 上移到 93.3 |
 
 ## 调整事项
 
@@ -74,6 +78,11 @@
 | TST-006 | 检查 | 使用 Attention、Qwen3-Omni、HFT Risk Books 扩展画线调试，并回归既有四份 PDF | 2026-06-11 | 已完成 | 最终输出位于 `tests/results/20260611-007/`；新增三份分别为 5 图 + 4 表、3 图 + 18 表、8 图 + 1 表；既有四份无图表缺失或已知视觉退化；FunAudio 逐图哈希完全一致；完整测试 178 通过、0 失败 |
 | TST-007 | 检查 | 使用 Attention 真实双栏 PDF 画线验证 BUG-018 修复并补充回归测试 | 2026-06-13 | 已完成 | 最终输出位于 `tests/results/20260613-004/1706.03762v7-attention_is_all_you_need/`；5 图 + 4 表均完整，Table 2/3 最终边界停在正文前，9 张最终截图与 `20260611-007` 逐图 SHA-256 完全一致；新增 3 条回归测试；`run_all.py --skip-golden` 为 181 通过、0 失败，`compileall` 与三个入口 `--help` 通过 |
 | TST-008 | 检查 | 验证 BUG-019 健壮性与一致性修复 | 2026-06-13 | 已完成 | 新增 `test_maintenance_fixes.py` 覆盖异常关闭、无对象评分、Figure 引用过滤、完整流程复用、共享正则、drawing 回退、确定性编号和 Supplementary 上下文；`run_all.py --skip-golden` 为 190 通过、0 失败，`compileall`、三个入口 `--help` 与 `git diff --check` 通过；完整 `run_all.py` 的 3 项 Golden 因 Basic Benchmark 目录缺少 `images/index.json` 失败，与本次代码无关 |
+| TST-009 | 检查 | 对 Basic Benchmark 7 个 PDF 执行完整 Markdown 转换与 `--debug-visual` 图表提取 | 2026-06-18 | 已完成 | 输出位于 `tests/results/20260618-001/`；每个 PDF 按 `markdown/`、`assets/`、`images/`、`txt/` 分层保存；最终共提取 68 图 + 70 表，生成 138 张 debug 画线图；已按最终 `index.json` 重写 Markdown 资产段落，验证 138 个 Markdown 图片链接均存在 |
+| TST-010 | 检查 | 验证 BUG-020 的 Attention Figure 2 图内标题裁剪修复 | 2026-06-18 | 已完成 | 新增 far-side 检测回归测试，先复现 9 通过、1 失败，再修复为 10 通过、0 失败；重跑 Attention 的 `--debug-visual`，`Figure_2_p4_debug_stages.png` 红框已包含顶部说明；`compileall`、三个入口 `--help`、`run_all.py --skip-golden`（191 通过、0 失败）均通过 |
+| TST-011 | 检查 | 验证 BUG-021 的 Attention Figure 3 dense label 裁剪修复 | 2026-06-18 | 已完成 | 新增小对象带回归测试，先复现 10 通过、1 失败，再修复为 11 通过、0 失败；重跑 Attention `--debug-visual` 后 Figure 3 的 phase_b 从原 y1=253.8 恢复到 y1=306.3，final 为 `114.5,93.4 -> 509.8,306.5`；已目视检查 debug 图并验证该 PDF Markdown 9 个图片链接均存在 |
+| TST-012 | 检查 | 验证 BUG-022 的 Attention Figure 5 竖排文字裁剪修复 | 2026-06-18 | 已完成 | 新增竖排文本标签回归测试，先复现 11 通过、1 失败，再修复为 12 通过、0 失败；重跑 Attention `--debug-visual` 后 Figure 5 的 phase_b 从原 y1=557.4 恢复到 y1=596.3，final 为 `116.4,178.6 -> 504.0,596.4`；已目视检查 debug 图和最终截图，并验证该 PDF Markdown 9 个图片链接均存在 |
+| TST-013 | 检查 | 验证 BUG-023 的 Attention Table 2 顶部横线补偿修复 | 2026-06-19 | 已完成 | 新增渲染横线回归测试，先复现 12 通过、1 失败，再修复为 13 通过、0 失败；重跑 Attention `--debug-visual` 后 Table 2 的 baseline/phase_b 从原 y0=98.1 上移到 y0=93.3，final 为 `125.8,93.3 -> 486.3,246.9`；已目视检查 debug 图和最终截图，并验证该 PDF Markdown 9 个图片链接均存在 |
 
 ## 文档维护
 
@@ -98,6 +107,9 @@
 | DOC-017 | 文档 | 按 skill-creator 规范补全 CLI 参数参考文档 | 2026-06-13 | 已完成 | 新增 `skills/pdf-markdown-summary/references/cli-options.md`，覆盖 4 个入口全部参数（pdf_to_markdown/summarize_pdf/process_pdf 高层入口 + extract_pdf_assets 调参引擎按功能分组、常用调参场景、roadmap 预留参数）；SKILL.md References 段新增引用；两个现有 reference 各加 `cli-options.md` 交叉引用，确认 references 无孤立文件，`git diff --check` 通过 |
 | DOC-018 | 文档 | 文档审查并更新过期内容 | 2026-06-13 | 已完成 | 核实 README 输出文件清单与 roadmap 项均准确（gathered_text/figure_contexts/layout_model.json 仍产出；图片按 caption 位置插入仍为 roadmap）。更新 README：目录树补 `cli-options.md`、使用方法加调参提示、已完成列表补智能 caption 检测/四阶段精裁/双栏感知/复用机制/CLI 参考文档（中英两处对齐）。更新 `docs/skill-execution-flow-20260605.md`：修正日期笔误 2025→2026，Step B 反映 BUG-019/M2 的 `--reuse-existing` 复用机制；`git diff --check` 通过 |
 | DOC-019 | 文档 | 归档已完成的 skill 重构计划文档 | 2026-06-13 | 已完成 | 将 `docs/2-plans/` 下两个重构期文档（设计 + 实施计划）`git mv` 至 `docs/1-archive/skill-refactor-plans-20260605/`（保留 rename 历史），删除空的 `docs/2-plans/` 目录；同步更新 AGENTS.md 第 4 节 `docs/2-plans/` 描述与 task-list DOC-002/003 路径 |
+| DOC-020 | 文档 | 新增 task-list 结构说明文档 | 2026-06-17 | 已完成 | 文档位于 `docs/task-list结构说明-20260617.md`；已独立分析当前 `task-list.md` 的分区、字段、ID 前缀、动作枚举、状态用法和维护建议；`git diff --check -- task-list.md` 通过，`rg -n "[ \t]+$" docs/task-list结构说明-20260617.md task-list.md` 无行尾空白输出 |
+| DOC-021 | 文档 | 新增 Basic Benchmark 图表细致排查记录 | 2026-06-18 | 已完成 | 文档位于 `docs/Basic-Benchmark图表细致排查记录-20260618.md`；记录 7 个 PDF 本轮排查目标、Attention Figure 2/3/5、Table 2 根因、调整、验证结果和后续策略冲突清单 |
+| DOC-022 | 文档 | 同步 AGENTS.md 只读参考目录重编号（docs/3-ref→docs/2-ref） | 2026-06-20 | 已完成 | 用户将只读参考目录由 `docs/3-ref/` 重编号为 `docs/2-ref/`；更新 AGENTS.md §4（标注原 `docs/3-ref/`、已重编号、只读约束不变；禁止修改/删除/移动/重命名、禁止写入运行产物三条约束迁移到 `docs/2-ref/`）与 §8（验证规则“不要写入”同步改为 `docs/2-ref/`）；历史日志条目 ADJ-004/DOC-005/DOC-011 中 `docs/3-ref/` 为当时事实，保持不动 |
 
 ## 功能开发
 

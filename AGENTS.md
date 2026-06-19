@@ -31,10 +31,10 @@
 
 - `docs/1-archive/` 存放旧文档归档。
 - `docs/2-plans/` 原存放重构设计与实施计划，重构完成后已归档至 `docs/1-archive/`；后续如有新计划可重建该目录。
-- `docs/3-ref/` 是只读参考目录。
+- `docs/2-ref/` 是只读参考目录（原 `docs/3-ref/`，已重编号；只读约束不变）。
 - 所有新建 Markdown 文档文件名必须增加 `-yyyyMMDD` 时间后缀。
-- 禁止修改、删除、移动、重命名 `docs/3-ref/` 中的任何文件。
-- 禁止把新的运行产物写入 `docs/3-ref/`。
+- 禁止修改、删除、移动、重命名 `docs/2-ref/` 中的任何文件。
+- 禁止把新的运行产物写入 `docs/2-ref/`。
 - 与当前 Skill 重构无关的旧文档，应移动到 `docs/1-archive/`。
 
 ## 5. old-version 规则
@@ -65,7 +65,7 @@
 - 修改 Skill 脚本后，至少验证三个入口脚本的 `--help`。
 - 修改 Python 脚本后，至少运行一次 `compileall` 或同等语法检查。
 - 修改根目录 `scripts/` 后，同步到 Skill 目录，并检查两边差异。
-- 测试数据、测试输出放入 `tests/`，不要写入 `docs/3-ref/`。
+- 测试数据、测试输出放入 `tests/`，不要写入 `docs/2-ref/`。
 - 完成开发后如需进行实际 PDF 文档测试，优先使用 `tests/basic-benchmark/`（Basic Benchmark）中的 7 个 PDF 测试文件夹。
 - 实际测试输出统一写入 `tests/results/<yyyymmdd-xxx>/`，格式为日期加序号，如 `20260605-001`、`20260605-002`。
 - `tests/results/<yyyymmdd-xxx>/` 下按每个 PDF 名称建立独立结果目录，例如 `tests/results/20260605-001/<pdf-name>/`。

@@ -36,6 +36,7 @@ from .caption_detection import (
 )
 from .refine import (
     refine_clip_by_objects,
+    expand_clip_to_rendered_horizontal_rule,
     detect_content_bbox_pixels,
     adaptive_acceptance_thresholds,
     detect_far_side_text_evidence,
@@ -406,6 +407,12 @@ def extract_tables(
                         text_blocks_for_limit,
                         gap=table_caption_gap,
                     )
+                base_clip = expand_clip_to_rendered_horizontal_rule(
+                    base_clip,
+                    page,
+                    caption_bbox,
+                    direction,
+                )
                 clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
 
                 # ================================================================

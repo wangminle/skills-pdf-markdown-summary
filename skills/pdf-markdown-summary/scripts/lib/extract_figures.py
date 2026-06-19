@@ -447,6 +447,7 @@ def extract_figures(
                         near_edge_only=refine_near_edge_only,
                         use_axis_union=True,
                         use_horizontal_union=False,
+                        text_lines=text_lines,
                     )
 
                 clip_after_B = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
