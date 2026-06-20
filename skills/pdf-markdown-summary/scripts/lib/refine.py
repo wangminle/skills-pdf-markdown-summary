@@ -64,6 +64,159 @@ def _looks_like_short_figure_label(text: str) -> bool:
     return True
 
 
+def trim_far_side_noise_before_content(
+    clip: Any,
+    candidate_clip: Any,
+    direction: str,
+    image_rects: List[Any],
+    vector_rects: List[Any],
+    text_lines: Optional[List[Tuple[Any, float, str]]] = None,
+    *,
+    pad: float = 8.0,
+    min_gap: float = 18.0,
+) -> Any:
+    """Trim isolated far-side noise before the first real figure content."""
+    if fitz is None:
+        return candidate_clip
+
+    evidence: List[Any] = []
+
+    def _add_rect(r: Any) -> None:
+        inter = r & clip
+        if inter.width > 0 and inter.height > 0:
+            evidence.append(inter)
+
+    for r in image_rects:
+        _add_rect(r)
+
+    for r in vector_rects:
+        inter = r & clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        # Page separator/header rules are often thin and very wide. They can be
+        # picked up by pixel autocrop but should not define a figure boundary.
+        if inter.width >= 0.70 * clip.width and inter.height <= 4.0:
+            continue
+        _add_rect(r)
+
+    for line_rect, _font_size, text in text_lines or []:
+        txt = (text or "").strip()
+        if not txt:
+            continue
+        inter = line_rect & clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        # Keep figure-internal labels and compact annotations as content
+        # evidence, but avoid using full-width body/caption text as a far edge.
+        if _looks_like_short_figure_label(txt) or inter.width <= 0.45 * clip.width:
+            evidence.append(inter)
+
+    if not evidence:
+        return candidate_clip
+
+    if direction == "above":
+        content_edge = min(r.y0 for r in evidence)
+        if content_edge - candidate_clip.y0 < min_gap:
+            return candidate_clip
+        new_y0 = max(clip.y0, content_edge - pad)
+        if new_y0 >= candidate_clip.y1:
+            return candidate_clip
+        return fitz.Rect(candidate_clip.x0, new_y0, candidate_clip.x1, candidate_clip.y1)
+
+    if direction == "below":
+        content_edge = max(r.y1 for r in evidence)
+        if candidate_clip.y1 - content_edge < min_gap:
+            return candidate_clip
+        new_y1 = min(clip.y1, content_edge + pad)
+        if new_y1 <= candidate_clip.y0:
+            return candidate_clip
+        return fitz.Rect(candidate_clip.x0, candidate_clip.y0, candidate_clip.x1, new_y1)
+
+    return candidate_clip
+
+
+def expand_clip_to_nearby_figure_title(
+    original_clip: Any,
+    limited_clip: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    direction: str,
+    *,
+    pad: float = 4.0,
+    max_gap: float = 12.0,
+    max_title_font_size: float = 11.0,
+) -> Any:
+    """恢复紧贴图主体的图内标题，避免被 layout 标题 blocker 排除。"""
+    if fitz is None or original_clip.width <= 1 or original_clip.height <= 1:
+        return limited_clip
+    if limited_clip.width <= 1 or limited_clip.height <= 1:
+        return limited_clip
+
+    def _is_page_header(line_rect: Any, text: str) -> bool:
+        width_ratio = line_rect.width / max(1.0, original_clip.width)
+        return width_ratio >= 0.70 and line_rect.y0 <= original_clip.y0 + 80.0 and ":" in text
+
+    def _is_numbered_section(text: str) -> bool:
+        return bool(re.match(r"^\s*\d+(?:\.\d+)*\.?\s+\S", text))
+
+    def _is_section_number_only(text: str) -> bool:
+        return bool(re.match(r"^\s*(?:\d+(?:\.\d+)+\.?|\d+\.)\s*$", text))
+
+    section_number_lines = [
+        line_rect
+        for line_rect, _font_size, text in text_lines
+        if _is_section_number_only((text or "").strip())
+    ]
+
+    def _has_adjacent_section_number(line_rect: Any) -> bool:
+        for number_rect in section_number_lines:
+            vertical_overlap = min(line_rect.y1, number_rect.y1) - max(line_rect.y0, number_rect.y0)
+            if vertical_overlap <= 0:
+                continue
+            overlap_ratio = vertical_overlap / max(1.0, min(line_rect.height, number_rect.height))
+            horizontal_gap = line_rect.x0 - number_rect.x1
+            if overlap_ratio >= 0.60 and 0 <= horizontal_gap <= 24.0:
+                return True
+        return False
+
+    candidates: List[Any] = []
+    for line_rect, font_size, text in text_lines:
+        txt = (text or "").strip()
+        if not txt:
+            continue
+        if font_size > max_title_font_size:
+            continue
+        if _is_numbered_section(txt) or _is_section_number_only(txt) or _is_page_header(line_rect, txt):
+            continue
+        if _has_adjacent_section_number(line_rect):
+            continue
+        inter = line_rect & original_clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+
+        if direction == "above":
+            gap = limited_clip.y0 - line_rect.y1
+            if 0 <= gap <= max_gap and line_rect.y1 >= original_clip.y0:
+                candidates.append(line_rect)
+        elif direction == "below":
+            gap = line_rect.y0 - limited_clip.y1
+            if 0 <= gap <= max_gap and line_rect.y0 <= original_clip.y1:
+                candidates.append(line_rect)
+
+    if not candidates:
+        return limited_clip
+
+    if direction == "above":
+        new_y0 = max(original_clip.y0, min(r.y0 for r in candidates) - pad)
+        if new_y0 < limited_clip.y0:
+            return fitz.Rect(limited_clip.x0, new_y0, limited_clip.x1, limited_clip.y1)
+    elif direction == "below":
+        new_y1 = min(original_clip.y1, max(r.y1 for r in candidates) + pad)
+        if new_y1 > limited_clip.y1:
+            return fitz.Rect(limited_clip.x0, limited_clip.y0, limited_clip.x1, new_y1)
+
+    return limited_clip
+
+
 # ============================================================================
 # 像素级内容检测
 # ============================================================================
@@ -356,6 +509,195 @@ def _has_text_label_band_near_trimmed_edge(
     return union.y0 <= clip.y0 + edge_tolerance
 
 
+def _near_caption_annotation_text_edge(
+    clip: Any,
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    *,
+    direction: str,
+    proposed_edge: float,
+    caption_rect: Any,
+    edge_tolerance: float = 12.0,
+) -> Optional[float]:
+    """Return the near edge needed to include figure-internal subcaptions or prompt text."""
+    if fitz is None or not text_lines:
+        return None
+
+    trimmed = (clip.y1 - proposed_edge) if direction == "above" else (proposed_edge - clip.y0)
+    if trimmed < max(8.0, 0.03 * clip.height):
+        return None
+
+    band_rect = (
+        fitz.Rect(clip.x0, proposed_edge - edge_tolerance, clip.x1, clip.y1)
+        if direction == "above"
+        else fitz.Rect(clip.x0, clip.y0, clip.x1, proposed_edge + edge_tolerance)
+    )
+
+    candidates: List[Tuple[Any, str]] = []
+    for lb, _fs, text in text_lines:
+        txt = text.strip()
+        if not txt:
+            continue
+        full_inter = lb & clip
+        if full_inter.width <= 0 or full_inter.height <= 0:
+            continue
+        if (full_inter & band_rect).width <= 0 or (full_inter & band_rect).height <= 0:
+            continue
+        if (lb & caption_rect).width > 0 and (lb & caption_rect).height > 0:
+            continue
+        if re.match(r"^\s*(?:Figure|Table)\s+\S+", txt, re.I):
+            continue
+        if re.match(r"^\s*\d+(?:\.\d+)+\.?\s+\S", txt):
+            continue
+        candidates.append((full_inter, txt))
+
+    if not candidates:
+        return None
+
+    union = candidates[0][0]
+    for r, _txt in candidates[1:]:
+        union = union | r
+
+    touches_near_edge = (
+        union.y1 >= clip.y1 - edge_tolerance
+        if direction == "above"
+        else union.y0 <= clip.y0 + edge_tolerance
+    )
+    if not touches_near_edge:
+        return None
+
+    texts = [txt for _r, txt in candidates]
+    has_panel_label = any(re.match(r"^\s*\([a-z]\)\s+", txt, re.I) for txt in texts)
+    protected = has_panel_label and len(candidates) >= 2
+
+    compact_multiline = (
+        len(candidates) >= 3
+        and union.width <= min(180.0, 0.35 * clip.width)
+        and union.height <= max(70.0, 0.35 * clip.height)
+        and union.height >= max(24.0, 0.10 * clip.height)
+    )
+    if compact_multiline:
+        protected = True
+
+    if not protected:
+        return None
+
+    pad = 6.0
+    if direction == "above":
+        return min(clip.y1, max(proposed_edge, union.y1 + pad))
+    return max(clip.y0, min(proposed_edge, union.y0 - pad))
+
+
+def _nearby_short_label_rects(
+    clip: Any,
+    content_rect: Any,
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    caption_rect: Any,
+    *,
+    max_font_size: float = 10.5,
+    max_gap: float = 24.0,
+) -> List[Any]:
+    """Collect compact axis/title labels adjacent to detected figure objects."""
+    if fitz is None or not text_lines or content_rect.width <= 0 or content_rect.height <= 0:
+        return []
+
+    labels: List[Any] = []
+    for lb, font_size, text in text_lines:
+        txt = (text or "").strip()
+        if not txt:
+            continue
+        if font_size > max_font_size:
+            continue
+        if not _looks_like_short_figure_label(txt):
+            continue
+        if re.match(r"^\s*(?:Figure|Table)\s+\S+", txt, re.I):
+            continue
+        if (lb & caption_rect).width > 0 and (lb & caption_rect).height > 0:
+            continue
+
+        inter = lb & clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        if inter.width > max(120.0, 0.30 * clip.width):
+            continue
+
+        horizontal_overlap = min(inter.x1, content_rect.x1) - max(inter.x0, content_rect.x0)
+        vertical_overlap = min(inter.y1, content_rect.y1) - max(inter.y0, content_rect.y0)
+        horizontal_near = (
+            horizontal_overlap > 0
+            or content_rect.x0 - max_gap <= (inter.x0 + inter.x1) / 2 <= content_rect.x1 + max_gap
+        )
+        vertical_near = (
+            vertical_overlap > 0
+            or 0 <= content_rect.y0 - inter.y1 <= max_gap
+            or 0 <= inter.y0 - content_rect.y1 <= max_gap
+        )
+        if horizontal_near and vertical_near:
+            labels.append(inter)
+
+    return labels
+
+
+def _restore_far_side_short_labels_after_text_trim(
+    original_clip: Any,
+    trimmed_clip: Any,
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    caption_rect: Any,
+    direction: str,
+    *,
+    pad: float = 8.0,
+    max_gap: float = 28.0,
+    max_font_size: float = 10.5,
+) -> Any:
+    """Restore compact figure labels just outside a far-side text trim boundary."""
+    if fitz is None or not text_lines:
+        return trimmed_clip
+    if original_clip.width <= 1 or original_clip.height <= 1 or trimmed_clip.height <= 1:
+        return trimmed_clip
+
+    labels: List[Any] = []
+    for lb, font_size, text in text_lines:
+        txt = (text or "").strip()
+        if not txt:
+            continue
+        if font_size > max_font_size:
+            continue
+        if not _looks_like_short_figure_label(txt):
+            continue
+        if re.match(r"^\s*(?:Figure|Table)\s+\S+", txt, re.I):
+            continue
+        if (lb & caption_rect).width > 0 and (lb & caption_rect).height > 0:
+            continue
+
+        inter = lb & original_clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        if inter.width > max(120.0, 0.30 * original_clip.width):
+            continue
+
+        if direction == "above":
+            gap_to_trim = trimmed_clip.y0 - inter.y1
+            if 0 <= gap_to_trim <= max_gap and inter.y0 < trimmed_clip.y0:
+                labels.append(inter)
+        elif direction == "below":
+            gap_to_trim = inter.y0 - trimmed_clip.y1
+            if 0 <= gap_to_trim <= max_gap and inter.y1 > trimmed_clip.y1:
+                labels.append(inter)
+
+    if not labels:
+        return trimmed_clip
+
+    if direction == "above":
+        new_y0 = max(original_clip.y0, min(r.y0 for r in labels) - pad)
+        if new_y0 < trimmed_clip.y0 and trimmed_clip.y1 - new_y0 >= 40.0:
+            return fitz.Rect(trimmed_clip.x0, new_y0, trimmed_clip.x1, trimmed_clip.y1)
+    elif direction == "below":
+        new_y1 = min(original_clip.y1, max(r.y1 for r in labels) + pad)
+        if new_y1 > trimmed_clip.y1 and new_y1 - trimmed_clip.y0 >= 40.0:
+            return fitz.Rect(trimmed_clip.x0, trimmed_clip.y0, trimmed_clip.x1, new_y1)
+
+    return trimmed_clip
+
+
 def expand_clip_to_rendered_horizontal_rule(
     clip: Any,
     page: Any,
@@ -529,6 +871,18 @@ def refine_clip_by_objects(
                 union = union | r
             chosen = union
 
+    object_only_chosen = fitz.Rect(chosen)
+    nearby_labels = _nearby_short_label_rects(clip, chosen, text_lines, caption_rect)
+    for label_rect in nearby_labels:
+        chosen = chosen | label_rect
+
+    object_only_chosen = fitz.Rect(
+        object_only_chosen.x0 - object_pad,
+        object_only_chosen.y0 - object_pad,
+        object_only_chosen.x1 + object_pad,
+        object_only_chosen.y1 + object_pad,
+    )
+
     # 应用 padding
     chosen = fitz.Rect(
         chosen.x0 - object_pad,
@@ -542,6 +896,7 @@ def refine_clip_by_objects(
     if near_edge_only:
         if direction == 'above':
             proposed_y1 = min(clip.y1, max(chosen.y1, clip.y0 + 40.0))
+            annotation_probe_y1 = min(clip.y1, max(object_only_chosen.y1, clip.y0 + 40.0))
             if _has_small_object_band_near_trimmed_edge(
                 clip,
                 image_rects + vector_rects,
@@ -555,9 +910,19 @@ def refine_clip_by_objects(
                 proposed_edge=proposed_y1,
             ):
                 proposed_y1 = clip.y1
+            annotation_edge = _near_caption_annotation_text_edge(
+                clip,
+                text_lines,
+                direction=direction,
+                proposed_edge=annotation_probe_y1,
+                caption_rect=caption_rect,
+            )
+            if annotation_edge is not None:
+                proposed_y1 = max(proposed_y1, annotation_edge)
             result.y1 = proposed_y1
         else:
             proposed_y0 = max(clip.y0, min(chosen.y0, clip.y1 - 40.0))
+            annotation_probe_y0 = max(clip.y0, min(object_only_chosen.y0, clip.y1 - 40.0))
             if _has_small_object_band_near_trimmed_edge(
                 clip,
                 image_rects + vector_rects,
@@ -571,6 +936,15 @@ def refine_clip_by_objects(
                 proposed_edge=proposed_y0,
             ):
                 proposed_y0 = clip.y0
+            annotation_edge = _near_caption_annotation_text_edge(
+                clip,
+                text_lines,
+                direction=direction,
+                proposed_edge=annotation_probe_y0,
+                caption_rect=caption_rect,
+            )
+            if annotation_edge is not None:
+                proposed_y0 = min(proposed_y0, annotation_edge)
             result.y0 = proposed_y0
         result.x0 = min(result.x0, chosen.x0)
         result.x1 = max(result.x1, chosen.x1)
@@ -1124,6 +1498,122 @@ def restore_table_clip_width(
     return fitz.Rect(base_clip.x0, clip.y0, base_clip.x1, clip.y1)
 
 
+def restore_table_tail_after_layout_trim(
+    original_clip: Any,
+    adjusted_clip: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    direction: str,
+    *,
+    min_tail_height: float = 12.0,
+) -> Any:
+    """当 layout 远端裁剪误切掉表格尾部行时，恢复表格尾部边界。"""
+    if fitz is None or original_clip.width <= 1 or original_clip.height <= 1:
+        return adjusted_clip
+    if adjusted_clip.width <= 1 or adjusted_clip.height <= 1:
+        return adjusted_clip
+
+    if direction == "below":
+        if adjusted_clip.y1 >= original_clip.y1 - min_tail_height:
+            return adjusted_clip
+        tail_clip = fitz.Rect(
+            adjusted_clip.x0,
+            adjusted_clip.y1,
+            adjusted_clip.x1,
+            original_clip.y1,
+        )
+        if looks_like_table_text(tail_clip, text_lines):
+            return fitz.Rect(
+                adjusted_clip.x0,
+                adjusted_clip.y0,
+                adjusted_clip.x1,
+                original_clip.y1,
+            )
+    elif direction == "above":
+        if adjusted_clip.y0 <= original_clip.y0 + min_tail_height:
+            return adjusted_clip
+        tail_clip = fitz.Rect(
+            adjusted_clip.x0,
+            original_clip.y0,
+            adjusted_clip.x1,
+            adjusted_clip.y0,
+        )
+        if looks_like_table_text(tail_clip, text_lines):
+            return fitz.Rect(
+                adjusted_clip.x0,
+                original_clip.y0,
+                adjusted_clip.x1,
+                adjusted_clip.y1,
+            )
+
+    return adjusted_clip
+
+
+def expand_table_clip_to_text_bounds(
+    clip: Any,
+    reference_clip: Any,
+    caption_rect: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    direction: str,
+    *,
+    pad: float = 2.5,
+    max_expand: float = 8.0,
+    min_caption_gap: float = 1.0,
+) -> Any:
+    """给 Table final 增加少量文本 bbox 安全边距，避免 autocrop 贴字。"""
+    if fitz is None or clip.width <= 1 or clip.height <= 1:
+        return clip
+    if reference_clip.width <= 1 or reference_clip.height <= 1:
+        return clip
+    if not looks_like_table_text(clip, text_lines):
+        return clip
+
+    x0_bound = min(reference_clip.x0, clip.x0)
+    x1_bound = max(reference_clip.x1, clip.x1)
+    y0_bound = reference_clip.y0
+    y1_bound = reference_clip.y1
+
+    if direction == "above":
+        y1_bound = max(y1_bound, caption_rect.y0 - min_caption_gap)
+    elif direction == "below":
+        y0_bound = min(y0_bound, caption_rect.y1 + min_caption_gap)
+
+    probe = fitz.Rect(
+        max(x0_bound, clip.x0 - max_expand),
+        max(y0_bound, clip.y0 - max_expand),
+        min(x1_bound, clip.x1 + max_expand),
+        min(y1_bound, clip.y1 + max_expand),
+    )
+    if probe.width <= 1 or probe.height <= 1:
+        return clip
+
+    text_rect = None
+    for line_rect, _font_size, text in text_lines:
+        txt = (text or "").strip()
+        if not txt:
+            continue
+        if re.match(r"^\s*Table\s+\S+", txt, re.I):
+            continue
+        caption_overlap = line_rect & caption_rect
+        if caption_overlap.width > 0 and caption_overlap.height > 0:
+            continue
+        inter = line_rect & probe
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        text_rect = fitz.Rect(line_rect) if text_rect is None else text_rect | line_rect
+
+    if text_rect is None:
+        return clip
+
+    new_x0 = max(x0_bound, min(clip.x0, text_rect.x0 - pad))
+    new_y0 = max(y0_bound, min(clip.y0, text_rect.y0 - pad))
+    new_x1 = min(x1_bound, max(clip.x1, text_rect.x1 + pad))
+    new_y1 = min(y1_bound, max(clip.y1, text_rect.y1 + pad))
+
+    if new_x1 - new_x0 < 1 or new_y1 - new_y0 < 1:
+        return clip
+    return fitz.Rect(new_x0, new_y0, new_x1, new_y1)
+
+
 # ============================================================================
 # 动态验收阈值
 # ============================================================================
@@ -1435,7 +1925,7 @@ def limit_clip_by_text_blocks(
                 continue
             other_rect = _rect(other)
             vertical_gap = max(0.0, current.y0 - other_rect.y1, other_rect.y0 - current.y1)
-            if vertical_gap <= 60.0 and _looks_like_content_block(other):
+            if vertical_gap <= max(60.0, min_near_distance) and _looks_like_content_block(other):
                 nearby_short_titles += 1
         if nearby_short_titles >= 2:
             return True
@@ -1768,7 +2258,8 @@ def detect_exact_n_lines_of_text(
     text_lines: List[Tuple[Any, float, str]],
     typical_line_h: float,
     n: int = 2,
-    tolerance: float = 0.35
+    tolerance: float = 0.35,
+    min_line_width_ratio: float = 0.0,
 ) -> Tuple[bool, List[Any]]:
     """
     检测 clip_rect 中是否恰好包含 n 行文字。
@@ -1779,6 +2270,7 @@ def detect_exact_n_lines_of_text(
         typical_line_h: 典型行高
         n: 期望的行数
         tolerance: 容差（相对于期望值的比例）
+        min_line_width_ratio: 单行文字相对 clip 宽度的最小宽度比例
 
     Returns:
         (is_exact_n_lines, matched_line_bboxes)
@@ -1789,8 +2281,12 @@ def detect_exact_n_lines_of_text(
     # 筛选在区域内的文本行
     text_in_region = []
     for bbox, size_est, text in text_lines:
-        if bbox.intersects(clip_rect) and bbox.height < typical_line_h * 1.5:
-            text_in_region.append((bbox, size_est, text))
+        if not bbox.intersects(clip_rect) or bbox.height >= typical_line_h * 1.5:
+            continue
+        inter = bbox & clip_rect
+        if min_line_width_ratio > 0 and inter.width < clip_rect.width * min_line_width_ratio:
+            continue
+        text_in_region.append((bbox, size_est, text))
 
     if not text_in_region:
         return False, []
@@ -2044,7 +2540,12 @@ def trim_clip_head_by_text_v2(
 
         # 检测是否恰好有 2 行文字
         is_exact_two, matched_lines = detect_exact_n_lines_of_text(
-            check_strip, text_lines, typical_line_h, n=2, tolerance=0.35
+            check_strip,
+            text_lines,
+            typical_line_h,
+            n=2,
+            tolerance=0.35,
+            min_line_width_ratio=max(0.18, width_ratio * 0.35),
         )
 
         if is_exact_two and len(matched_lines) == 2:
@@ -2329,6 +2830,15 @@ def trim_clip_head_by_text_v2(
                     new_y1 = first_para_y0 - gap
                     min_trim = original_clip.y1 - 0.6 * original_clip.height
                     clip = fitz.Rect(clip.x0, clip.y0, clip.x1, max(new_y1, min_trim))
+
+    clip = _restore_far_side_short_labels_after_text_trim(
+        original_clip,
+        clip,
+        text_lines,
+        caption_rect,
+        direction,
+        pad=max(6.0, gap),
+    )
 
     # 强制最小高度
     min_h = 40.0

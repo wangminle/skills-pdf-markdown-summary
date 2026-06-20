@@ -20,6 +20,7 @@ if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
 
 import fitz
+import pytest
 
 import lib.refine as refine_module
 from lib.caption_detection import (
@@ -33,10 +34,16 @@ from lib.layout_model import adjust_clip_with_layout
 from lib.models import DocumentLayoutModel, EnhancedTextUnit, TextBlock
 from lib.refine import (
     detect_text_pollution,
+    expand_clip_to_nearby_figure_title,
+    expand_table_clip_to_text_bounds,
     limit_clip_by_neighbor_captions,
     limit_clip_by_text_blocks,
     looks_like_table_text,
+    refine_clip_by_objects,
     refine_clip_to_table_band,
+    restore_table_tail_after_layout_trim,
+    trim_far_side_noise_before_content,
+    trim_clip_head_by_text_v2,
     trim_far_side_text_iterative,
 )
 
@@ -212,7 +219,7 @@ def test_table_band_removes_body_and_keeps_full_table() -> None:
     )
     assert changed
     assert 200 <= refined.y0 <= 210, refined
-    assert refined.y1 == clip.y1
+    assert refined.y1 == pytest.approx(clip.y1, abs=0.01)
 
 
 def test_baseline_clip_stops_before_far_section_title_below_caption() -> None:
@@ -382,6 +389,324 @@ def test_baseline_clip_preserves_clustered_diagram_labels() -> None:
     )
 
     assert limited == clip
+
+
+def test_baseline_clip_preserves_spread_diagram_labels_above_caption() -> None:
+    clip = fitz.Rect(26, 0, 569, 303)
+    caption = fitz.Rect(71, 309, 526, 352)
+    blocks = [
+        _make_text_block(fitz.Rect(102, 106, 120, 111), "Query", "title_h3", 1),
+        _make_text_block(fitz.Rect(398, 110, 416, 114), "Query", "title_h3", 1),
+        _make_text_block(fitz.Rect(131, 135, 446, 149), "Response Response", "title_h3", 1),
+        _make_text_block(fitz.Rect(111, 212, 409, 218), "Query Query", "title_h3", 1),
+        _make_text_block(fitz.Rect(420, 246, 439, 250), "Response", "title_h3", 1),
+    ]
+
+    limited = limit_clip_by_text_blocks(
+        clip,
+        caption,
+        "above",
+        blocks,
+        gap=6,
+        min_near_distance=80,
+    )
+
+    assert limited == clip
+
+
+def test_autocrop_trims_far_side_header_rule_before_figure_content() -> None:
+    clip = fitz.Rect(26, 0, 569, 303)
+    autocrop = fitz.Rect(64, 39, 532, 303)
+    image_rects = []
+    vector_rects = [
+        fitz.Rect(82, 71, 513, 298),
+        fitz.Rect(70, 38, 526, 39),
+    ]
+    text_lines = [
+        (fitz.Rect(102, 106, 120, 111), 5.0, "Query"),
+        (fitz.Rect(131, 135, 446, 149), 5.0, "Response Response"),
+    ]
+
+    trimmed = trim_far_side_noise_before_content(
+        clip,
+        autocrop,
+        "above",
+        image_rects,
+        vector_rects,
+        text_lines,
+        pad=8,
+    )
+
+    assert 62 <= trimmed.y0 <= 64, trimmed
+    assert trimmed.y1 == autocrop.y1
+
+
+def test_baseline_expands_to_nearby_chart_title_above_figure() -> None:
+    original = fitz.Rect(26, 0, 569, 423)
+    limited = fitz.Rect(26, 158.5, 569, 423)
+    text_lines = [
+        (
+            fitz.Rect(68, 56, 527, 64),
+            8.0,
+            "Gemini 2.5: Pushing the Frontier with Advanced Reasoning.",
+        ),
+        (fitz.Rect(62, 116, 215, 128), 12.0, "4.1. Gemini Plays Pokemon"),
+        (
+            fitz.Rect(270, 145, 411, 152.5),
+            6.0,
+            "Gemini 2.5 Pro Plays Pokemon Progress Timeline",
+        ),
+        (fitz.Rect(200, 159, 221, 164), 3.8, "Hall of Fame"),
+    ]
+
+    expanded = expand_clip_to_nearby_figure_title(
+        original,
+        limited,
+        text_lines,
+        "above",
+        pad=4,
+        max_gap=12,
+    )
+
+    assert 140 <= expanded.y0 <= 142, expanded
+    assert expanded.y1 == limited.y1
+
+
+def test_baseline_title_recovery_ignores_page_header_and_section_title() -> None:
+    original = fitz.Rect(26, 0, 569, 236)
+    limited = fitz.Rect(26, 134, 569, 236)
+    text_lines = [
+        (
+            fitz.Rect(68, 56, 527, 64),
+            8.0,
+            "Gemini 2.5: Pushing the Frontier with Advanced Reasoning.",
+        ),
+        (fitz.Rect(62, 116, 215, 128), 12.0, "4.1. Gemini Plays Pokemon"),
+    ]
+
+    expanded = expand_clip_to_nearby_figure_title(
+        original,
+        limited,
+        text_lines,
+        "above",
+        pad=4,
+        max_gap=12,
+    )
+
+    assert expanded == limited
+
+
+def test_baseline_title_recovery_ignores_split_numbered_section_heading() -> None:
+    original = fitz.Rect(26.0, 224.4, 569.3, 508.0)
+    limited = fitz.Rect(26.0, 242.4, 569.3, 508.0)
+    text_lines = [
+        (fitz.Rect(70.9, 228.4, 83.3, 238.4), 10.0, "2.2"),
+        (fitz.Rect(93.3, 228.4, 210.1, 238.4), 10.0, "Audio Transformer (AuT)"),
+        (fitz.Rect(470.0, 256.0, 612.0, 266.0), 10.0, "Hi, I'm Qwen, your helpful assistant."),
+    ]
+
+    expanded = expand_clip_to_nearby_figure_title(
+        original,
+        limited,
+        text_lines,
+        "above",
+        pad=4,
+        max_gap=12,
+    )
+
+    assert expanded == limited
+
+
+def test_final_title_recovery_ignores_large_section_title() -> None:
+    original = fitz.Rect(26.0, 68.8, 586.0, 306.3)
+    limited = fitz.Rect(114.5, 93.0, 509.8, 306.3)
+    text_lines = [
+        (fitz.Rect(108.0, 72.8, 230.8, 84.7), 12.0, "Attention Visualizations"),
+        (fitz.Rect(119.6, 156.1, 130.0, 160.5), 4.5, "It"),
+    ]
+
+    expanded = expand_clip_to_nearby_figure_title(
+        original,
+        limited,
+        text_lines,
+        "above",
+        pad=4,
+        max_gap=12,
+    )
+
+    assert expanded == limited
+
+
+def test_phase_a_restores_far_side_short_chart_title() -> None:
+    clip = fitz.Rect(26.0, 247.7, 586.0, 605.5)
+    page = fitz.Rect(0.0, 0.0, 612.0, 792.0)
+    caption = fitz.Rect(103.6, 611.5, 508.7, 669.3)
+    text_lines = [
+        (
+            fitz.Rect(86.4, 238.1, 525.6, 249.0),
+            10.9,
+            "strengths of a learning approach — the policies are all sensible and qualitatively similar.",
+        ),
+        (
+            fitz.Rect(86.4, 251.7, 435.9, 262.6),
+            10.9,
+            "learning performs significant quantitative optimization on a name-specific basis.",
+        ),
+        (fitz.Rect(265.8, 275.6, 334.7, 289.3), 10.0, "absolute trainer"),
+        (fitz.Rect(405.8, 582.8, 463.6, 596.5), 10.0, "feature index"),
+    ]
+
+    trimmed = trim_clip_head_by_text_v2(
+        clip,
+        page,
+        caption,
+        "above",
+        text_lines,
+        width_ratio=0.5,
+        font_min=7,
+        font_max=16,
+        gap=6,
+        adjacent_th=24,
+        far_text_th=300,
+        far_text_para_min_ratio=0.30,
+        far_side_min_dist=50,
+        far_side_para_min_ratio=0.12,
+        typical_line_h=12,
+    )
+
+    assert 267 <= trimmed.y0 <= 271, trimmed
+    assert trimmed.y1 == clip.y1
+
+
+def test_phase_b_preserves_near_caption_panel_subcaptions() -> None:
+    clip = fitz.Rect(26.0, 82.0, 569.3, 311.9)
+    caption = fitz.Rect(62.4, 317.9, 422.4, 329.4)
+    vector_rects = [
+        fitz.Rect(55.3, 82.0, 541.1, 283.6),
+    ]
+    text_lines = [
+        (fitz.Rect(61.5, 284.2, 294.5, 294.2), 10.0, "(a) The fully autonomous Run 2 milestones as a func-"),
+        (fitz.Rect(62.4, 296.2, 236.2, 306.1), 10.0, "tion of the number of individual actions."),
+        (fitz.Rect(301.5, 284.1, 532.9, 294.2), 10.0, "(b) Comparison of 2.5 Pro and 2.5 Flash in terms of"),
+        (fitz.Rect(302.3, 296.2, 395.3, 306.1), 10.0, "actions to milestones."),
+    ]
+
+    refined = refine_clip_by_objects(
+        clip,
+        caption,
+        "above",
+        image_rects=[],
+        vector_rects=vector_rects,
+        object_pad=8.0,
+        min_area_ratio=0.015,
+        merge_gap=6.0,
+        near_edge_only=True,
+        use_axis_union=True,
+        text_lines=text_lines,
+    )
+
+    assert refined.y1 == pytest.approx(clip.y1, abs=0.01)
+
+
+def test_phase_b_expands_to_nearby_axis_titles_without_full_edge_fallback() -> None:
+    clip = fitz.Rect(26.0, 296.1, 586.0, 605.5)
+    caption = fitz.Rect(103.6, 611.5, 508.7, 669.3)
+    vector_rects = [
+        fitz.Rect(181.0, 304.4, 405.0, 574.0),
+    ]
+    text_lines = [
+        (fitz.Rect(405.8, 582.8, 463.6, 596.5), 10.0, "feature index"),
+        (fitz.Rect(218.6, 562.0, 270.8, 575.7), 10.0, "policy index"),
+        (fitz.Rect(103.6, 623.5, 508.7, 669.3), 10.0, "FIGURE 4: caption text"),
+    ]
+
+    refined = refine_clip_by_objects(
+        clip,
+        caption,
+        "above",
+        image_rects=[],
+        vector_rects=vector_rects,
+        object_pad=8.0,
+        min_area_ratio=0.015,
+        merge_gap=6.0,
+        near_edge_only=True,
+        use_axis_union=True,
+        text_lines=text_lines,
+    )
+
+    assert 604 <= refined.y1 <= clip.y1, refined
+    assert refined.y1 < clip.y1
+
+
+def test_phase_b_preserves_near_caption_prompt_text_column() -> None:
+    clip = fitz.Rect(26.0, 521.4, 569.3, 714.1)
+    caption = fitz.Rect(62.4, 720.1, 534.7, 745.2)
+    image_rects = [
+        fitz.Rect(61.1, 521.4, 523.1, 655.2),
+    ]
+    text_lines = [
+        (fitz.Rect(68.5, 656.5, 209.3, 667.5), 10.0, "Please convert this image into"),
+        (fitz.Rect(68.3, 670.2, 209.5, 681.0), 10.0, "SVG and try to reconstruct the"),
+        (fitz.Rect(76.2, 683.6, 201.6, 694.6), 10.0, "spatial arrangement of the"),
+        (fitz.Rect(121.0, 697.2, 156.9, 708.1), 10.0, "objects."),
+    ]
+
+    refined = refine_clip_by_objects(
+        clip,
+        caption,
+        "above",
+        image_rects=image_rects,
+        vector_rects=[],
+        object_pad=8.0,
+        min_area_ratio=0.015,
+        merge_gap=6.0,
+        near_edge_only=True,
+        use_axis_union=True,
+        text_lines=text_lines,
+    )
+
+    assert refined.y1 == pytest.approx(clip.y1, abs=0.01)
+
+
+def test_text_trim_ignores_narrow_axis_ticks_near_caption() -> None:
+    clip = fitz.Rect(26, 0, 569.3, 236.1)
+    page_rect = fitz.Rect(0, 0, 595, 842)
+    caption = fitz.Rect(62.4, 242.1, 365.3, 253.6)
+    text_lines = [
+        (
+            fitz.Rect(68.2, 56.0, 526.8, 64.0),
+            8.0,
+            "Gemini 2.5: Pushing the Frontier with Advanced Reasoning, Multimodality.",
+        ),
+        (fitz.Rect(101.4, 195.7, 107.1, 203.4), 4.5, "20"),
+        (fitz.Rect(104.2, 220.2, 107.1, 227.8), 4.5, "0"),
+        (fitz.Rect(88.9, 129.9, 98.1, 195.8), 5.4, "Accuracy / Pass rate (%)"),
+        (
+            fitz.Rect(62.4, 242.1, 365.3, 253.6),
+            10.9,
+            "Figure 3 | Impact of Thinking on Gemini models performance.",
+        ),
+    ]
+
+    trimmed = trim_clip_head_by_text_v2(
+        clip,
+        page_rect,
+        caption,
+        "above",
+        text_lines,
+        width_ratio=0.5,
+        font_min=7,
+        font_max=16,
+        gap=6,
+        adjacent_th=24,
+        far_text_th=300,
+        far_side_min_dist=50,
+        far_side_para_min_ratio=0.12,
+        typical_line_h=13.74,
+    )
+
+    assert trimmed.y1 == clip.y1
+    assert 68 <= trimmed.y0 <= 72, trimmed
 
 
 def test_baseline_clip_stops_at_wide_numeric_body_block() -> None:
@@ -691,6 +1016,104 @@ def test_restore_table_clip_width_recovers_over_narrow_structured_table() -> Non
     assert restored.x1 == base_clip.x1
     assert restored.y0 == narrow_clip.y0
     assert restored.y1 == narrow_clip.y1
+
+
+def test_layout_trim_preserves_structured_table_tail() -> None:
+    clip = fitz.Rect(26, 248.8, 566, 498.1)
+    caption = fitz.Rect(70, 224, 524, 246)
+    far_table_blocks = [
+        _make_text_block(fitz.Rect(163, 435, 490, 472), "87.9 91.2 90.0 90.0", "paragraph_group", 1),
+        _make_text_block(fitz.Rect(163, 463, 490, 482), "71.9 72.4 70.5 71.4", "paragraph_group", 1),
+        _make_text_block(fitz.Rect(163, 473, 490, 492), "30.8 47.3 50.2 51.1", "paragraph_group", 1),
+    ]
+    layout_model = DocumentLayoutModel(
+        page_size=(595, 842),
+        num_columns=2,
+        margin_left=70,
+        margin_right=525,
+        margin_top=50,
+        margin_bottom=790,
+        column_gap=20,
+        typical_font_size=10,
+        typical_line_height=11,
+        typical_line_gap=2,
+        text_units={0: []},
+        text_blocks={0: far_table_blocks},
+        vacant_regions={0: []},
+    )
+    text_lines = [
+        (fitz.Rect(278, 421, 315, 430), 8.8, "Counting"),
+        (fitz.Rect(70, 435, 119, 444), 8.8, "CountBench"),
+        (fitz.Rect(163, 435, 179, 444), 8.8, "87.9"),
+        (fitz.Rect(224, 435, 240, 444), 8.8, "91.2"),
+        (fitz.Rect(295, 435, 310, 444), 8.8, "93.6"),
+        (fitz.Rect(377, 435, 393, 444), 8.8, "90.0"),
+        (fitz.Rect(474, 435, 490, 444), 8.8, "90.0"),
+        (fitz.Rect(254, 449, 339, 458), 8.8, "Video Understanding"),
+        (fitz.Rect(70, 463, 145, 473), 8.8, "Video-MMEw/o sub"),
+        (fitz.Rect(163, 463, 179, 472), 8.8, "71.9"),
+        (fitz.Rect(224, 463, 240, 472), 8.8, "72.4"),
+        (fitz.Rect(295, 463, 310, 472), 8.8, "73.3"),
+        (fitz.Rect(377, 463, 393, 472), 8.8, "70.5"),
+        (fitz.Rect(474, 463, 490, 472), 8.8, "71.4"),
+        (fitz.Rect(70, 473, 106, 482), 8.8, "LVBench"),
+        (fitz.Rect(163, 473, 179, 482), 8.8, "30.8"),
+        (fitz.Rect(224, 473, 240, 482), 8.8, "57.9"),
+        (fitz.Rect(295, 473, 310, 482), 8.8, "47.3"),
+        (fitz.Rect(377, 473, 393, 482), 8.8, "50.2"),
+        (fitz.Rect(474, 473, 490, 482), 8.8, "51.1"),
+        (fitz.Rect(70, 483, 97, 492), 8.8, "MLVU"),
+        (fitz.Rect(163, 483, 179, 492), 8.8, "64.6"),
+        (fitz.Rect(224, 483, 240, 492), 8.8, "71.0"),
+        (fitz.Rect(295, 483, 310, 492), 8.8, "74.6"),
+        (fitz.Rect(377, 483, 393, 492), 8.8, "75.2"),
+        (fitz.Rect(474, 483, 490, 492), 8.8, "75.7"),
+    ]
+
+    adjusted = adjust_clip_with_layout(clip, caption, layout_model, 0, "below")
+    assert 428 <= adjusted.y1 <= 430, adjusted
+
+    restored = restore_table_tail_after_layout_trim(
+        clip,
+        adjusted,
+        text_lines,
+        "below",
+    )
+    assert restored.y1 == clip.y1
+    assert restored.x0 == adjusted.x0
+    assert restored.x1 == adjusted.x1
+
+
+def test_table_final_padding_keeps_text_bbox_before_caption() -> None:
+    final_clip = fitz.Rect(159.4, 69.8, 452.7, 126.7)
+    reference_clip = fitz.Rect(26.0, 0.0, 586.0, 126.4)
+    caption = fitz.Rect(142.8, 132.4, 468.9, 142.4)
+    text_lines = [
+        (fitz.Rect(170.2, 75.8, 210.0, 86.0), 10.0, "Test set"),
+        (fitz.Rect(252.0, 75.8, 341.0, 86.0), 10.0, "Offline"),
+        (fitz.Rect(374.0, 75.8, 441.8, 86.0), 10.0, "Streaming"),
+        (fitz.Rect(172.0, 90.0, 440.0, 100.0), 10.0, "w/o CS w/o RL w/ RL w/o CS w/o RL w/ RL"),
+        (fitz.Rect(176.0, 106.0, 432.0, 116.0), 10.0, "A 4.53 1.70 1.59 6.19 5.85 2.28"),
+        (fitz.Rect(176.0, 119.0, 441.8, 128.9), 10.0, "B 4.76 4.56 4.50 6.32 5.68 5.07"),
+        (
+            fitz.Rect(142.8, 132.4, 468.9, 142.4),
+            10.0,
+            "Table 5: Word Error Rate (WER, %) evaluation Result on code-switched test sets",
+        ),
+    ]
+
+    expanded = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "above",
+        pad=2.5,
+    )
+
+    assert expanded.y1 >= 131.0, expanded
+    assert expanded.y1 <= caption.y0 - 1.0, expanded
+    assert expanded.y0 == final_clip.y0
 
 
 def test_table_direction_ignores_adjacent_table_reference_line() -> None:

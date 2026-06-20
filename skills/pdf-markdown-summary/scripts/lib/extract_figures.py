@@ -41,6 +41,8 @@ from .refine import (
     detect_far_side_text_evidence,
     trim_far_side_text_post_autocrop,
     trim_clip_head_by_text_v2,
+    trim_far_side_noise_before_content,
+    expand_clip_to_nearby_figure_title,
     merge_rects,
     build_text_masks_px,
     snap_clip_edges,
@@ -395,12 +397,24 @@ def extract_figures(
                         if block.block_type in ['paragraph_group', 'list_group']
                         or block.block_type.startswith('title_')
                     ]
+                    clip_before_text_block_limit = create_rect(
+                        base_clip.x0,
+                        base_clip.y0,
+                        base_clip.x1,
+                        base_clip.y1,
+                    )
                     base_clip = limit_clip_by_text_blocks(
                         base_clip,
                         caption_bbox,
                         direction,
                         text_blocks_for_limit,
                         gap=caption_gap,
+                    )
+                    base_clip = expand_clip_to_nearby_figure_title(
+                        clip_before_text_block_limit,
+                        base_clip,
+                        text_lines,
+                        direction,
                     )
                 clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
 
@@ -546,6 +560,15 @@ def extract_figures(
                             typical_line_h=typical_line_h,
                             scan_lines=3,
                         )
+                        autocrop_clip = trim_far_side_noise_before_content(
+                            clip,
+                            autocrop_clip,
+                            direction,
+                            image_rects,
+                            vector_rects,
+                            text_lines,
+                            pad=max(8.0, object_pad),
+                        )
 
                         autocrop_h = autocrop_clip.height
                         base_h = base_clip.height
@@ -557,6 +580,14 @@ def extract_figures(
                             logger.debug(f"Figure {ident}: autocrop rejected (h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})")
                     except Exception as e:
                         logger.warning(f"Figure {ident}: autocrop failed: {e}")
+
+                if ident not in no_refine_set:
+                    final_clip = expand_clip_to_nearby_figure_title(
+                        clip_after_B,
+                        final_clip,
+                        text_lines,
+                        direction,
+                    )
 
                 # ================================================================
                 # 修复6: 增强验收检查

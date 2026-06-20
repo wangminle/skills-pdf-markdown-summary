@@ -43,6 +43,8 @@ from .refine import (
     trim_far_side_text_iterative,
     refine_clip_to_table_band,
     restore_table_clip_width,
+    restore_table_tail_after_layout_trim,
+    expand_table_clip_to_text_bounds,
     trim_clip_head_by_text_v2,
     merge_rects,
     build_text_masks_px,
@@ -484,6 +486,7 @@ def extract_tables(
                 # 版式驱动裁剪（如果提供了 layout_model）
                 # ================================================================
                 if layout_model is not None and ident not in no_refine_set:
+                    clip_before_layout = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
                     clip = adjust_clip_with_layout(
                         clip,
                         caption_bbox,
@@ -491,6 +494,12 @@ def extract_tables(
                         pno,
                         direction,
                         debug=debug_captions,
+                    )
+                    clip = restore_table_tail_after_layout_trim(
+                        clip_before_layout,
+                        clip,
+                        text_lines,
+                        direction,
                     )
 
                 table_band_changed = False
@@ -596,6 +605,13 @@ def extract_tables(
                     final_clip,
                     base_clip,
                     table_band_changed=table_band_changed,
+                )
+                final_clip = expand_table_clip_to_text_bounds(
+                    final_clip,
+                    clip,
+                    caption_bbox,
+                    text_lines,
+                    direction,
                 )
 
                 def save_current_debug(
