@@ -159,21 +159,25 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 已完成：
 
 - 正式 Skill 包结构。
-- PDF-to-Markdown 最小可用流程。
+- PDF-to-Markdown 可用流程。
 - 摘要素材准备入口。
 - 完整处理入口。
 - Markdown block JSON 与 conversion report 输出。
-- 智能 caption 检测（位置/格式/结构/上下文评分）与四阶段图表精裁（text-trim / 对象对齐 / 版式驱动 / autocrop）。
-- 双栏版式感知与强结构表格行带识别。
+- 智能 caption 检测（位置/格式/结构/上下文评分）与 Figure/Table 分流精裁。
+- 图表截图支持 baseline 限制、文本裁切、对象对齐、列感知 X 收窄、版式驱动、autocrop、final 安全补边和 debug visual。
+- Table 专用多行表头回收、渲染横线补偿、强结构表格行带识别、宽度恢复、末行/换行尾行保护和远端章节标题裁除。
+- 双栏版式感知与伪双栏几何防护。
 - 完整流程复用首次提取产物，避免重复解析 PDF。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
+- Basic Benchmark 七份 PDF 已完成多轮逐图 debug 排查，图表选取策略记录见 `docs/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
+- 当前图表提取代码流程说明见 `docs/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
 
 继续改进方向：
 
 - 图片按 caption 位置插入 Markdown。
-- pdfplumber 表格结构化。
-- OCR fallback。
+- pdfplumber 表格结构化输出。
+- OCR fallback（当前 CLI 保留 `--ocr` 参数，但生产流程仍依赖 PDF 文本层）。
 - 更完整的测试集与 benchmark。
 - 清理确认无引用的旧代码。
 
@@ -326,21 +330,25 @@ images/layout_model.json
 Implemented:
 
 - Formal Skill package.
-- Minimal PDF-to-Markdown pipeline.
+- Working PDF-to-Markdown pipeline.
 - Summary preparation CLI.
 - Combined processing CLI.
 - Markdown block JSON and conversion report.
-- Smart caption detection (position/format/structure/context scoring) and 4-phase clip refinement (text-trim / object-align / layout-driven / autocrop).
-- Double-column layout awareness and strong-structure table band detection.
+- Smart caption detection (position/format/structure/context scoring) and separate Figure/Table crop refinement.
+- Figure/Table screenshots support baseline limiting, text trimming, object alignment, column-aware X clipping, layout-driven trimming, autocrop, final padding, and debug overlays.
+- Table-specific multiline header recovery, rendered-rule compensation, strong table-band detection, width restoration, tail-row protection, wrapped-tail preservation, and far-side section-heading trimming.
+- Double-column layout awareness and false-double-column geometry guards.
 - Full pipeline reuses the first extraction to avoid re-parsing the PDF.
 - Complete CLI options reference (`references/cli-options.md`).
+- Multi-round Basic Benchmark visual review is recorded in `docs/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
+- Current extraction flow diagrams are documented in `docs/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.
 
 Planned:
 
 - Better asset placement in Markdown.
 - Structured table extraction.
-- OCR fallback.
+- OCR fallback (`--ocr` is reserved; production extraction currently relies on the PDF text layer).
 - Broader tests and benchmarks.
 - Safe cleanup of unused legacy code.
 

@@ -9,7 +9,7 @@ For the full list of command-line flags, see `cli-options.md`.
 1. Run `scripts/summarize_pdf.py` to prepare text and image assets.
 2. Read `text/<paper>.txt`.
 3. Read `images/index.json` and inspect all `images/*.png`.
-4. Rename figures and tables when needed.
+4. If any crop looks suspicious, rerun the asset extractor with `--debug-visual --debug-captions` and inspect the overlay images.
 5. Write `<paper>_阅读摘要-YYYYMMDD.md`.
 
 ## Command
@@ -25,6 +25,7 @@ python3 scripts/summarize_pdf.py --pdf "<paper>.pdf" --preset robust
 - Audience: senior undergraduate students in the same field.
 - Include all important figures and tables.
 - Use relative image links.
+- Explain why each included figure/table matters; do not include images as decoration.
 
 ## Recommended Structure
 
@@ -50,5 +51,6 @@ Always use both:
 
 - `text/<paper>.txt`
 - `images/*.png`
+- `images/index.json`
 
 Do not write the summary from text only when figures are available.

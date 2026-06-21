@@ -1,96 +1,67 @@
 ---
 name: pdf-markdown-summary
-description: Use this skill when the user wants to turn a PDF (especially a research paper or technical report) into well-structured Markdown with extracted figures/tables, or generate a reading summary with embedded images. Do NOT trigger for general PDF operations like merge, split, rotate, watermark, encrypt, or form-filling — those belong to the system pdf skill. Trigger specifically for "PDF 转 Markdown", "转 md", "提取图表", "论文摘要", "带图摘要", "阅读笔记", "论文阅读摘要", "资料库入库", "处理这篇论文", "extract figures from PDF", "paper summary with figures".
+description: Convert PDFs, especially research papers and technical reports, into structured Markdown with extracted figure/table screenshots, or prepare figure-aware reading summaries. Use for "PDF 转 Markdown", "转 md", "提取图表", "论文摘要", "带图摘要", "阅读笔记", "论文阅读摘要", "资料库入库", "处理这篇论文", "extract figures/tables from PDF", and "paper summary with figures". Do not use for generic PDF merge/split/rotate/watermark/encrypt/form-filling tasks; use the system pdf skill for those.
 ---
 
 # PDF Markdown Summary
 
-Convert PDF documents — especially research papers and technical reports — into well-structured Markdown with extracted figure/table assets, or generate a Chinese reading summary with embedded images.
+Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-## When to Use This Skill
+## Core Workflow
 
-**Use this skill when the user wants to:**
+1. Choose the entry point:
+   - `scripts/pdf_to_markdown.py` for PDF -> Markdown.
+   - `scripts/summarize_pdf.py` for summary assets only.
+   - `scripts/process_pdf.py` for Markdown plus summary assets in one run.
+   - `scripts/extract_pdf_assets.py` only when tuning figure/table extraction.
+2. Run the script with `--preset robust` unless a narrow diagnostic task requires custom flags.
+3. Inspect generated Markdown, `images/index.json`, extracted PNGs, and any `--debug-visual` overlays when crop quality matters.
+4. For summaries, read both `text/<paper>.txt` and the extracted images before writing the final note.
 
-- Convert a PDF to well-structured Markdown (preserve headings, paragraphs, formulas)
-- Extract figures, tables, or diagrams from a PDF as standalone PNG images
-- Generate a reading summary of a research paper with embedded figures
-- Prepare PDF content for knowledge-base ingestion
-- Create a Chinese or English paper reading note ("阅读笔记")
-
-**Do NOT use this skill when the user wants to:**
-
-- Merge, split, rotate, watermark, or encrypt PDFs → use the system `pdf` skill
-- Fill PDF forms → use the system `pdf` skill
-- Create PDFs from scratch → use the system `pdf` skill
-- Basic OCR on scanned documents → use the system `pdf` skill
-
-## Three Workflows
-
-### 1. PDF-to-Markdown (转 Markdown)
-
-Convert a PDF into structured Markdown with extracted assets.
+## Commands
 
 ```bash
-python3 scripts/pdf_to_markdown.py --pdf "<paper>.pdf" --out "<paper>.md"
+python3 scripts/pdf_to_markdown.py --pdf "<paper>.pdf" --out "<paper>.md" --images figures --tables screenshot
 ```
-
-Outputs:
-- `{stem}.md` — structured Markdown document
-- `images/Figure_*.png`, `images/Table_*.png` — extracted assets
-- `images/index.json` — asset index with captions, pages, identifiers
-- `text/{stem}.txt` — plain text extraction
-- `text/conversion_report.json` — conversion quality report
-
-### 2. PDF Summary (论文摘要)
-
-Extract text and figure assets, then write a reading summary with embedded images.
 
 ```bash
 python3 scripts/summarize_pdf.py --pdf "<paper>.pdf" --preset robust
 ```
 
-After the command finishes:
-1. Read `text/<paper>.txt` for full paper text
-2. Read `images/index.json` and inspect all `images/*.png`
-3. Write `{paper}_阅读摘要-{date}.md` with embedded relative image links
-
-### 3. Complete Processing (完整处理)
-
-Run Markdown conversion and summary preparation together.
-
 ```bash
 python3 scripts/process_pdf.py --pdf "<paper>.pdf" --out "<paper>.md" --preset robust
 ```
 
+For crop diagnostics:
+
+```bash
+python3 scripts/extract_pdf_assets.py --pdf "<paper>.pdf" --preset robust --debug-visual --debug-captions
+```
+
 ## Output Rules
 
-**For Markdown conversion:**
-- Use relative image paths: `images/Figure_1_xxx.png`
-- Preserve headings, paragraphs, and document structure
-- If table structure extraction fails, use screenshot fallback — never drop tables
+- Use relative image links in generated Markdown.
+- Keep table screenshots when structure extraction is unavailable; do not drop tables.
+- For summaries, default to Chinese unless the user asks for another language.
+- Always use both the text file and Figure/Table images when writing a figure-aware summary.
+- Explain important figures and tables briefly instead of listing images without interpretation.
 
-**For summaries:**
-- Default language: Chinese (unless user requests English)
-- Target 1500-3000 Chinese characters for research-paper summaries
-- Embed all important figures and tables
-- Explain each figure/table in 1-2 concise sentences
-- Write for senior undergraduate readers in the same technical field
-- Always use BOTH text AND images — do not write summary from text alone
+## Extraction Capabilities
 
-## Core Capabilities (What Makes This Skill Different)
+The asset extractor includes:
 
-This skill provides **intelligent figure/table extraction** beyond simple embedded-image export:
-
-- **Caption detection**: Finds "Figure 1:", "Table 2:", "Figure SIV", "图1" captions and uses them to locate assets
-- **Identifier parsing**: Supports roman numerals (I, IV), S-prefix (S1, SIV), Extended Data, Chinese labels (图/表/附图)
-- **4-phase clip refinement**: text-trim → object-align → layout-driven → autocrop
-- **Acceptance checking**: Validates extraction quality with fallback mechanism
-- **Context building**: Links figures/tables to their text references in the paper body
+- Smart caption scoring using position, format, structure, and context.
+- Identifier parsing for numeric, roman, S-prefix, Extended Data, Chinese Figure/Table labels.
+- Direction detection using local evidence, global anchor fallback, page-position heuristics, and explicit overrides.
+- Baseline limiting by neighboring captions and layout text blocks.
+- Figure refinement for text trimming, object alignment, column-aware X clipping, layout adjustment, autocrop, and figure-title recovery.
+- Table refinement for multiline header recovery, rendered horizontal-rule compensation, table-band detection, width restoration, text-bbox padding, wrapped-tail preservation, and far-side section-heading trimming.
+- Debug overlays showing `baseline`, `phase_a`, `phase_b`, and `final` regions.
 
 ## References
 
-For detailed workflow instructions and advanced options, read the relevant reference:
+Load only the reference needed for the current task:
 
-- `references/pdf-to-markdown.md` — PDF-to-Markdown workflow details
-- `references/pdf-summary.md` — Summary workflow details
-- `references/cli-options.md` — Complete CLI options reference for all entry points
+- `references/pdf-to-markdown.md` for Markdown conversion workflow.
+- `references/pdf-summary.md` for figure-aware summary workflow.
+- `references/cli-options.md` for all CLI flags and extraction tuning options.

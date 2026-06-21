@@ -72,3 +72,4 @@ cython_debug/
 tests/results/
 
 # Benchmark 输入数据 (tests/basic-benchmark/) 为测试输入 PDF，已纳入版本控制，不忽略
+/tests/some-verification

@@ -1,6 +1,6 @@
-# Basic Benchmark 图表细致排查记录
+# Basic Benchmark 图表细致排查记录（20260618-0621）
 
-> 日期：2026-06-18
+> 日期：2026-06-18 至 2026-06-21
 > 范围：`tests/basic-benchmark/` 中 7 个 PDF 的 Markdown 转换、图表提取与 `--debug-visual` 逐图排查。
 > 输出批次：`tests/results/20260618-001/`
 
@@ -1185,6 +1185,31 @@ Figure 5 与 Figure 3 同属于 attention visualization / dense label figure，�
 - Table 的数字弱行回补没有删除，只是不再作为“远端收紧安全起点”；这避免正文数字句污染，同时仍保留 Qwen Table 2 这类真实末行回补。
 - `network?` 保护只在 `below` 方向、紧贴多片段表格行、短窄单行时触发；后续章节标题仍由 `trim_table_far_side_section_heading()` 裁除。
 - Figure 小写正文尾句规则只处理明显正文残片，不影响无句末标点的图内短标题、轴标题和面板标签。
+
+## 阶段性总复盘：为什么这轮最终能收口
+
+目前 Basic Benchmark 里的图和表选取已经基本达到完全正确状态。这个结果不是靠某一个通用阈值调准，而是把图表裁剪从“最终截图是否好看”拆成了可定位、可验证、可回归的多个阶段问题。
+
+本轮最有效的做法，是始终按 debug visual 的阶段边界排查：先看 `baseline` 是否已经选错方向或漏掉主体，再看 layout blocker、Phase A、Phase B、X 收窄、autocrop 和 final 文本补边分别承担了什么责任。这样每个错误都能定位到具体阶段，而不是在最终红框上反复猜参数。
+
+第二个关键点是修复范围控制得足够细。大量调整都被限定为 `Figure-only`、`Table-only`、`final-only`、`near-caption-only` 或 `text-bbox-aware`，例如 FunAudio Table 5 只做 Table final 安全补边，Gemini 图内标题只在 Figure 路径回收，Qwen 表格章节标题只在 Table 远端裁除逻辑里处理。这样能修掉目标 case，同时降低对其他已通过样本的干扰。
+
+第三个关键点是持续记录策略冲突和负例。Gemini 图内标题回收可能误伤 Qwen 章节标题，Qwen 表格章节裁除可能误伤 Gemini/Kearns 表头，Table 末行回补又可能让 Gemini Table 12 的数字正文回归。每次发现冲突后，都没有简单撤回修复，而是补充更精确的守卫条件和回归测试，把“正例要保住、负例要排除”的边界写清楚。
+
+第四个关键点是把视觉经验沉淀成结构化判断。最后稳定下来的规则不是“上移几 pt”或“下移几 pt”，而是识别多行表头、短图内标题、轴刻度、竖排标签、同排数据单元格、正文段落 blocker、裸 Figure caption、伪双栏 column gap 和换行尾行等具体版式结构。这些规则更接近 PDF 的真实排版语义，因此比单一像素阈值更容易泛化。
+
+第五个关键点是验证闭环比较完整。每轮修改都结合真实 PDF 重跑、用户点名 debug 图目视复核、历史问题回看和单元测试补充。到最终收口时，`test_caption_anchor_quality.py` 已覆盖 72 个图表裁剪回归样本，完整 `tests/scripts` 为 111 通过；同时 `compileall`、4 个入口脚本 `--help` 和 `git diff --check` 都通过。
+
+这轮做得比较好的方向：
+
+- 阶段化 debug：把问题定位到具体裁剪阶段，而不是直接调最终框。
+- 局部化修复：优先 Table/Figure 分流，避免全局 autocrop 参数波动。
+- 保守优先级清晰：无法稳定区分时，宁可保留一点空白，也不裁掉表头、末行、图内标签。
+- 冲突意识强：每个修复都检查是否伤害之前样本，尤其关注 Gemini、Qwen、Kearns、Attention 之间的策略冲突。
+- 文档化充分：从 BUG-020 到 BUG-040，现象、根因、修复、坐标、验证、风险都记录在同一份文档里。
+- 真实 PDF 与单元测试并行：视觉结果解决“是不是对”，回归测试解决“以后会不会又坏”。
+
+总结来说，本轮成功的关键是把图表裁剪拆成 caption 锚点、方向、版式阻断、对象证据、文本证据和最终补边几个可解释的子问题，并且每个修复都控制作用范围。最终才能既修掉用户点名问题，又基本不破坏其他已经合格的图表。
 
 ## 当前策略冲突清单
 

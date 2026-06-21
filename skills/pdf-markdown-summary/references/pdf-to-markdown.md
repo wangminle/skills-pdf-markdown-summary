@@ -19,8 +19,7 @@ python3 scripts/pdf_to_markdown.py \
   --out "<paper>.md" \
   --asset-dir images \
   --tables auto \
-  --images figures \
-  --ocr auto
+  --images figures
 ```
 
 ## Expected Outputs
@@ -37,9 +36,10 @@ text/
 
 - Use PyMuPDF as the primary PDF backend.
 - Use pdfplumber only as an optional table-structure enhancement.
-- Use OCR only when requested or when text-layer detection is insufficient.
+- Treat OCR flags as reserved roadmap options; current production extraction relies on the PDF text layer.
 - Do not drop tables if structure extraction fails; use image fallback.
 - Keep Markdown paths relative to the Markdown file location.
+- Use `--debug-visual` through `scripts/extract_pdf_assets.py` when figure/table crop quality needs diagnosis.
 
 ## Quality Checks
 
