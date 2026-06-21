@@ -44,7 +44,9 @@ from .refine import (
     refine_clip_to_table_band,
     restore_table_clip_width,
     restore_table_tail_after_layout_trim,
+    expand_clip_to_nearby_table_header,
     expand_table_clip_to_text_bounds,
+    trim_table_far_side_section_heading,
     trim_clip_head_by_text_v2,
     merge_rects,
     build_text_masks_px,
@@ -395,6 +397,12 @@ def extract_tables(
                         gap=table_caption_gap,
                     )
 
+                table_text_reference_clip = create_rect(
+                    base_clip.x0,
+                    base_clip.y0,
+                    base_clip.x1,
+                    base_clip.y1,
+                )
                 if layout_model is not None:
                     text_blocks_for_limit = [
                         block
@@ -402,12 +410,25 @@ def extract_tables(
                         if block.block_type in ['paragraph_group', 'list_group']
                         or block.block_type.startswith('title_')
                     ]
+                    clip_before_text_block_limit = create_rect(
+                        base_clip.x0,
+                        base_clip.y0,
+                        base_clip.x1,
+                        base_clip.y1,
+                    )
                     base_clip = limit_clip_by_text_blocks(
                         base_clip,
                         caption_bbox,
                         direction,
                         text_blocks_for_limit,
                         gap=table_caption_gap,
+                    )
+                    base_clip = expand_clip_to_nearby_table_header(
+                        clip_before_text_block_limit,
+                        base_clip,
+                        text_lines,
+                        caption_bbox,
+                        direction,
                     )
                 base_clip = expand_clip_to_rendered_horizontal_rule(
                     base_clip,
@@ -608,11 +629,22 @@ def extract_tables(
                 )
                 final_clip = expand_table_clip_to_text_bounds(
                     final_clip,
-                    clip,
+                    table_text_reference_clip,
                     caption_bbox,
                     text_lines,
                     direction,
+                    layout_text_blocks=layout_model.text_blocks.get(pno, []) if layout_model is not None else None,
                 )
+
+                if layout_model is not None and ident not in no_refine_set:
+                    final_clip = trim_table_far_side_section_heading(
+                        final_clip,
+                        caption_bbox,
+                        direction,
+                        layout_model.text_blocks.get(pno, []),
+                        text_lines,
+                        typical_line_h=typical_line_h,
+                    )
 
                 def save_current_debug(
                     *,

@@ -287,7 +287,7 @@ def score_local_direction(
         search_height = min(300.0, max(160.0, clip_height * 0.5))
         page_width = max(1.0, page_rect.width)
 
-        def table_text_score(side: str) -> float:
+        def table_text_features(side: str) -> Tuple[float, Optional[float], int, Optional[float]]:
             if side == 'above':
                 nearby = [
                     line for line in text_lines
@@ -303,6 +303,15 @@ def score_local_direction(
                 ]
                 gaps = [line[0].y0 - caption_bbox.y1 for line in nearby]
 
+            caption_like_gaps = [
+                (caption_bbox.y0 - line[0].y1) if side == "above" else (line[0].y0 - caption_bbox.y1)
+                for line in nearby
+                if re.match(
+                    r"^\s*(?:table|tab\.?|figure|fig\.?)\s*[A-Z]?\d+\b",
+                    line[2].strip(),
+                    re.IGNORECASE,
+                )
+            ]
             nearby = [
                 line for line in nearby
                 if not re.match(
@@ -318,7 +327,7 @@ def score_local_direction(
             ]
 
             if not nearby:
-                return 0.0
+                return 0.0, None, 0, (min(caption_like_gaps) if caption_like_gaps else None)
 
             rows: List[List[Tuple["fitz.Rect", float, str]]] = []
             row_centers: List[float] = []
@@ -358,20 +367,58 @@ def score_local_direction(
             nearest_gap = min(structured_gaps) if structured_gaps else min(gaps)
             proximity = math.exp(-nearest_gap / 20.0)
             structure_bonus = min(1.0, len(structured_gaps) / 4.0)
-            return (
+            score = (
                 0.20 * short_ratio
                 + 0.15 * (1.0 - wide_long_ratio)
                 + 0.50 * proximity
                 + 0.15 * structure_bonus
             )
+            return (
+                score,
+                (min(structured_gaps) if structured_gaps else None),
+                len(structured_gaps),
+                (min(caption_like_gaps) if caption_like_gaps else None),
+            )
 
-        above_text_score = table_text_score('above')
-        below_text_score = table_text_score('below')
+        (
+            above_text_score,
+            above_structured_gap,
+            above_structured_count,
+            above_caption_like_gap,
+        ) = table_text_features('above')
+        (
+            below_text_score,
+            below_structured_gap,
+            below_structured_count,
+            below_caption_like_gap,
+        ) = table_text_features('below')
         score_diff = abs(above_text_score - below_text_score)
+        if (
+            above_structured_gap is not None
+            and below_structured_gap is not None
+            and below_caption_like_gap is not None
+            and below_caption_like_gap <= search_height
+            and above_structured_gap <= 25.0
+            and abs(above_structured_gap - below_structured_gap) <= 8.0
+            and below_text_score - above_text_score <= 0.12
+        ):
+            return 'above', 0.62
         if score_diff >= 0.03:
             direction = 'above' if above_text_score > below_text_score else 'below'
             confidence = min(0.95, 0.60 + score_diff * 2.0)
             return direction, confidence
+        if (
+            above_structured_gap is not None
+            and below_structured_gap is not None
+            and above_structured_count > 0
+            and below_structured_count > 0
+        ):
+            gap_diff = abs(above_structured_gap - below_structured_gap)
+            nearest_gap = min(above_structured_gap, below_structured_gap)
+            if gap_diff >= 5.0 and nearest_gap <= 35.0:
+                direction = 'above' if above_structured_gap < below_structured_gap else 'below'
+                confidence = min(0.72, 0.60 + gap_diff / 100.0)
+                return direction, confidence
 
     x_left = page_rect.x0 + margin_x
     x_right = page_rect.x1 - margin_x
@@ -398,6 +445,58 @@ def score_local_direction(
         return ('below', below_ratio)
 
     return ('below' if is_table else 'above', max(above_ratio, below_ratio))
+
+
+def correct_bare_figure_caption_direction(
+    direction: str,
+    caption_bbox: "fitz.Rect",
+    caption_text: str,
+    page_rect: "fitz.Rect",
+    image_rects: List["fitz.Rect"],
+    vector_rects: List["fitz.Rect"],
+    neighbor_caption_rects: List["fitz.Rect"],
+    *,
+    clip_height: float = 400.0,
+    caption_gap: float = 3.0,
+) -> str:
+    """纠正只有 ``Figure N`` 的独立短 caption 被下方下一张图吸走的方向。
+
+    GPT-5 System Card 中存在短 caption 单独居中的版式：真实图在 caption 上方，
+    而下方紧接下一张更大的图。普通对象覆盖率会偏向下方，因此这里要求同时满足：
+    当前已判为 below、caption 文本为裸 ``Figure N``、下方有下一张 figure caption、
+    且 caption 上方近处有实际对象证据。
+    """
+    if direction != "below":
+        return direction
+    if not re.match(r"^\s*(?:figure|fig\.?)\s+[A-Z]?\d+\s*$", caption_text or "", re.I):
+        return direction
+
+    next_caption_gaps = [
+        rect.y0 - caption_bbox.y1
+        for rect in neighbor_caption_rects
+        if rect.y0 >= caption_bbox.y1 + caption_gap
+    ]
+    if not next_caption_gaps:
+        return direction
+    if min(next_caption_gaps) > min(340.0, max(140.0, clip_height * 0.85)):
+        return direction
+
+    search_top = max(page_rect.y0, caption_bbox.y0 - min(220.0, max(80.0, clip_height * 0.55)))
+    near_above = create_rect(page_rect.x0, search_top, page_rect.x1, caption_bbox.y0 - caption_gap)
+    if near_above.height <= 1:
+        return direction
+
+    for rect in list(image_rects) + list(vector_rects):
+        inter = rect & near_above
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        horizontal_overlap = inter.width / max(1.0, min(rect.width, near_above.width))
+        if horizontal_overlap < 0.20:
+            continue
+        gap = caption_bbox.y0 - rect.y1
+        if 0 <= gap <= 90.0:
+            return "above"
+    return direction
 
 
 def determine_direction(
@@ -493,6 +592,7 @@ _score_direction_for_caption = score_direction_for_caption
 __all__ = [
     "compute_global_anchor",
     "determine_direction",
+    "correct_bare_figure_caption_direction",
     "score_direction_for_caption",
     "score_local_direction",
     "compute_object_ratio",

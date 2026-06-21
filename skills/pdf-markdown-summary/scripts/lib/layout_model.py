@@ -225,19 +225,39 @@ def detect_columns(
             peak1_x = bins[top_peaks[0]]
             peak2_x = bins[top_peaks[1]]
 
-            num_columns = 2
-            column_gap = peak2_x - peak1_x - (page_width - peak2_x)
-            mid_x = (peak1_x + peak2_x) / 2
+            candidate_gap = peak2_x - peak1_x - (page_width - peak2_x)
+            peak_sep = peak2_x - peak1_x
+            valid_gap = 0 < candidate_gap <= 0.30 * page_width
+            valid_sep = 0.18 * page_width <= peak_sep <= 0.60 * page_width
 
-            if debug:
-                print(f"Detected TWO columns:")
-                print(f"  Left column x0 ≈ {peak1_x:.1f}pt")
-                print(f"  Right column x0 ≈ {peak2_x:.1f}pt")
-                print(f"  Column gap ≈ {column_gap:.1f}pt")
+            if not (valid_gap and valid_sep):
+                num_columns = 1
+                column_gap = 0.0
 
-            for units in all_units.values():
-                for unit in units:
-                    unit.column = 0 if unit.bbox.x0 < mid_x else 1
+                if debug:
+                    print("Rejected TWO-column candidate:")
+                    print(f"  Left peak x0 ≈ {peak1_x:.1f}pt")
+                    print(f"  Right peak x0 ≈ {peak2_x:.1f}pt")
+                    print(f"  Candidate gap ≈ {candidate_gap:.1f}pt")
+                    print(f"  Peak separation ≈ {peak_sep:.1f}pt")
+
+                for units in all_units.values():
+                    for unit in units:
+                        unit.column = -1
+            else:
+                num_columns = 2
+                column_gap = candidate_gap
+                mid_x = (peak1_x + peak2_x) / 2
+
+                if debug:
+                    print(f"Detected TWO columns:")
+                    print(f"  Left column x0 ≈ {peak1_x:.1f}pt")
+                    print(f"  Right column x0 ≈ {peak2_x:.1f}pt")
+                    print(f"  Column gap ≈ {column_gap:.1f}pt")
+
+                for units in all_units.values():
+                    for unit in units:
+                        unit.column = 0 if unit.bbox.x0 < mid_x else 1
         else:
             num_columns = 1
             column_gap = 0.0

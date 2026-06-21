@@ -58,7 +58,12 @@ from .extract_helpers import (
     estimate_document_line_metrics,
     DrawItem,
 )
-from .direction import compute_global_anchor, determine_direction, score_local_direction
+from .direction import (
+    compute_global_anchor,
+    correct_bare_figure_caption_direction,
+    determine_direction,
+    score_local_direction,
+)
 from .layout_model import adjust_clip_with_layout
 from .debug_visual import create_debug_stage, save_debug_visualization
 from .models import DebugStageInfo, CaptionBlock
@@ -353,6 +358,31 @@ def extract_figures(
                     page_position_heuristic=True,
                     local_evidence=local_evidence,
                 )
+                figure_neighbor_caption_rects = []
+                if caption_index is not None:
+                    for key, cands in caption_index.candidates.items():
+                        if not key.startswith("figure_"):
+                            continue
+                        for cand in cands:
+                            if cand.page != pno or cand.score < 25.0:
+                                continue
+                            if (
+                                abs(cand.rect.y0 - caption_bbox.y0) < 2.0
+                                and abs(cand.rect.x0 - caption_bbox.x0) < 2.0
+                            ):
+                                continue
+                            figure_neighbor_caption_rects.append(cand.rect)
+                direction = correct_bare_figure_caption_direction(
+                    direction,
+                    caption_bbox,
+                    full_caption_text,
+                    page_rect,
+                    image_rects,
+                    vector_rects,
+                    figure_neighbor_caption_rects,
+                    clip_height=clip_height,
+                    caption_gap=caption_gap,
+                )
 
                 # ================================================================
                 # 计算基础裁剪窗口 (Baseline)
@@ -369,24 +399,11 @@ def extract_figures(
 
                 base_clip = create_rect(x_left, y_top, x_right, y_bottom)
                 if caption_index is not None:
-                    neighbor_caption_rects = []
-                    for key, cands in caption_index.candidates.items():
-                        if not key.startswith("figure_"):
-                            continue
-                        for cand in cands:
-                            if cand.page != pno or cand.score < 25.0:
-                                continue
-                            if (
-                                abs(cand.rect.y0 - caption_bbox.y0) < 2.0
-                                and abs(cand.rect.x0 - caption_bbox.x0) < 2.0
-                            ):
-                                continue
-                            neighbor_caption_rects.append(cand.rect)
                     base_clip = limit_clip_by_neighbor_captions(
                         base_clip,
                         caption_bbox,
                         direction,
-                        neighbor_caption_rects,
+                        figure_neighbor_caption_rects,
                         gap=caption_gap,
                     )
 

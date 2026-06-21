@@ -108,7 +108,17 @@ def trim_far_side_noise_before_content(
             continue
         # Keep figure-internal labels and compact annotations as content
         # evidence, but avoid using full-width body/caption text as a far edge.
-        if _looks_like_short_figure_label(txt) or inter.width <= 0.45 * clip.width:
+        sentence_tail = (
+            txt.rstrip().endswith((".", "。", "!", "?", "；", ";"))
+            or (txt[:1].islower() and len(txt.split()) >= 2)
+        )
+        compact_annotation = (
+            inter.width <= 0.45 * clip.width
+            and len(txt) <= 80
+            and not sentence_tail
+            and not re.match(r"^\s*\d+(?:\.\d+)+\s+\S", txt)
+        )
+        if _looks_like_short_figure_label(txt) or compact_annotation:
             evidence.append(inter)
 
     if not evidence:
@@ -161,6 +171,14 @@ def expand_clip_to_nearby_figure_title(
     def _is_section_number_only(text: str) -> bool:
         return bool(re.match(r"^\s*(?:\d+(?:\.\d+)+\.?|\d+\.)\s*$", text))
 
+    def _is_body_tail_fragment(text: str) -> bool:
+        txt = text.strip()
+        return (
+            txt[:1].islower()
+            and len(txt.split()) >= 2
+            and txt.rstrip().endswith((".", "。", "!", "?", "；", ";"))
+        )
+
     section_number_lines = [
         line_rect
         for line_rect, _font_size, text in text_lines
@@ -184,6 +202,8 @@ def expand_clip_to_nearby_figure_title(
         if not txt:
             continue
         if font_size > max_title_font_size:
+            continue
+        if _is_body_tail_fragment(txt):
             continue
         if _is_numbered_section(txt) or _is_section_number_only(txt) or _is_page_header(line_rect, txt):
             continue
@@ -1204,7 +1224,12 @@ def trim_far_side_text_post_autocrop(
             continue
 
         width_ratio = inter.width / max(1.0, clip.width)
-        if width_ratio < min_width_ratio:
+        is_body_tail_fragment = (
+            txt[:1].islower()
+            and len(txt.split()) >= 2
+            and txt.rstrip().endswith((".", "。", "!", "?", "；", ";"))
+        )
+        if width_ratio < min_width_ratio and not is_body_tail_fragment:
             continue
         if len(txt) < min_text_len:
             continue
@@ -1548,15 +1573,114 @@ def restore_table_tail_after_layout_trim(
     return adjusted_clip
 
 
+def expand_clip_to_nearby_table_header(
+    original_clip: Any,
+    limited_clip: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    caption_rect: Any,
+    direction: str,
+    *,
+    pad: float = 4.0,
+    max_gap: float = 8.0,
+    max_header_height: float = 60.0,
+    table_probe_height: float = 180.0,
+) -> Any:
+    """恢复被 layout blocker 裁掉的多行表头。"""
+    if fitz is None or not text_lines:
+        return limited_clip
+    if original_clip.width <= 1 or original_clip.height <= 1:
+        return limited_clip
+    if limited_clip.width <= 1 or limited_clip.height <= 1:
+        return limited_clip
+
+    if direction == "above":
+        if limited_clip.y0 <= original_clip.y0 + 0.5:
+            return limited_clip
+        probe = fitz.Rect(
+            limited_clip.x0,
+            limited_clip.y0,
+            limited_clip.x1,
+            min(limited_clip.y1, limited_clip.y0 + table_probe_height),
+        )
+        if not looks_like_table_text(probe, text_lines, min_lines=3):
+            return limited_clip
+        band_y0 = max(original_clip.y0, limited_clip.y0 - max_header_height)
+        band_y1 = limited_clip.y0 + max_gap
+    elif direction == "below":
+        if limited_clip.y1 >= original_clip.y1 - 0.5:
+            return limited_clip
+        probe = fitz.Rect(
+            limited_clip.x0,
+            max(limited_clip.y0, limited_clip.y1 - table_probe_height),
+            limited_clip.x1,
+            limited_clip.y1,
+        )
+        if not looks_like_table_text(probe, text_lines, min_lines=3):
+            return limited_clip
+        band_y0 = limited_clip.y1 - max_gap
+        band_y1 = min(original_clip.y1, limited_clip.y1 + max_header_height)
+    else:
+        return limited_clip
+
+    band = fitz.Rect(original_clip.x0, band_y0, original_clip.x1, band_y1)
+    candidates: List[Any] = []
+    for line_rect, _font_size, text in text_lines:
+        txt = (text or "").strip()
+        if not txt:
+            continue
+        if re.match(r"^\s*(?:Figure|Table)\s+\S+", txt, re.I):
+            continue
+        if (line_rect & caption_rect).width > 0 and (line_rect & caption_rect).height > 0:
+            continue
+
+        inter = line_rect & band
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        if inter.width < max(24.0, original_clip.width * 0.04):
+            continue
+        if len(txt) > 140:
+            continue
+        if len(txt) > 80 and txt.rstrip().endswith((".", "。", "!", "?", "；", ";")):
+            continue
+
+        if direction == "above" and line_rect.y0 < limited_clip.y0:
+            candidates.append(line_rect & original_clip)
+        elif direction == "below" and line_rect.y1 > limited_clip.y1:
+            candidates.append(line_rect & original_clip)
+
+    if len(candidates) < 2:
+        return limited_clip
+
+    if direction == "above":
+        nearest_gap = limited_clip.y0 - max(r.y1 for r in candidates)
+        if nearest_gap > max_gap:
+            return limited_clip
+        new_y0 = max(original_clip.y0, min(r.y0 for r in candidates) - pad)
+        if new_y0 < limited_clip.y0 and limited_clip.y1 - new_y0 >= 40.0:
+            return fitz.Rect(limited_clip.x0, new_y0, limited_clip.x1, limited_clip.y1)
+    else:
+        nearest_gap = min(r.y0 for r in candidates) - limited_clip.y1
+        if nearest_gap > max_gap:
+            return limited_clip
+        new_y1 = min(original_clip.y1, max(r.y1 for r in candidates) + pad)
+        if new_y1 > limited_clip.y1 and new_y1 - limited_clip.y0 >= 40.0:
+            return fitz.Rect(limited_clip.x0, limited_clip.y0, limited_clip.x1, new_y1)
+
+    return limited_clip
+
+
 def expand_table_clip_to_text_bounds(
     clip: Any,
     reference_clip: Any,
     caption_rect: Any,
     text_lines: List[Tuple[Any, float, str]],
     direction: str,
+    layout_text_blocks: Optional[List[Any]] = None,
     *,
     pad: float = 2.5,
     max_expand: float = 8.0,
+    far_max_expand: float = 160.0,
+    connected_row_gap: float = 24.0,
     min_caption_gap: float = 1.0,
 ) -> Any:
     """给 Table final 增加少量文本 bbox 安全边距，避免 autocrop 贴字。"""
@@ -1564,8 +1688,380 @@ def expand_table_clip_to_text_bounds(
         return clip
     if reference_clip.width <= 1 or reference_clip.height <= 1:
         return clip
-    if not looks_like_table_text(clip, text_lines):
-        return clip
+    table_like_before_trim = looks_like_table_text(clip, text_lines)
+
+    def _is_caption_like(txt: str) -> bool:
+        return bool(re.match(r"^\s*(?:Table|Figure|Tab\.?|Fig\.?)\s+\S+", txt, re.I))
+
+    def _group_rows(search_rect: Any) -> List[Tuple[Any, int, str]]:
+        rows: List[List[Tuple[Any, str]]] = []
+        centers: List[float] = []
+        for line_rect, _font_size, text in sorted(
+            text_lines,
+            key=lambda item: (item[0].y0, item[0].x0),
+        ):
+            txt = (text or "").strip()
+            if not txt or _is_caption_like(txt):
+                continue
+            if (line_rect & caption_rect).width > 0 and (line_rect & caption_rect).height > 0:
+                continue
+            inter = line_rect & search_rect
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if inter.width < max(10.0, clip.width * 0.02):
+                continue
+            center = (line_rect.y0 + line_rect.y1) / 2.0
+            if rows and abs(center - centers[-1]) <= 3.5:
+                rows[-1].append((line_rect & search_rect, txt))
+                centers[-1] = sum((r.y0 + r.y1) / 2.0 for r, _txt in rows[-1]) / len(rows[-1])
+            else:
+                rows.append([(line_rect & search_rect, txt)])
+                centers.append(center)
+
+        row_rects: List[Tuple[Any, int, str]] = []
+        for row in rows:
+            row_rect = fitz.Rect(row[0][0])
+            parts: List[str] = []
+            for rect, txt in row:
+                row_rect |= rect
+                parts.append(txt)
+            row_rects.append((row_rect, len(row), " ".join(parts).strip()))
+        return row_rects
+
+    def _looks_like_table_row(row_rect: Any, part_count: int, text: str) -> bool:
+        words = text.split()
+        numeric_count = len(re.findall(r"\d+(?:\.\d+)?%?|[-–]|/", text))
+        if part_count >= 2:
+            return True
+        if numeric_count >= 2 and row_rect.width <= clip.width * 0.90:
+            return True
+        if len(text) <= 45:
+            return True
+        if row_rect.width <= clip.width * 0.55 and len(words) <= 14:
+            return True
+        return False
+
+    def _looks_like_structured_table_row(row_rect: Any, part_count: int, text: str) -> bool:
+        return part_count >= 2
+
+    def _looks_like_body_row(row_rect: Any, part_count: int, text: str) -> bool:
+        if part_count >= 2:
+            return False
+        words = text.split()
+        if len(words) < 8:
+            return False
+        if row_rect.width < clip.width * 0.60:
+            return False
+        return True
+
+    def _looks_like_body_line(line_rect: Any, text: str) -> bool:
+        words = text.split()
+        if len(words) < 8:
+            return False
+        if line_rect.width < clip.width * 0.60:
+            return False
+        return True
+
+    def _numeric_token_count(text: str) -> int:
+        return len(re.findall(r"\d+(?:\.\d+)?%?|[-–]|/", text))
+
+    def _block_text(block: Any) -> str:
+        units = getattr(block, "units", None) or []
+        if units:
+            return " ".join((getattr(unit, "text", "") or "").strip() for unit in units).strip()
+        return ""
+
+    def _expand_far_side_to_layout_row(current: Any) -> Any:
+        if not layout_text_blocks:
+            return current
+        blocks: List[Tuple[Any, str, str]] = []
+        for block in layout_text_blocks:
+            rect = getattr(block, "bbox", None)
+            block_type = getattr(block, "block_type", "") or ""
+            if rect is None:
+                continue
+            text = _block_text(block)
+            if not text:
+                continue
+            blocks.append((rect, block_type, text))
+        if not blocks:
+            return current
+
+        def _same_row_peer_rects(title_rect: Any) -> List[Any]:
+            peers: List[Any] = []
+            for rect, block_type, text in blocks:
+                if rect is title_rect:
+                    continue
+                overlap = min(rect.y1, title_rect.y1) - max(rect.y0, title_rect.y0)
+                if overlap <= 0.45 * min(rect.height, title_rect.height):
+                    continue
+                if rect.x1 > title_rect.x0 + 1 and rect.x0 < title_rect.x1 - 1:
+                    continue
+                if re.match(r"^\s*\d+(?:\.\d+)*$", text):
+                    continue
+                if rect.width >= 0.55 * current.width and len(text.split()) >= 8:
+                    continue
+                if block_type in ("paragraph_group", "list_group") or block_type.startswith("title_"):
+                    peers.append(rect)
+            return peers
+
+        candidates: List[Any] = []
+        for rect, block_type, text in blocks:
+            if not block_type.startswith("title_"):
+                continue
+            if direction == "below":
+                gap_to_edge = rect.y0 - current.y1
+                if not (0 <= gap_to_edge <= connected_row_gap):
+                    continue
+            elif direction == "above":
+                gap_to_edge = current.y0 - rect.y1
+                if not (0 <= gap_to_edge <= connected_row_gap):
+                    continue
+            else:
+                continue
+            peers = _same_row_peer_rects(rect)
+            if not peers:
+                continue
+            row_rect = fitz.Rect(rect)
+            for peer in peers:
+                row_rect |= peer
+            candidates.append(row_rect)
+
+        if not candidates:
+            return current
+        if direction == "below":
+            new_y1 = min(reference_clip.y1, max(row.y1 for row in candidates) + pad)
+            if new_y1 > current.y1 + 0.5 and new_y1 - current.y0 >= 40.0:
+                return fitz.Rect(current.x0, current.y0, current.x1, new_y1)
+        elif direction == "above":
+            new_y0 = max(reference_clip.y0, min(row.y0 for row in candidates) - pad)
+            if new_y0 < current.y0 - 0.5 and current.y1 - new_y0 >= 40.0:
+                return fitz.Rect(current.x0, new_y0, current.x1, current.y1)
+        return current
+
+    def _trim_far_side_body_prefix(current: Any) -> Any:
+        rows = _group_rows(current)
+        if not rows:
+            return current
+
+        if direction == "above":
+            ordered = sorted(rows, key=lambda item: item[0].y0)
+            body_seen = False
+            for row, part_count, text in ordered:
+                if row.y0 < current.y0 - 0.5:
+                    continue
+                if _looks_like_body_row(row, part_count, text):
+                    body_seen = True
+                    continue
+                if body_seen and _looks_like_structured_table_row(row, part_count, text):
+                    new_y0 = max(current.y0, row.y0 - pad)
+                    if new_y0 > current.y0 + 0.5 and current.y1 - new_y0 >= 40.0:
+                        return fitz.Rect(current.x0, new_y0, current.x1, current.y1)
+                    return current
+                if not body_seen and _looks_like_table_row(row, part_count, text):
+                    return current
+        elif direction == "below":
+            ordered = sorted(rows, key=lambda item: item[0].y0, reverse=True)
+            body_seen = False
+            for row, part_count, text in ordered:
+                if row.y1 > current.y1 + 0.5:
+                    continue
+                if _looks_like_body_row(row, part_count, text):
+                    body_seen = True
+                    continue
+                if body_seen and _looks_like_structured_table_row(row, part_count, text):
+                    new_y1 = min(current.y1, row.y1 + pad)
+                    if new_y1 < current.y1 - 0.5 and new_y1 - current.y0 >= 40.0:
+                        return fitz.Rect(current.x0, current.y0, current.x1, new_y1)
+                    return current
+                if not body_seen and _looks_like_table_row(row, part_count, text):
+                    return current
+        return current
+
+    def _trim_far_side_to_first_structured_row(current: Any) -> Any:
+        """裁掉 Table final 远端被带入的正文尾句或大段空白。
+
+        只在能看到强结构表格行时触发；单个短文本行不作为安全起点，避免把
+        普通正文尾句误当表格。
+        """
+        rows = _group_rows(current)
+        if not rows:
+            return current
+
+        def _looks_like_noise_prefix_row(row_rect: Any, part_count: int, text: str) -> bool:
+            if part_count >= 2:
+                return False
+            stripped = text.strip()
+            if not stripped:
+                return True
+            if _looks_like_body_row(row_rect, part_count, stripped):
+                return True
+            if stripped.endswith((".", "。", "!", "?", "；", ";")):
+                return True
+            return False
+
+        if direction == "above":
+            ordered = sorted(rows, key=lambda item: item[0].y0)
+            for row, part_count, text in ordered:
+                if row.y0 < current.y0 - 0.5:
+                    continue
+                strong_table_start = part_count >= 2
+                if not strong_table_start:
+                    continue
+                leading_rows = [
+                    prior
+                    for prior in ordered
+                    if prior[0].y1 <= row.y0 + 0.5 and prior[0].y0 >= current.y0 - 0.5
+                ]
+                has_leading_noise = bool(leading_rows)
+                large_gap = row.y0 - current.y0 > max(18.0, 1.5 * typical_line_height_from_rows(rows))
+                if has_leading_noise:
+                    nearby_header = any(
+                        not _looks_like_noise_prefix_row(prior_row, prior_parts, prior_text)
+                        and row.y0 - prior_row.y1 <= connected_row_gap
+                        for prior_row, prior_parts, prior_text in leading_rows
+                    )
+                    if nearby_header:
+                        return current
+                if has_leading_noise or large_gap:
+                    new_y0 = max(current.y0, row.y0 - pad)
+                    if new_y0 > current.y0 + 0.5 and current.y1 - new_y0 >= 40.0:
+                        return fitz.Rect(current.x0, new_y0, current.x1, current.y1)
+                return current
+
+        elif direction == "below":
+            ordered = sorted(rows, key=lambda item: item[0].y0, reverse=True)
+            for row, part_count, text in ordered:
+                if row.y1 > current.y1 + 0.5:
+                    continue
+                strong_table_end = part_count >= 2
+                if not strong_table_end:
+                    continue
+                trailing_rows = [
+                    later
+                    for later in ordered
+                    if later[0].y0 >= row.y1 - 0.5 and later[0].y1 <= current.y1 + 0.5
+                ]
+                has_trailing_noise = bool(trailing_rows)
+                large_gap = current.y1 - row.y1 > max(18.0, 1.5 * typical_line_height_from_rows(rows))
+                if has_trailing_noise:
+                    nearby_footer = any(
+                        (
+                            not _looks_like_noise_prefix_row(later_row, later_parts, later_text)
+                            or (
+                                later_parts == 1
+                                and later_row.width <= current.width * 0.45
+                                and len(later_text.split()) <= 8
+                                and not re.match(r"^\s*\d+(?:\.\d+)+\s+\S", later_text)
+                            )
+                        )
+                        and later_row.y0 - row.y1 <= connected_row_gap
+                        for later_row, later_parts, later_text in trailing_rows
+                    )
+                    if nearby_footer:
+                        return current
+                if has_trailing_noise or large_gap:
+                    new_y1 = min(current.y1, row.y1 + pad)
+                    if new_y1 < current.y1 - 0.5 and new_y1 - current.y0 >= 40.0:
+                        return fitz.Rect(current.x0, current.y0, current.x1, new_y1)
+                return current
+
+        return current
+
+    def typical_line_height_from_rows(rows: List[Tuple[Any, int, str]]) -> float:
+        heights = [row.height for row, _parts, _text in rows if row.height > 0]
+        if not heights:
+            return 10.0
+        heights = sorted(heights)
+        return heights[len(heights) // 2]
+
+    def _expand_far_side_to_connected_rows(current: Any) -> Any:
+        search_rect = fitz.Rect(reference_clip)
+        if direction == "above":
+            search_rect.y1 = min(search_rect.y1, caption_rect.y0 - min_caption_gap)
+            search_rect.y0 = max(search_rect.y0, current.y0 - far_max_expand)
+        elif direction == "below":
+            search_rect.y0 = max(search_rect.y0, caption_rect.y1 + min_caption_gap)
+            search_rect.y1 = min(search_rect.y1, current.y1 + far_max_expand)
+        else:
+            return current
+        if search_rect.width <= 1 or search_rect.height <= 1:
+            return current
+
+        rows = _group_rows(search_rect)
+        if not rows:
+            return current
+
+        if direction == "above":
+            selected_top = current.y0
+            touched = False
+            for row, part_count, text in sorted(rows, key=lambda item: item[0].y0, reverse=True):
+                if row.y0 >= current.y1:
+                    continue
+                if row.y0 >= current.y0 - 0.5:
+                    continue
+                if row.y0 > selected_top + connected_row_gap:
+                    continue
+                gap = selected_top - row.y1
+                if gap > connected_row_gap:
+                    if touched:
+                        break
+                    continue
+                if _looks_like_body_row(row, part_count, text):
+                    break
+                if not _looks_like_table_row(row, part_count, text):
+                    break
+                selected_top = min(selected_top, row.y0)
+                touched = True
+            if not touched or current.y0 - selected_top < 0.5:
+                return current
+            return fitz.Rect(
+                current.x0,
+                max(reference_clip.y0, selected_top - pad),
+                current.x1,
+                current.y1,
+            )
+
+        selected_bottom = current.y1
+        touched = False
+        for row, part_count, text in sorted(rows, key=lambda item: item[0].y0):
+            if row.y1 <= current.y0:
+                continue
+            if row.y1 <= current.y1 + 0.5:
+                continue
+            if row.y1 < selected_bottom - connected_row_gap:
+                continue
+            gap = row.y0 - selected_bottom
+            if gap > connected_row_gap:
+                if touched:
+                    break
+                continue
+            if _looks_like_body_row(row, part_count, text):
+                break
+            if not _looks_like_table_row(row, part_count, text):
+                break
+            selected_bottom = max(selected_bottom, row.y1)
+            touched = True
+        if not touched or selected_bottom - current.y1 < 0.5:
+            return current
+        return fitz.Rect(
+            current.x0,
+            current.y0,
+            current.x1,
+            min(reference_clip.y1, selected_bottom + pad),
+        )
+
+    trimmed_clip = _trim_far_side_body_prefix(clip)
+    if not table_like_before_trim and not looks_like_table_text(trimmed_clip, text_lines):
+        expanded_weak_clip = _expand_far_side_to_connected_rows(trimmed_clip)
+        expanded_weak_clip = _expand_far_side_to_layout_row(expanded_weak_clip)
+        if expanded_weak_clip == trimmed_clip:
+            return clip
+        clip = expanded_weak_clip
+    else:
+        clip = _expand_far_side_to_connected_rows(trimmed_clip)
+        clip = _expand_far_side_to_layout_row(clip)
+    clip = _trim_far_side_to_first_structured_row(clip)
 
     x0_bound = min(reference_clip.x0, clip.x0)
     x1_bound = max(reference_clip.x1, clip.x1)
@@ -1599,6 +2095,10 @@ def expand_table_clip_to_text_bounds(
         inter = line_rect & probe
         if inter.width <= 0 or inter.height <= 0:
             continue
+        if direction == "above" and line_rect.y1 <= clip.y0 + 0.5 and _looks_like_body_line(line_rect, txt):
+            continue
+        if direction == "below" and line_rect.y0 >= clip.y1 - 0.5 and _looks_like_body_line(line_rect, txt):
+            continue
         text_rect = fitz.Rect(line_rect) if text_rect is None else text_rect | line_rect
 
     if text_rect is None:
@@ -1611,7 +2111,241 @@ def expand_table_clip_to_text_bounds(
 
     if new_x1 - new_x0 < 1 or new_y1 - new_y0 < 1:
         return clip
-    return fitz.Rect(new_x0, new_y0, new_x1, new_y1)
+    expanded_clip = fitz.Rect(new_x0, new_y0, new_x1, new_y1)
+    return _trim_far_side_to_first_structured_row(expanded_clip)
+
+
+def trim_table_far_side_section_heading(
+    clip: Any,
+    caption_rect: Any,
+    direction: str,
+    layout_text_blocks: Optional[List[Any]],
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    *,
+    typical_line_h: Optional[float] = None,
+    gap: float = 6.0,
+    far_region_ratio: float = 0.40,
+    min_height: float = 40.0,
+) -> Any:
+    """从表格 final 远端去掉紧跟表格的章节标题。
+
+    Qwen3-Omni 等论文里，章节标题的编号（如 ``5.1.2`` / ``5.2`` / ``9.2``）
+    常被 PDF 抽取拆到后续正文段落，留下无编号的短标题（``Performance of
+    Audio→Text``），绕过所有“编号章节标题”过滤，被表格远端纳入截图。
+
+    判别一个远端 ``title_`` 块是否为章节标题，使用两个稳定信号：
+
+    - 它紧跟其后就是一整段满宽正文段落（章节标题后必有正文），而表格列表头
+      其后是表格数据行而非段落；
+    - 它远端方向没有窄的表格单元格行（否则它只是表格内部的小节行，而非尾部标题）。
+    """
+    if fitz is None or not layout_text_blocks:
+        return clip
+    if clip.width <= 1 or clip.height <= 1:
+        return clip
+
+    lh = typical_line_h if (typical_line_h and typical_line_h > 0) else 10.0
+    para_tol = 3.0 * lh
+
+    def _block_text(block: Any) -> str:
+        units = getattr(block, "units", None) or []
+        if units:
+            return " ".join((getattr(unit, "text", "") or "").strip() for unit in units).strip()
+        return ""
+
+    titles: List[Tuple[Any, str]] = []
+    paragraphs: List[Tuple[Any, str]] = []
+    for block in layout_text_blocks:
+        block_type = getattr(block, "block_type", "") or ""
+        rect = getattr(block, "bbox", None)
+        if rect is None:
+            continue
+        if block_type.startswith("title_"):
+            titles.append((rect, _block_text(block)))
+        elif block_type in ("paragraph_group", "list_group"):
+            paragraphs.append((rect, _block_text(block)))
+    if not titles or not paragraphs:
+        return clip
+
+    def _is_body_paragraph(rect: Any, text: str) -> bool:
+        words = text.split()
+        if len(words) < 8:
+            return False
+        if rect.width < 0.55 * clip.width:
+            return False
+        if re.match(r"^\s*\d+(?:\.\d+)+\s+\S", text):
+            return True
+        if re.search(r"[.!?。！？；;:,，]($|\s)", text):
+            return True
+        return False
+
+    def _has_near_section_number(title_rect: Any, title_text: str) -> bool:
+        if re.match(r"^\s*\d+(?:\.\d+)+\s+\S", title_text):
+            return True
+        for line_rect, _font_size, text in text_lines or []:
+            s = (text or "").strip()
+            if not re.match(r"^\d+(?:\.\d+)+$", s):
+                continue
+            overlap = min(line_rect.y1, title_rect.y1) - max(line_rect.y0, title_rect.y0)
+            if overlap <= 0.35 * min(title_rect.height, line_rect.height):
+                continue
+            if line_rect.x1 <= title_rect.x0 + max(18.0, 1.5 * lh):
+                return True
+        return False
+
+    def _followed_by_body(title_rect: Any) -> bool:
+        for p, text in paragraphs:
+            if not _is_body_paragraph(p, text):
+                continue
+            if p.width < 0.55 * clip.width:
+                continue
+            if title_rect.y0 - lh <= p.y0 <= title_rect.y1 + para_tol:
+                return True
+        return False
+
+    def _table_cells_beyond(title_rect: Any) -> int:
+        count = 0
+        for line_rect, _font_size, text in text_lines or []:
+            if not (text or "").strip():
+                continue
+            inter = line_rect & clip
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if inter.width >= 0.55 * clip.width:
+                continue  # 宽行视为正文段落，不计入表格单元格
+            if direction == "below":
+                if line_rect.y0 > title_rect.y1 + 0.3 * lh:
+                    count += 1
+            else:
+                if line_rect.y1 < title_rect.y0 - 0.3 * lh:
+                    count += 1
+        return count
+
+    def _has_same_row_table_context(title_rect: Any) -> bool:
+        """标题同一横向行带是否存在并排的表格单元格。
+
+        若有（如被误判为标题的表格最后一行 ``Generation RTF(...) 0.47 0.56``），
+        说明它其实是表格行而非章节标题，应保留不裁。
+
+        同时看左右两侧，以覆盖最右侧数据单元格被误判为标题的场景。
+        章节编号（如 ``5.1.2``）需排除，以免误判真正的章节标题。
+        """
+        peer_cells = 0
+        for line_rect, _font_size, text in text_lines or []:
+            s = (text or "").strip()
+            if not s:
+                continue
+            if re.match(r"^\d+(?:\.\d+)+$", s):
+                continue
+            overlap = min(line_rect.y1, title_rect.y1) - max(line_rect.y0, title_rect.y0)
+            if overlap <= 0.5 * min(title_rect.height, line_rect.height):
+                continue
+            if line_rect.x1 > title_rect.x0 + 1 and line_rect.x0 < title_rect.x1 - 1:
+                continue
+            if line_rect.width >= 0.55 * clip.width and len(s.split()) >= 8:
+                continue  # 宽长句是正文，不是并排表格单元格
+            if line_rect.width >= 0.55 * clip.width:
+                continue  # 宽行是正文段落，不是数据单元格
+            if any(ch.isdigit() for ch in s) or len(s) <= 45:
+                peer_cells += 1
+        for block in layout_text_blocks or []:
+            rect = getattr(block, "bbox", None)
+            if rect is None:
+                continue
+            if rect is title_rect:
+                continue
+            text = _block_text(block)
+            if not text or re.match(r"^\s*\d+(?:\.\d+)*\s*$", text):
+                continue
+            overlap = min(rect.y1, title_rect.y1) - max(rect.y0, title_rect.y0)
+            if overlap <= 0.45 * min(title_rect.height, rect.height):
+                continue
+            if rect.x1 > title_rect.x0 + 1 and rect.x0 < title_rect.x1 - 1:
+                continue
+            if rect.width >= 0.55 * clip.width and len(text.split()) >= 8:
+                continue
+            if any(ch.isdigit() for ch in text) or len(text) <= 45:
+                peer_cells += 1
+        return peer_cells >= 1
+
+    def _has_near_table_header_context(title_rect: Any) -> bool:
+        row_centers: List[float] = []
+        row_parts: List[int] = []
+        for line_rect, _font_size, text in text_lines or []:
+            s = (text or "").strip()
+            if not s or re.match(r"^\d+(?:\.\d+)+$", s):
+                continue
+            inter = line_rect & clip
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if line_rect.width >= 0.55 * clip.width and len(s.split()) >= 8:
+                continue
+            if direction == "below":
+                if not (title_rect.y0 - 0.5 * lh <= line_rect.y0 <= title_rect.y1 + 2.0 * lh):
+                    continue
+            else:
+                if not (title_rect.y0 - 0.5 * lh <= line_rect.y0 <= title_rect.y1 + 2.5 * lh):
+                    continue
+            center = (line_rect.y0 + line_rect.y1) / 2.0
+            matched = False
+            for idx, existing in enumerate(row_centers):
+                if abs(center - existing) <= 3.5:
+                    row_parts[idx] += 1
+                    matched = True
+                    break
+            if not matched:
+                row_centers.append(center)
+                row_parts.append(1)
+        return any(parts >= 2 for parts in row_parts)
+
+    def _is_section_heading_candidate(title_rect: Any, title_text: str) -> bool:
+        if _has_same_row_table_context(title_rect):
+            return False
+        has_section_number = _has_near_section_number(title_rect, title_text)
+        if has_section_number:
+            return True
+        if _has_near_table_header_context(title_rect):
+            return False
+        if _followed_by_body(title_rect):
+            return True
+        return False
+
+    if direction == "below":
+        cut: Optional[float] = None
+        for title_rect, title_text in titles:
+            inter = title_rect & clip
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if title_rect.y0 < clip.y0 + far_region_ratio * clip.height:
+                continue
+            if title_rect.y0 <= caption_rect.y1:
+                continue
+            if not _is_section_heading_candidate(title_rect, title_text):
+                continue
+            candidate = title_rect.y0 - gap
+            if clip.y0 + min_height < candidate < clip.y1:
+                cut = candidate if cut is None else min(cut, candidate)
+        if cut is not None:
+            return fitz.Rect(clip.x0, clip.y0, clip.x1, cut)
+    elif direction == "above":
+        cut = None
+        for title_rect, title_text in titles:
+            inter = title_rect & clip
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if title_rect.y1 > clip.y1 - far_region_ratio * clip.height:
+                continue
+            if title_rect.y1 >= caption_rect.y0:
+                continue
+            if not _is_section_heading_candidate(title_rect, title_text):
+                continue
+            candidate = title_rect.y1 + gap
+            if clip.y0 < candidate < clip.y1 - min_height:
+                cut = candidate if cut is None else max(cut, candidate)
+        if cut is not None:
+            return fitz.Rect(clip.x0, cut, clip.x1, clip.y1)
+
+    return clip
 
 
 # ============================================================================
@@ -2094,8 +2828,29 @@ def refine_clip_x_range(
     x_left = clip.x0
     x_right = clip.x1
 
+    def _has_trustworthy_column_geometry(model: Any) -> bool:
+        column_gap = float(getattr(model, 'column_gap', 0.0) or 0.0)
+        if column_gap <= 0 or column_gap > 0.30 * page_width:
+            return False
+
+        margin_left = float(getattr(model, 'margin_left', page_rect.x0) or page_rect.x0)
+        margin_right = float(getattr(model, 'margin_right', page_rect.x1) or page_rect.x1)
+        page_aligned_margins = (
+            abs(margin_left - page_rect.x0) <= 2.0
+            and abs(margin_right - page_rect.x1) <= 2.0
+        )
+        if page_aligned_margins and column_gap > 0.25 * page_width:
+            return False
+
+        col_width = (page_width - column_gap) / 2.0
+        return col_width >= page_width * 0.20
+
     # 策略1：版式模型双栏检测
-    if layout_model is not None and layout_model.num_columns >= 2:
+    if (
+        layout_model is not None
+        and layout_model.num_columns >= 2
+        and _has_trustworthy_column_geometry(layout_model)
+    ):
         page_center = page_rect.x0 + page_width / 2
         caption_center = (caption_rect.x0 + caption_rect.x1) / 2
 
@@ -2901,6 +3656,10 @@ __all__ = [
     "refine_clip_x_range",
     "refine_clip_to_table_band",
     "restore_table_clip_width",
+    "trim_table_far_side_section_heading",
+    "restore_table_tail_after_layout_trim",
+    "expand_clip_to_nearby_table_header",
+    "expand_table_clip_to_text_bounds",
     # 文本裁切辅助
     "is_caption_text",
     "detect_exact_n_lines_of_text",

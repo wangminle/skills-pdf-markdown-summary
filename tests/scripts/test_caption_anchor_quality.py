@@ -28,13 +28,14 @@ from lib.caption_detection import (
     is_caption_reference,
     is_likely_reference_context,
 )
-from lib.direction import score_local_direction
+from lib.direction import correct_bare_figure_caption_direction, score_local_direction
 from lib.extract_figures import FIGURE_LINE_RE
-from lib.layout_model import adjust_clip_with_layout
+from lib.layout_model import adjust_clip_with_layout, detect_columns
 from lib.models import DocumentLayoutModel, EnhancedTextUnit, TextBlock
 from lib.refine import (
     detect_text_pollution,
     expand_clip_to_nearby_figure_title,
+    expand_clip_to_nearby_table_header,
     expand_table_clip_to_text_bounds,
     limit_clip_by_neighbor_captions,
     limit_clip_by_text_blocks,
@@ -45,6 +46,7 @@ from lib.refine import (
     trim_far_side_noise_before_content,
     trim_clip_head_by_text_v2,
     trim_far_side_text_iterative,
+    trim_table_far_side_section_heading,
 )
 
 
@@ -1018,6 +1020,87 @@ def test_restore_table_clip_width_recovers_over_narrow_structured_table() -> Non
     assert restored.y1 == narrow_clip.y1
 
 
+def test_column_detection_rejects_unrealistic_large_gap_candidate() -> None:
+    units = []
+    for i in range(12):
+        units.append(EnhancedTextUnit(
+            bbox=fitz.Rect(0, 80 + i * 14, 120, 90 + i * 14),
+            text=f"Left-like paragraph sample {i}",
+            page=0,
+            font_name="Test",
+            font_size=10.0,
+            font_weight="regular",
+            font_flags=0,
+            color=(0, 0, 0),
+            text_type="paragraph",
+            confidence=1.0,
+            column=-1,
+            indent=0,
+            block_idx=i,
+            line_idx=0,
+        ))
+        units.append(EnhancedTextUnit(
+            bbox=fitz.Rect(430, 80 + i * 14, 560, 90 + i * 14),
+            text=f"Right-like paragraph sample {i}",
+            page=0,
+            font_name="Test",
+            font_size=10.0,
+            font_weight="regular",
+            font_flags=0,
+            color=(0, 0, 0),
+            text_type="paragraph",
+            confidence=1.0,
+            column=-1,
+            indent=430,
+            block_idx=i,
+            line_idx=1,
+        ))
+
+    num_columns, column_gap, updated = detect_columns({0: units}, 595.3)
+
+    assert num_columns == 1
+    assert column_gap == 0
+    assert {unit.column for unit in updated[0]} == {-1}
+
+
+def test_x_refine_ignores_untrusted_wide_gap_layout_columns() -> None:
+    clip = fitz.Rect(26.0, 100.0, 569.3, 400.0)
+    caption = fitz.Rect(120.0, 410.0, 475.0, 430.0)
+    page = fitz.Rect(0.0, 0.0, 595.3, 842.0)
+    layout_model = DocumentLayoutModel(
+        page_size=(595.3, 842.0),
+        num_columns=2,
+        margin_left=0.0,
+        margin_right=595.3,
+        margin_top=50.0,
+        margin_bottom=790.0,
+        column_gap=327.0,
+        typical_font_size=10.0,
+        typical_line_height=12.0,
+        typical_line_gap=2.0,
+        text_units={0: []},
+        text_blocks={0: []},
+        vacant_regions={0: []},
+    )
+    image_rects = [fitz.Rect(70.9, 120.0, 524.4, 380.0)]
+
+    refined = refine_module.refine_clip_x_range(
+        clip,
+        caption,
+        "above",
+        image_rects,
+        [],
+        page,
+        layout_model=layout_model,
+        page_num=0,
+        x_margin=15.0,
+        min_width_ratio=0.30,
+    )
+
+    assert refined.width > 480.0, refined
+    assert refined.x1 > 520.0, refined
+
+
 def test_layout_trim_preserves_structured_table_tail() -> None:
     clip = fitz.Rect(26, 248.8, 566, 498.1)
     caption = fitz.Rect(70, 224, 524, 246)
@@ -1082,6 +1165,194 @@ def test_layout_trim_preserves_structured_table_tail() -> None:
     assert restored.y1 == clip.y1
     assert restored.x0 == adjusted.x0
     assert restored.x1 == adjusted.x1
+
+
+def test_table_header_recovery_restores_multiline_header_above_table_body() -> None:
+    original = fitz.Rect(26.0, 170.0, 569.3, 500.0)
+    limited = fitz.Rect(26.0, 233.8, 569.3, 500.0)
+    caption = fitz.Rect(62.0, 510.0, 533.0, 535.0)
+    text_lines = [
+        (fitz.Rect(80.0, 211.5, 518.0, 221.5), 8.8, "Benchmark Gemini 1.5 Gemini 2.0 Gemini 2.5"),
+        (fitz.Rect(160.0, 223.0, 505.0, 233.0), 8.8, "Flash Pro Flash-Lite Flash Pro Flash-Lite Pro"),
+        (fitz.Rect(70.0, 236.0, 145.0, 246.0), 8.8, "LiveCodeBench"),
+        (fitz.Rect(180.0, 236.0, 198.0, 246.0), 8.8, "65.9"),
+        (fitz.Rect(240.0, 236.0, 258.0, 246.0), 8.8, "72.4"),
+        (fitz.Rect(300.0, 236.0, 318.0, 246.0), 8.8, "80.1"),
+        (fitz.Rect(70.0, 250.0, 130.0, 260.0), 8.8, "HumanEval"),
+        (fitz.Rect(180.0, 250.0, 198.0, 260.0), 8.8, "87.2"),
+        (fitz.Rect(240.0, 250.0, 258.0, 260.0), 8.8, "91.1"),
+        (fitz.Rect(300.0, 250.0, 318.0, 260.0), 8.8, "92.5"),
+    ]
+
+    expanded = expand_clip_to_nearby_table_header(
+        original,
+        limited,
+        text_lines,
+        caption,
+        "above",
+    )
+
+    assert 207 <= expanded.y0 <= 209, expanded
+    assert expanded.y1 == limited.y1
+
+
+def test_table_final_text_bounds_recovers_connected_header_band() -> None:
+    final_clip = fitz.Rect(57.4, 230.9, 537.9, 420.0)
+    reference_clip = fitz.Rect(26.0, 0.0, 569.3, 419.6)
+    caption = fitz.Rect(62.0, 425.6, 533.1, 464.2)
+    text_lines = [
+        (fitz.Rect(142.7, 88.7, 283.4, 98.7), 10.0, "Key Results for Gemini 2.5 Pro"),
+        (fitz.Rect(88.9, 101.1, 364.5, 111.1), 10.0, "Area CCL"),
+        (fitz.Rect(443.5, 101.1, 505.9, 111.1), 10.0, "CCL reached?"),
+        (fitz.Rect(142.7, 126.2, 336.2, 136.2), 10.0, "Based on qualitative assessment, 2.5 Pro"),
+        (fitz.Rect(142.7, 138.1, 336.1, 148.1), 10.0, "demonstrates a general trend of increasing"),
+        (fitz.Rect(142.7, 150.1, 334.6, 160.1), 10.0, "model capabilities across models 1.5 Pro, 2.0"),
+        (fitz.Rect(142.7, 162.1, 313.9, 172.0), 10.0, "and 2.5 Pro: it generates detailed technical"),
+        (fitz.Rect(142.7, 174.7, 336.2, 184.6), 10.0, "knowledge of biological, radiological and nu-"),
+        (fitz.Rect(142.7, 186.6, 336.1, 196.6), 10.0, "clear domains. However, no current Gem-"),
+        (fitz.Rect(142.7, 198.6, 334.6, 208.6), 10.0, "ini model consistently or completely enables"),
+        (fitz.Rect(142.7, 210.6, 313.9, 220.5), 10.0, "progress through key bottleneck stages."),
+        (fitz.Rect(95.2, 236.4, 105.1, 246.4), 10.0, "biohazard-icon"),
+        (fitz.Rect(142.7, 235.1, 335.8, 245.1), 10.0, "Solve rate on autonomous offense suite:"),
+        (fitz.Rect(346.5, 235.2, 424.5, 245.1), 10.0, "Autonomy Level 1"),
+        (fitz.Rect(443.5, 234.5, 526.9, 245.1), 10.0, "CCL not reached"),
+        (fitz.Rect(68.3, 249.4, 131.8, 259.4), 10.0, "Cybersecurity"),
+        (fitz.Rect(142.7, 271.4, 334.6, 281.5), 10.0, "On key skills benchmark: 7/8 easy, 14/28"),
+        (fitz.Rect(443.5, 270.8, 526.9, 281.5), 10.0, "CCL not reached"),
+    ]
+
+    expanded = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "above",
+    )
+
+    assert expanded.y0 < 90.0, expanded
+    assert expanded.y1 == final_clip.y1
+
+
+def test_table_final_text_bounds_stops_before_body_paragraph() -> None:
+    final_clip = fitz.Rect(57.4, 416.9, 537.9, 703.2)
+    reference_clip = fitz.Rect(26.0, 381.6, 569.3, 702.8)
+    caption = fitz.Rect(62.0, 708.8, 533.1, 747.4)
+    text_lines = [
+        (fitz.Rect(62.4, 371.9, 534.4, 382.9), 10.9, "In Table 6, we show the performance of Gemini 2.5 models at video understanding."),
+        (fitz.Rect(62.4, 385.4, 534.4, 396.4), 10.9, "seen, Gemini 2.5 Pro achieves state-of-the-art performance on key video understanding benchmarks,"),
+        (fitz.Rect(62.4, 398.9, 534.4, 410.0), 10.9, "surpassing recent models like GPT 4.1 under comparable testing conditions."),
+        (fitz.Rect(211.1, 433.7, 254.0, 442.1), 8.4, "Gemini 2.5"),
+        (fitz.Rect(62.4, 433.7, 532.9, 447.3), 8.4, "Capability Benchmark Gemini 2.5 o3 o4-mini Claude 4"),
+        (fitz.Rect(125.0, 465.0, 220.0, 473.0), 8.4, "LiveCodeBench"),
+        (fitz.Rect(421.0, 465.0, 445.0, 473.0), 8.4, "69.0%"),
+        (fitz.Rect(501.0, 465.0, 525.0, 473.0), 8.4, "70.5%"),
+    ]
+
+    expanded = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "above",
+    )
+
+    assert expanded.y0 >= 416.0, expanded
+
+
+def test_table_final_text_bounds_recovers_header_but_not_leading_body_line() -> None:
+    final_clip = fitz.Rect(57.7, 484.5, 526.4, 734.3)
+    reference_clip = fitz.Rect(26.0, 472.9, 569.3, 735.4)
+    caption = fitz.Rect(62.0, 741.4, 366.9, 752.9)
+    text_lines = [
+        (
+            fitz.Rect(62.4, 476.9, 532.9, 487.8),
+            10.9,
+            "in 0/3 cases (quite far away). Gemini 2.5 Pro gets the color in 3/3 cases, and gets the timestamp in",
+        ),
+        (fitz.Rect(61.5, 484.5, 532.9, 495.5), 10.9, "1/3 cases (remaining 2/3 are within 3 seconds close)."),
+        (fitz.Rect(79.8, 517.8, 111.3, 528.7), 10.9, "Model"),
+        (fitz.Rect(197.6, 517.8, 221.2, 528.7), 10.9, "Trial"),
+        (fitz.Rect(233.1, 517.8, 312.3, 528.7), 10.9, "Model response"),
+        (fitz.Rect(79.8, 536.9, 151.6, 547.8), 10.9, "Gemini 1.5 Pro"),
+        (fitz.Rect(206.3, 536.9, 212.4, 547.8), 10.9, "1"),
+        (fitz.Rect(233.1, 536.9, 515.7, 547.8), 10.9, "The t-shirt the robot arms are trying to fold is a dark teal or"),
+        (fitz.Rect(160.0, 565.0, 225.0, 576.0), 10.9, "Gemini 1.5 Pro"),
+        (fitz.Rect(412.0, 565.0, 425.0, 576.0), 10.9, "1"),
+        (fitz.Rect(466.0, 565.0, 515.0, 576.0), 10.9, "The t-shirt"),
+        (fitz.Rect(412.0, 626.0, 425.0, 637.0), 10.9, "3"),
+        (fitz.Rect(466.0, 626.0, 515.0, 637.0), 10.9, "The t-shirt"),
+        (fitz.Rect(160.0, 654.0, 270.0, 665.0), 10.9, "2.5 Pro Preview 05-06"),
+        (fitz.Rect(412.0, 654.0, 425.0, 665.0), 10.9, "1"),
+        (fitz.Rect(466.0, 654.0, 515.0, 665.0), 10.9, "The t-shirt"),
+        (fitz.Rect(412.0, 682.0, 425.0, 693.0), 10.9, "2"),
+        (fitz.Rect(466.0, 682.0, 515.0, 693.0), 10.9, "The T-shirt"),
+        (fitz.Rect(412.0, 710.0, 425.0, 721.0), 10.9, "3"),
+        (fitz.Rect(466.0, 710.0, 515.0, 721.0), 10.9, "The t-shirt"),
+    ]
+
+    expanded = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "above",
+    )
+
+    assert 515.0 <= expanded.y0 <= 518.0, expanded
+    assert expanded.y1 == final_clip.y1
+
+
+def test_table_direction_tie_break_prefers_nearest_structured_table() -> None:
+    caption = fitz.Rect(62.0, 162.0, 533.2, 200.6)
+    page = fitz.Rect(0.0, 0.0, 595.3, 842.0)
+    text_lines = [
+        (fitz.Rect(123.0, 88.6, 162.5, 96.3), 7.8, "Gemini 1.5"),
+        (fitz.Rect(166.7, 88.6, 206.2, 96.3), 7.8, "Gemini 1.5"),
+        (fitz.Rect(62.4, 93.4, 102.9, 101.2), 7.8, "Benchmark"),
+        (fitz.Rect(133.4, 98.2, 152.0, 106.0), 7.8, "Flash"),
+        (fitz.Rect(212.9, 98.2, 247.4, 106.0), 7.8, "Flash-Lite"),
+        (fitz.Rect(62.4, 111.8, 89.5, 119.5), 7.8, "FLEURS"),
+        (fitz.Rect(133.0, 116.6, 152.4, 124.4), 7.8, "12.71"),
+        (fitz.Rect(178.9, 116.6, 194.0, 124.4), 7.8, "7.14"),
+        (fitz.Rect(222.6, 116.6, 237.7, 124.4), 7.8, "9.60"),
+        (fitz.Rect(266.3, 116.6, 281.4, 124.4), 7.8, "9.04"),
+        (fitz.Rect(310.0, 116.6, 325.1, 124.4), 7.8, "9.95"),
+        (fitz.Rect(353.4, 116.6, 369.2, 124.3), 7.8, "6.66"),
+        (fitz.Rect(401.3, 116.6, 420.7, 124.4), 7.8, "19.52"),
+        (fitz.Rect(456.9, 116.6, 476.4, 124.4), 7.8, "12.16"),
+        (fitz.Rect(507.2, 116.6, 522.3, 124.4), 7.8, "8.17"),
+        (fitz.Rect(62.4, 132.0, 95.0, 139.8), 7.8, "CoVoST2"),
+        (fitz.Rect(133.0, 136.8, 152.4, 144.6), 7.8, "34.81"),
+        (fitz.Rect(178.9, 136.8, 194.0, 144.6), 7.8, "37.53"),
+        (fitz.Rect(222.6, 136.8, 237.7, 144.6), 7.8, "34.74"),
+        (fitz.Rect(266.3, 136.8, 281.4, 144.6), 7.8, "36.35"),
+        (fitz.Rect(310.0, 136.8, 325.1, 144.6), 7.8, "36.15"),
+        (fitz.Rect(353.4, 136.8, 369.2, 144.6), 7.8, "38.48"),
+        (fitz.Rect(200.3, 217.8, 241.8, 226.0), 8.2, "Gemini 1.5"),
+        (fitz.Rect(250.8, 217.8, 292.3, 226.0), 8.2, "Gemini 1.5"),
+        (fitz.Rect(66.8, 222.9, 106.1, 231.1), 8.2, "Modalities"),
+        (fitz.Rect(137.3, 222.9, 180.0, 231.1), 8.2, "Benchmark"),
+        (fitz.Rect(211.3, 228.0, 230.9, 236.1), 8.2, "Flash"),
+        (fitz.Rect(137.3, 242.9, 190.5, 251.1), 8.2, "ActivityNet-QA"),
+        (fitz.Rect(213.1, 242.9, 229.0, 251.1), 8.2, "56.2"),
+        (fitz.Rect(263.6, 242.9, 279.5, 251.1), 8.2, "57.3"),
+        (fitz.Rect(62.0, 430.0, 533.2, 455.0), 10.0, "Table 6 | Evaluation of Gemini 2.5 vs. prior models"),
+    ]
+
+    direction, confidence = score_local_direction(
+        caption,
+        page,
+        [],
+        [],
+        clip_height=520.0,
+        margin_x=26.0,
+        caption_gap=6.0,
+        is_table=True,
+        text_lines=text_lines,
+    )
+
+    assert direction == "above"
+    assert confidence >= 0.6
 
 
 def test_table_final_padding_keeps_text_bbox_before_caption() -> None:
@@ -1363,6 +1634,438 @@ def test_layout_trims_section_title_from_short_figure() -> None:
     assert adjusted.y0 > title_rect.y1, adjusted
 
 
+def test_table_far_side_trims_trailing_section_heading() -> None:
+    """表格下方紧跟的章节标题（编号被拆到正文）应从 final 远端剔除。
+
+    复刻 Qwen3-Omni Table 5：标题块 "Performance of Audio→Text" 残留在表格
+    远端，其编号 "5.1.2" 被拆到后续正文段落里。
+    """
+    clip = fitz.Rect(66.1, 267.4, 529.5, 460.0)
+    caption = fitz.Rect(70.6, 243.0, 524.4, 264.9)
+    layout_blocks = [
+        _make_text_block(fitz.Rect(100.8, 420.4, 230.9, 431.4), "Performance of Audio→Text", "title_h3"),
+        _make_text_block(fitz.Rect(70.4, 421.4, 526.1, 472.7), "5.1.2 We compare Qwen3-Omni with other leading specialist and generalist models on ASR.", "paragraph_group"),
+    ]
+    text_lines = [
+        (fitz.Rect(70.9, 398.0, 130.0, 408.0), 8.0, "Multilingual"),
+        (fitz.Rect(200.0, 398.0, 218.0, 408.0), 8.0, "74.4"),
+        (fitz.Rect(70.4, 421.4, 95.0, 431.4), 10.0, "5.1.2"),
+        (fitz.Rect(100.8, 420.4, 230.9, 431.4), 10.0, "Performance of Audio→Text"),
+        (fitz.Rect(70.4, 421.4, 526.1, 431.4), 10.0, "5.1.2 We compare Qwen3-Omni with other leading specialist and generalist models"),
+        (fitz.Rect(70.4, 433.0, 520.0, 443.0), 10.0, "chatting, audio reasoning, and music understanding benchmarks."),
+    ]
+
+    result = trim_table_far_side_section_heading(
+        clip, caption, "below", layout_blocks, text_lines,
+    )
+    assert 413.0 <= result.y1 <= 415.0, result
+    assert result.x0 == clip.x0 and result.x1 == clip.x1
+
+
+def test_table_far_side_keeps_misclassified_last_data_row() -> None:
+    """被误判为标题、但右侧带数字数据列的表格末行应保留，不得误裁。
+
+    复刻 Qwen3-Omni Table 2：末行 "Generation RTF(Real Time Factor) 0.47 0.56 0.66"
+    被布局模型误判为 title_h3，但右侧有数据列，属于真实表格行。
+    """
+    clip = fitz.Rect(99.0, 529.8, 496.4, 677.9)
+    caption = fitz.Rect(70.6, 510.0, 524.0, 528.0)
+    layout_blocks = [
+        _make_text_block(fitz.Rect(103.8, 662.7, 244.1, 671.7), "Generation RTF(Real Time Factor)", "title_h3"),
+        _make_text_block(fitz.Rect(325.7, 662.7, 469.8, 671.7), "0.47 0.56 0.66", "paragraph_group"),
+        _make_text_block(fitz.Rect(70.6, 698.2, 526.1, 770.0), "sources across varying concurrency scenarios.", "paragraph_group"),
+    ]
+    text_lines = [
+        (fitz.Rect(103.8, 637.9, 300.0, 647.9), 8.0, "Thinker Token Generation Rate (TPS)"),
+        (fitz.Rect(103.8, 662.7, 244.1, 671.7), 8.0, "Generation RTF(Real Time Factor)"),
+        (fitz.Rect(325.7, 662.7, 469.8, 671.7), 8.0, "0.47 0.56 0.66"),
+        (fitz.Rect(70.6, 698.2, 526.1, 708.2), 10.0, "sources across varying concurrency scenarios."),
+    ]
+
+    result = trim_table_far_side_section_heading(
+        clip, caption, "below", layout_blocks, text_lines,
+    )
+    assert result.y1 == clip.y1, result
+
+
+def test_table_far_side_keeps_header_followed_by_table_rows() -> None:
+    """Gemini 表头虽然可能被识别为 title_h3，但后续是表格行，不应被裁。"""
+    clip = fitz.Rect(57.4, 86.2, 537.9, 420.0)
+    caption = fitz.Rect(62.0, 425.6, 533.1, 464.2)
+    layout_blocks = [
+        _make_text_block(fitz.Rect(142.7, 88.7, 283.4, 98.7), "Key Results for Gemini 2.5 Pro", "title_h3"),
+        _make_text_block(fitz.Rect(88.9, 101.1, 364.5, 111.1), "Area CCL", "paragraph_group"),
+        _make_text_block(fitz.Rect(443.5, 101.1, 505.9, 111.1), "CCL reached?", "title_h3"),
+        _make_text_block(fitz.Rect(142.7, 126.2, 526.9, 245.1), "Solve rate Autonomy Level 1 CCL not reached", "paragraph_group"),
+    ]
+    text_lines = [
+        (fitz.Rect(142.7, 88.7, 283.4, 98.7), 8.0, "Key Results for Gemini 2.5 Pro"),
+        (fitz.Rect(88.9, 101.1, 122.0, 111.1), 8.0, "Area"),
+        (fitz.Rect(340.0, 101.1, 365.0, 111.1), 8.0, "CCL"),
+        (fitz.Rect(443.5, 101.1, 505.9, 111.1), 8.0, "CCL reached?"),
+        (fitz.Rect(142.7, 235.1, 335.8, 245.1), 8.0, "Solve rate on internal coding set"),
+        (fitz.Rect(346.5, 235.2, 424.5, 245.1), 8.0, "Autonomy Level 1"),
+        (fitz.Rect(443.5, 234.5, 526.9, 245.1), 8.0, "CCL not reached"),
+    ]
+
+    result = trim_table_far_side_section_heading(
+        clip, caption, "above", layout_blocks, text_lines,
+    )
+    assert result.y0 == clip.y0, result
+
+
+def test_table_far_side_trims_numbered_section_heading_above_table() -> None:
+    """FunAudio 表格上方紧贴章节标题时，应只裁掉章节标题，保留下方表格。"""
+    clip = fitz.Rect(135.4, 281.1, 421.0, 478.7)
+    caption = fitz.Rect(181.0, 484.4, 430.7, 494.4)
+    layout_blocks = [
+        _make_text_block(fitz.Rect(137.9, 283.6, 273.5, 293.5), "Evaluation on Noise Robustness", "title_h3"),
+        _make_text_block(fitz.Rect(199.4, 310.2, 398.1, 472.4), "FunAudio-ASR Environment canteen 20.67 20.34 19.88", "paragraph_group"),
+    ]
+    text_lines = [
+        (fitz.Rect(105.0, 283.6, 132.0, 293.5), 10.0, "6.2.3"),
+        (fitz.Rect(137.9, 283.6, 273.5, 293.5), 10.0, "Evaluation on Noise Robustness"),
+        (fitz.Rect(199.4, 310.2, 271.0, 320.2), 8.0, "FunAudio-ASR"),
+        (fitz.Rect(282.0, 310.2, 330.0, 320.2), 8.0, "Environment"),
+        (fitz.Rect(342.0, 310.2, 398.1, 320.2), 8.0, "WER (%)"),
+    ]
+
+    result = trim_table_far_side_section_heading(
+        clip, caption, "above", layout_blocks, text_lines,
+    )
+    assert 298.0 <= result.y0 <= 301.0, result
+
+
+def test_table_far_side_keeps_same_row_data_cell_at_far_edge() -> None:
+    """Attention 表格最右侧数据单元格误判为 title_h3 时，不应裁掉末行。"""
+    clip = fitz.Rect(125.8, 93.3, 486.3, 246.9)
+    caption = fitz.Rect(107.7, 71.2, 504.0, 92.1)
+    layout_blocks = [
+        _make_text_block(fitz.Rect(407.3, 217.7, 450.7, 228.9), "3.3 · 10^18", "title_h3"),
+        _make_text_block(fitz.Rect(136.7, 230.5, 353.7, 240.5), "28.4 41.8", "paragraph_group"),
+    ]
+    text_lines = [
+        (fitz.Rect(136.7, 217.7, 212.7, 228.9), 8.0, "Transformer"),
+        (fitz.Rect(250.0, 217.7, 315.0, 228.9), 8.0, "28.4"),
+        (fitz.Rect(407.3, 217.7, 450.7, 228.9), 8.0, "3.3 · 10^18"),
+        (fitz.Rect(136.7, 230.5, 353.7, 240.5), 8.0, "28.4 41.8"),
+    ]
+
+    result = trim_table_far_side_section_heading(
+        clip, caption, "below", layout_blocks, text_lines,
+    )
+    assert result.y1 == clip.y1, result
+
+
+def test_table_far_side_keeps_layout_only_same_row_data_cell() -> None:
+    """text_lines 缺失同排数据时，layout 同排数据块也应保护表格末行。"""
+    clip = fitz.Rect(99.0, 529.8, 496.4, 674.2)
+    caption = fitz.Rect(105.8, 513.7, 489.2, 523.8)
+    layout_blocks = [
+        _make_text_block(fitz.Rect(103.8, 662.7, 244.1, 671.7), "Generation RTF(Real Time Factor)", "title_h3"),
+        _make_text_block(fitz.Rect(325.7, 662.7, 469.8, 671.7), "0.47 0.56 0.66", "paragraph_group"),
+        _make_text_block(fitz.Rect(70.6, 698.2, 526.1, 708.2), "sources across varying concurrency scenarios.", "paragraph_group"),
+    ]
+
+    result = trim_table_far_side_section_heading(
+        clip,
+        caption,
+        "below",
+        layout_blocks,
+        [],
+    )
+
+    assert result.y1 == clip.y1, result
+
+
+def test_table_final_text_bounds_recovers_qwen_table2_tail_row() -> None:
+    """Qwen Table 2 final 缺少末行时，应回补紧邻的结构化表格行。"""
+    final_clip = fitz.Rect(99.0, 529.8, 496.4, 656.7)
+    reference_clip = fitz.Rect(26.0, 529.8, 569.3, 681.1)
+    caption = fitz.Rect(105.8, 513.7, 489.2, 523.8)
+    text_lines = [
+        (fitz.Rect(304.0, 538.3, 491.4, 562.0), 8.0, "Qwen3-Omni-30B-A3B 1 Concurrency 4 Concurrency 6 Concurrency"),
+        (fitz.Rect(103.8, 568.1, 486.2, 616.9), 8.0, "Thinker-Talker Tail Packet Preprocessing Latency 72/160ms 94/180ms 100/200ms"),
+        (fitz.Rect(103.8, 622.8, 487.2, 631.8), 8.0, "Overral Latency (Audio/Video) 234/547ms 728/1517ms 1172/2284ms"),
+        (fitz.Rect(103.8, 637.9, 487.5, 656.8), 8.0, "Thinker Token Generation Rate (TPS) 75 tokens/s Talker Token Generation Rate (TPS) 140 tokens/s"),
+        (fitz.Rect(103.8, 662.7, 244.1, 671.7), 8.0, "Generation RTF(Real Time Factor)"),
+        (fitz.Rect(325.7, 662.7, 469.8, 671.7), 8.0, "0.47 0.56 0.66"),
+        (fitz.Rect(70.6, 698.2, 526.1, 708.2), 10.0, "sources across varying concurrency scenarios. Experiments are conducted on the vLLM framework."),
+    ]
+
+    expanded = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "below",
+    )
+
+    assert 673.0 <= expanded.y1 <= 675.0, expanded
+    assert expanded.y1 < 690.0, expanded
+
+
+def test_table_final_text_bounds_recovers_tail_row_from_layout_blocks() -> None:
+    """当 text_lines 漏掉末行时，layout 同行数据块可兜底回补表格行。"""
+    final_clip = fitz.Rect(99.0, 529.8, 496.4, 656.7)
+    reference_clip = fitz.Rect(26.0, 529.8, 569.3, 681.1)
+    caption = fitz.Rect(105.8, 513.7, 489.2, 523.8)
+    text_lines = [
+        (fitz.Rect(304.0, 538.3, 491.4, 562.0), 8.0, "Qwen3-Omni-30B-A3B 1 Concurrency 4 Concurrency 6 Concurrency"),
+        (fitz.Rect(103.8, 568.1, 486.2, 616.9), 8.0, "Thinker-Talker Tail Packet Preprocessing Latency 72/160ms 94/180ms 100/200ms"),
+        (fitz.Rect(103.8, 622.8, 487.2, 631.8), 8.0, "Overral Latency (Audio/Video) 234/547ms 728/1517ms 1172/2284ms"),
+        (fitz.Rect(103.8, 637.9, 487.5, 656.8), 8.0, "Thinker Token Generation Rate (TPS) 75 tokens/s Talker Token Generation Rate (TPS) 140 tokens/s"),
+    ]
+    layout_blocks = [
+        _make_text_block(fitz.Rect(103.8, 662.7, 244.1, 671.7), "Generation RTF(Real Time Factor)", "title_h3"),
+        _make_text_block(fitz.Rect(325.7, 662.7, 469.8, 671.7), "0.47 0.56 0.66", "paragraph_group"),
+        _make_text_block(fitz.Rect(70.6, 698.2, 526.1, 708.2), "sources across varying concurrency scenarios.", "paragraph_group"),
+    ]
+
+    expanded = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "below",
+        layout_text_blocks=layout_blocks,
+    )
+
+    assert 673.0 <= expanded.y1 <= 675.0, expanded
+    assert expanded.y1 < 690.0, expanded
+
+
+def test_table_final_text_bounds_trims_far_side_blank_before_table() -> None:
+    """FunAudio Table 2 顶部远端空白较大时，应收紧到表格首行附近。"""
+    final_clip = fitz.Rect(103.0, 550.3, 509.1, 689.9)
+    reference_clip = fitz.Rect(26.0, 550.3, 586.0, 689.7)
+    caption = fitz.Rect(155.7, 695.7, 456.0, 705.6)
+    text_lines = [
+        (fitz.Rect(113.4, 585.0, 160.0, 595.0), 8.0, "Test set"),
+        (fitz.Rect(410.0, 585.0, 498.6, 595.0), 8.0, "FunAudio-ASR"),
+        (fitz.Rect(113.4, 612.0, 160.0, 622.0), 8.0, "In-house"),
+        (fitz.Rect(210.0, 612.0, 230.0, 622.0), 8.0, "7.20"),
+        (fitz.Rect(470.0, 612.0, 498.6, 622.0), 8.0, "6.66"),
+    ]
+
+    trimmed = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "above",
+    )
+
+    assert 581.0 <= trimmed.y0 <= 583.0, trimmed
+    assert trimmed.y1 == final_clip.y1
+
+
+def test_table_final_text_bounds_trims_body_tail_before_header() -> None:
+    """Kearns Table 1 顶部正文尾句进入 final 时，应裁到表头附近。"""
+    final_clip = fitz.Rect(83.9, 384.5, 478.9, 494.5)
+    reference_clip = fitz.Rect(26.0, 342.3, 586.0, 494.4)
+    caption = fitz.Rect(134.4, 500.4, 477.9, 510.6)
+    text_lines = [
+        (fitz.Rect(86.4, 384.5, 126.0, 397.9), 10.0, "almost 13%."),
+        (fitz.Rect(197.6, 408.9, 310.0, 419.8), 10.0, "Feature(s) Added"),
+        (fitz.Rect(340.0, 408.9, 467.8, 419.8), 10.0, "Reduction in Trading Cost"),
+        (fitz.Rect(144.2, 422.9, 250.0, 433.0), 10.0, "Bid-Ask Spread"),
+        (fitz.Rect(390.0, 422.9, 422.7, 433.0), 10.0, "7.97%"),
+    ]
+
+    trimmed = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "above",
+    )
+
+    assert 406.0 <= trimmed.y0 <= 407.0, trimmed
+    assert trimmed.y1 == final_clip.y1
+
+
+def test_table_final_text_bounds_trims_numeric_body_tail_before_header() -> None:
+    """Gemini Table 12 的数字正文尾句不应被当作表格起点保留。"""
+    final_clip = fitz.Rect(57.7, 488.0, 526.4, 734.3)
+    reference_clip = fitz.Rect(26.0, 472.9, 569.3, 735.4)
+    caption = fitz.Rect(62.0, 741.4, 366.9, 752.9)
+    text_lines = [
+        (
+            fitz.Rect(61.5, 488.2, 526.4, 498.9),
+            10.0,
+            "1/3 cases (remaining 2/3 are within 3 seconds close).",
+        ),
+        (fitz.Rect(79.8, 517.8, 121.0, 528.7), 10.0, "Model"),
+        (fitz.Rect(204.0, 517.8, 226.0, 528.7), 10.0, "Trial"),
+        (fitz.Rect(233.1, 517.8, 312.3, 528.7), 10.0, "Model response"),
+        (fitz.Rect(79.8, 536.9, 157.0, 547.8), 10.0, "Gemini 1.5 Pro"),
+        (fitz.Rect(204.0, 536.9, 212.0, 547.8), 10.0, "1"),
+        (
+            fitz.Rect(233.1, 536.9, 515.7, 559.0),
+            10.0,
+            "The t-shirt the robot arms are trying to fold is a dark teal or turquoise blue color.",
+        ),
+    ]
+
+    trimmed = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "above",
+    )
+
+    assert 515.0 <= trimmed.y0 <= 516.0, trimmed
+    assert trimmed.y1 == final_clip.y1
+
+
+def test_table_final_text_bounds_keeps_wrapped_tail_cell_line() -> None:
+    """GPT-5 Table 16 的短换行单元格尾行应保留到 final 底部。"""
+    final_clip = fitz.Rect(76.4, 169.7, 519.0, 262.1)
+    reference_clip = fitz.Rect(26.0, 168.8, 569.3, 364.1)
+    caption = fitz.Rect(109.4, 151.9, 485.3, 162.8)
+    text_lines = [
+        (fitz.Rect(87.3, 179.1, 140.6, 189.1), 10.0, "Evaluation"),
+        (fitz.Rect(198.4, 179.1, 250.3, 189.1), 10.0, "Capability"),
+        (fitz.Rect(337.9, 179.1, 395.6, 189.1), 10.0, "Description"),
+        (fitz.Rect(87.3, 237.7, 144.4, 247.7), 10.0, "Cyber Range"),
+        (fitz.Rect(198.4, 237.7, 326.0, 247.7), 10.0, "Vulnerability Identification &"),
+        (fitz.Rect(198.4, 249.6, 252.5, 259.6), 10.0, "Exploitation"),
+        (fitz.Rect(337.9, 237.7, 508.0, 247.7), 10.0, "Can models conduct fully end-to-end"),
+        (fitz.Rect(337.9, 249.6, 508.0, 259.6), 10.0, "cyber operations in a realistic, emulated"),
+        (fitz.Rect(337.9, 261.6, 377.3, 271.6), 10.0, "network?"),
+        (fitz.Rect(70.9, 305.9, 314.4, 316.8), 10.0, "5.1.2.1 Capture the Flag (CTF) Challenges"),
+    ]
+
+    expanded = expand_table_clip_to_text_bounds(
+        final_clip,
+        reference_clip,
+        caption,
+        text_lines,
+        "below",
+    )
+
+    assert 273.5 <= expanded.y1 <= 275.0, expanded
+
+
+def test_figure_noise_trim_ignores_sentence_tail_as_content_evidence() -> None:
+    """GPT-5 Figure 29 顶部正文尾句不应阻止 far-side 图像边界收紧。"""
+    original_clip = fitz.Rect(26.0, 195.5, 569.3, 400.4)
+    candidate_clip = fitz.Rect(44.9, 328.7, 550.4, 400.4)
+    image_rects = [fitz.Rect(70.9, 348.0, 524.4, 395.0)]
+    text_lines = [
+        (fitz.Rect(70.5, 328.7, 142.0, 336.8), 10.0, "of such behaviors."),
+        (fitz.Rect(97.0, 354.0, 220.0, 364.0), 10.0, "Grader Sycophancy"),
+    ]
+
+    trimmed = trim_far_side_noise_before_content(
+        original_clip,
+        candidate_clip,
+        "above",
+        image_rects,
+        [],
+        text_lines,
+        pad=8.0,
+        min_gap=10.0,
+    )
+
+    assert 339.5 <= trimmed.y0 <= 341.0, trimmed
+    assert trimmed.y1 == candidate_clip.y1
+
+
+def test_figure_post_autocrop_trims_narrow_lowercase_sentence_tail() -> None:
+    """窄正文尾句即使宽度不足 30%，也应从 Figure far side 裁掉。"""
+    clip = fitz.Rect(44.9, 328.7, 550.4, 400.4)
+    text_lines = [
+        (fitz.Rect(70.5, 328.7, 142.0, 336.8), 10.0, "of such behaviors."),
+        (fitz.Rect(97.0, 354.0, 220.0, 364.0), 10.0, "Grader Sycophancy"),
+    ]
+
+    trimmed, changed = trim_far_side_text_iterative(
+        clip,
+        text_lines,
+        "above",
+        typical_line_h=10.0,
+        max_passes=1,
+    )
+
+    assert changed
+    assert 342.0 <= trimmed.y0 <= 343.5, trimmed
+
+
+def test_figure_title_recovery_ignores_lowercase_sentence_tail() -> None:
+    """图内标题回收不应把正文尾句重新扩回 final。"""
+    original_clip = fitz.Rect(26.0, 328.7, 569.3, 400.4)
+    limited_clip = fitz.Rect(44.9, 342.8, 550.4, 400.4)
+    text_lines = [
+        (fitz.Rect(70.5, 328.7, 142.0, 336.8), 10.0, "of such behaviors."),
+        (fitz.Rect(197.0, 354.0, 310.0, 364.0), 10.0, "Grader Sycophancy"),
+    ]
+
+    expanded = expand_clip_to_nearby_figure_title(
+        original_clip,
+        limited_clip,
+        text_lines,
+        "above",
+    )
+
+    assert expanded == limited_clip
+
+
+def test_table_far_side_trims_single_number_section_heading() -> None:
+    """Qwen Table 16 远端单级章节标题 `7 Conclusion` 应从表格截图剔除。"""
+    clip = fitz.Rect(66.1, 374.4, 527.1, 739.3)
+    caption = fitz.Rect(70.6, 336.6, 524.4, 368.4)
+    layout_blocks = [
+        _make_text_block(fitz.Rect(70.9, 724.9, 151.2, 736.8), "7 Conclusion", "title_h2"),
+        _make_text_block(
+            fitz.Rect(70.9, 750.3, 526.1, 771.3),
+            "In this paper, we introduce Qwen3-Omni-30B-A3B, Qwen3-Omni-30B-A3B-Thinking, and Qwen3-Omni-Flash-Instruct.",
+            "paragraph_group",
+        ),
+    ]
+
+    result = trim_table_far_side_section_heading(
+        clip,
+        caption,
+        "below",
+        layout_blocks,
+        [],
+    )
+
+    assert 718.0 <= result.y1 <= 720.0, result
+
+
+def test_bare_figure_caption_prefers_above_when_next_caption_below() -> None:
+    """裸 Figure caption 下方有下一张 caption、上方有对象时，应回到上方图。"""
+    direction = correct_bare_figure_caption_direction(
+        "below",
+        fitz.Rect(275.1, 239.4, 320.1, 250.3),
+        "Figure 22",
+        fitz.Rect(0.0, 0.0, 595.3, 842.0),
+        image_rects=[fitz.Rect(70.0, 130.0, 525.0, 230.0)],
+        vector_rects=[],
+        neighbor_caption_rects=[fitz.Rect(275.0, 520.0, 320.0, 531.0)],
+        clip_height=400.0,
+    )
+    assert direction == "above"
+
+
+def test_bare_figure_caption_keeps_below_without_above_object() -> None:
+    direction = correct_bare_figure_caption_direction(
+        "below",
+        fitz.Rect(275.1, 239.4, 320.1, 250.3),
+        "Figure 22",
+        fitz.Rect(0.0, 0.0, 595.3, 842.0),
+        image_rects=[],
+        vector_rects=[],
+        neighbor_caption_rects=[fitz.Rect(275.0, 520.0, 320.0, 531.0)],
+        clip_height=400.0,
+    )
+    assert direction == "below"
+
+
 def main() -> int:
     tests = [
         test_caption_index_scores_candidates,
@@ -1390,6 +2093,10 @@ def main() -> int:
         test_table_band_recognizes_compact_single_block_rows,
         test_looks_like_table_text_accepts_short_compact_table,
         test_restore_table_clip_width_recovers_over_narrow_structured_table,
+        test_table_final_text_bounds_recovers_connected_header_band,
+        test_table_final_text_bounds_stops_before_body_paragraph,
+        test_table_final_text_bounds_recovers_header_but_not_leading_body_line,
+        test_table_direction_tie_break_prefers_nearest_structured_table,
         test_table_direction_ignores_adjacent_table_reference_line,
         test_table_direction_keeps_short_numeric_cells_as_evidence,
         test_table_direction_prefers_nearest_structured_rows_over_chart_labels,
@@ -1399,6 +2106,24 @@ def main() -> int:
         test_table_direction_uses_text_structure_above_caption,
         test_table_direction_uses_text_structure_below_caption,
         test_layout_trims_section_title_from_short_figure,
+        test_table_far_side_trims_trailing_section_heading,
+        test_table_far_side_keeps_misclassified_last_data_row,
+        test_table_far_side_keeps_header_followed_by_table_rows,
+        test_table_far_side_trims_numbered_section_heading_above_table,
+        test_table_far_side_keeps_same_row_data_cell_at_far_edge,
+        test_table_far_side_keeps_layout_only_same_row_data_cell,
+        test_table_final_text_bounds_recovers_qwen_table2_tail_row,
+        test_table_final_text_bounds_recovers_tail_row_from_layout_blocks,
+        test_table_final_text_bounds_trims_far_side_blank_before_table,
+        test_table_final_text_bounds_trims_body_tail_before_header,
+        test_table_final_text_bounds_trims_numeric_body_tail_before_header,
+        test_table_final_text_bounds_keeps_wrapped_tail_cell_line,
+        test_figure_noise_trim_ignores_sentence_tail_as_content_evidence,
+        test_figure_post_autocrop_trims_narrow_lowercase_sentence_tail,
+        test_figure_title_recovery_ignores_lowercase_sentence_tail,
+        test_table_far_side_trims_single_number_section_heading,
+        test_bare_figure_caption_prefers_above_when_next_caption_below,
+        test_bare_figure_caption_keeps_below_without_above_object,
     ]
     passed = 0
     failed = 0
