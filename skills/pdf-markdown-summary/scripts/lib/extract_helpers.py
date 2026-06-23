@@ -12,8 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple
 
 # 尝试导入 fitz
 try:
@@ -21,70 +20,11 @@ try:
 except ImportError:
     fitz = None  # type: ignore
 
-# 避免循环导入
-if TYPE_CHECKING:
-    from .models import DrawItem
+from .models import DrawItem
+from .pixel_detect import estimate_ink_ratio
 
 # 模块日志器
 logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# 数据结构
-# ============================================================================
-
-@dataclass
-class DrawItem:
-    """绘图项（用于线条/网格感知）"""
-    rect: "fitz.Rect"
-    orient: str  # 'H' | 'V' | 'O'
-
-
-# ============================================================================
-# 墨迹密度估计
-# ============================================================================
-
-def estimate_ink_ratio(pix: "fitz.Pixmap", white_threshold: int = 250) -> float:
-    """
-    估计位图中"有墨迹"的像素比例（0~1）。
-
-    通过子采样快速近似；值越大表示内容越密集。
-
-    Args:
-        pix: PyMuPDF Pixmap 对象
-        white_threshold: 白色阈值（默认 250）
-
-    Returns:
-        非白色像素占比（0.0~1.0）
-    """
-    if fitz is None:
-        return 0.0
-
-    w, h = pix.width, pix.height
-    n = pix.n
-    if pix.alpha:
-        tmp = fitz.Pixmap(fitz.csRGB, pix)
-        pix = tmp
-        n = pix.n
-    samples = memoryview(pix.samples)
-    stride = pix.stride
-    step_x = max(1, w // 800)
-    step_y = max(1, h // 800)
-    nonwhite = 0
-    total = 0
-    for y in range(0, h, step_y):
-        row = samples[y * stride:(y + 1) * stride]
-        for x in range(0, w, step_x):
-            off = x * n
-            r = row[off + 0]
-            g = row[off + 1] if n > 1 else r
-            b = row[off + 2] if n > 2 else r
-            if r < white_threshold or g < white_threshold or b < white_threshold:
-                nonwhite += 1
-            total += 1
-    if total == 0:
-        return 0.0
-    return nonwhite / float(total)
 
 
 # ============================================================================

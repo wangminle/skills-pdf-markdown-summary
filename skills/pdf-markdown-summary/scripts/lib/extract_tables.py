@@ -34,30 +34,33 @@ from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
     merge_caption_lines, is_caption_reference,
 )
-from .refine import (
-    refine_clip_by_objects,
-    expand_clip_to_rendered_horizontal_rule,
-    detect_content_bbox_pixels,
+from .acceptance import (
     adaptive_acceptance_thresholds,
-    detect_far_side_text_evidence,
-    trim_far_side_text_iterative,
+    compute_clip_quality_metrics,
+    detect_text_pollution,
+    estimate_far_side_text_coverage,
+    evaluate_refinement_acceptance,
+    looks_like_table_text,
+)
+from .clip_limit import (
+    limit_clip_by_neighbor_captions,
+    limit_clip_by_text_blocks,
+    refine_clip_x_range,
+    snap_clip_edges,
+)
+from .far_side import detect_far_side_text_evidence, trim_far_side_text_iterative
+from .object_refine import merge_rects, refine_clip_by_objects
+from .pixel_detect import build_text_masks_px, detect_content_bbox_pixels, estimate_ink_ratio
+from .table_refine import (
+    expand_clip_to_nearby_table_header,
+    expand_clip_to_rendered_horizontal_rule,
+    expand_table_clip_to_text_bounds,
     refine_clip_to_table_band,
     restore_table_clip_width,
     restore_table_tail_after_layout_trim,
-    expand_clip_to_nearby_table_header,
-    expand_table_clip_to_text_bounds,
     trim_table_far_side_section_heading,
-    trim_clip_head_by_text_v2,
-    merge_rects,
-    build_text_masks_px,
-    snap_clip_edges,
-    estimate_ink_ratio,
-    refine_clip_x_range,
-    detect_text_pollution,
-    looks_like_table_text,
-    limit_clip_by_neighbor_captions,
-    limit_clip_by_text_blocks,
 )
+from .text_trim import trim_clip_head_by_text_v2
 from .extract_helpers import (
     collect_draw_items,
     collect_text_lines,
@@ -69,6 +72,7 @@ from .extract_helpers import (
 from .direction import compute_global_anchor, determine_direction, score_local_direction
 from .layout_model import adjust_clip_with_layout
 from .debug_visual import create_debug_stage, save_debug_visualization
+from .extraction_logger import log_event
 from .models import DebugStageInfo, CaptionBlock
 from .output import get_unique_path
 
@@ -403,7 +407,9 @@ def extract_tables(
                     base_clip.x1,
                     base_clip.y1,
                 )
-                if layout_model is not None:
+                refine_enabled = ident not in no_refine_set
+
+                if refine_enabled and layout_model is not None:
                     text_blocks_for_limit = [
                         block
                         for block in layout_model.text_blocks.get(pno, [])
@@ -430,45 +436,67 @@ def extract_tables(
                         caption_bbox,
                         direction,
                     )
-                base_clip = expand_clip_to_rendered_horizontal_rule(
-                    base_clip,
-                    page,
-                    caption_bbox,
-                    direction,
-                )
-                clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
-
-                # ================================================================
-                # Phase A: 文本裁切（表格模式：启用 skip_adjacent_sweep 保护表头）
-                # ================================================================
-                if text_trim and ident not in no_refine_set:
-                    clip = trim_clip_head_by_text_v2(
-                        clip,
-                        page_rect,
+                if refine_enabled:
+                    base_clip = expand_clip_to_rendered_horizontal_rule(
+                        base_clip,
+                        page,
                         caption_bbox,
                         direction,
-                        text_lines,
-                        width_ratio=text_trim_width_ratio,
-                        font_min=text_trim_font_min,
-                        font_max=text_trim_font_max,
-                        gap=text_trim_gap,
-                        adjacent_th=adjacent_th,
-                        far_text_th=far_text_th,
-                        far_text_para_min_ratio=far_text_para_min_ratio,
-                        far_text_trim_mode=far_text_trim_mode,
-                        far_side_min_dist=far_side_min_dist,
-                        far_side_para_min_ratio=far_side_para_min_ratio,
-                        typical_line_h=typical_line_h,
-                        skip_adjacent_sweep=True,
-                        debug=debug_captions,
                     )
 
-                clip_after_A = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
+                if not refine_enabled:
+                    final_clip = create_rect(
+                        base_clip.x0,
+                        base_clip.y0,
+                        base_clip.x1,
+                        base_clip.y1,
+                    )
+                    clip_after_A = create_rect(
+                        final_clip.x0,
+                        final_clip.y0,
+                        final_clip.x1,
+                        final_clip.y1,
+                    )
+                    clip_after_B = create_rect(
+                        final_clip.x0,
+                        final_clip.y0,
+                        final_clip.x1,
+                        final_clip.y1,
+                    )
+                    table_band_changed = False
+                else:
+                    clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
 
-                # ================================================================
-                # Phase B: 对象对齐（表格使用不同的参数）
-                # ================================================================
-                if ident not in no_refine_set:
+                    # ================================================================
+                    # Phase A: 文本裁切（表格模式：启用 skip_adjacent_sweep 保护表头）
+                    # ================================================================
+                    if text_trim:
+                        clip = trim_clip_head_by_text_v2(
+                            clip,
+                            page_rect,
+                            caption_bbox,
+                            direction,
+                            text_lines,
+                            width_ratio=text_trim_width_ratio,
+                            font_min=text_trim_font_min,
+                            font_max=text_trim_font_max,
+                            gap=text_trim_gap,
+                            adjacent_th=adjacent_th,
+                            far_text_th=far_text_th,
+                            far_text_para_min_ratio=far_text_para_min_ratio,
+                            far_text_trim_mode=far_text_trim_mode,
+                            far_side_min_dist=far_side_min_dist,
+                            far_side_para_min_ratio=far_side_para_min_ratio,
+                            typical_line_h=typical_line_h,
+                            skip_adjacent_sweep=True,
+                            debug=debug_captions,
+                        )
+
+                    clip_after_A = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
+
+                    # ================================================================
+                    # Phase B: 对象对齐（表格使用不同的参数）
+                    # ================================================================
                     clip = refine_clip_by_objects(
                         clip,
                         caption_bbox,
@@ -483,12 +511,11 @@ def extract_tables(
                         use_horizontal_union=True,
                     )
 
-                clip_after_B = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
+                    clip_after_B = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
 
-                # ============================================================
-                # 修复4: X 方向列感知裁剪
-                # ============================================================
-                if ident not in no_refine_set:
+                    # ============================================================
+                    # 修复4: X 方向列感知裁剪
+                    # ============================================================
                     clip = refine_clip_x_range(
                         clip,
                         caption_bbox,
@@ -503,28 +530,27 @@ def extract_tables(
                         debug=debug_captions,
                     )
 
-                # ================================================================
-                # 版式驱动裁剪（如果提供了 layout_model）
-                # ================================================================
-                if layout_model is not None and ident not in no_refine_set:
-                    clip_before_layout = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
-                    clip = adjust_clip_with_layout(
-                        clip,
-                        caption_bbox,
-                        layout_model,
-                        pno,
-                        direction,
-                        debug=debug_captions,
-                    )
-                    clip = restore_table_tail_after_layout_trim(
-                        clip_before_layout,
-                        clip,
-                        text_lines,
-                        direction,
-                    )
+                    # ================================================================
+                    # 版式驱动裁剪（如果提供了 layout_model）
+                    # ================================================================
+                    if layout_model is not None:
+                        clip_before_layout = create_rect(clip.x0, clip.y0, clip.x1, clip.y1)
+                        clip = adjust_clip_with_layout(
+                            clip,
+                            caption_bbox,
+                            layout_model,
+                            pno,
+                            direction,
+                            debug=debug_captions,
+                        )
+                        clip = restore_table_tail_after_layout_trim(
+                            clip_before_layout,
+                            clip,
+                            text_lines,
+                            direction,
+                        )
 
-                table_band_changed = False
-                if ident not in no_refine_set:
+                    table_band_changed = False
                     table_band_clip, table_band_changed = refine_clip_to_table_band(
                         base_clip,
                         caption_bbox,
@@ -540,111 +566,113 @@ def extract_tables(
                             table_band_clip.y1,
                         )
 
-                # ================================================================
-                # Phase D: Autocrop（白边自动裁切）
-                # ================================================================
-                final_clip = clip
+                    # ================================================================
+                    # Phase D: Autocrop（白边自动裁切）
+                    # ================================================================
+                    final_clip = clip
 
-                if autocrop and ident not in no_refine_set:
-                    try:
-                        pix_for_analysis = page.get_pixmap(dpi=dpi, clip=clip)
+                    if autocrop:
+                        try:
+                            pix_for_analysis = page.get_pixmap(dpi=dpi, clip=clip)
 
-                        mask_rects_px: Optional[List[Tuple[int, int, int, int]]] = None
-                        if autocrop_mask_text:
-                            mask_rects_px = build_text_masks_px(
-                                clip, text_lines,
-                                scale=scale,
-                                direction=direction,
-                                near_frac=mask_top_frac,
-                                width_ratio=mask_width_ratio,
-                                font_max=mask_font_max,
-                                mask_mode='auto',
+                            mask_rects_px: Optional[List[Tuple[int, int, int, int]]] = None
+                            if autocrop_mask_text:
+                                mask_rects_px = build_text_masks_px(
+                                    clip, text_lines,
+                                    scale=scale,
+                                    direction=direction,
+                                    near_frac=mask_top_frac,
+                                    width_ratio=mask_width_ratio,
+                                    font_max=mask_font_max,
+                                    mask_mode='auto',
+                                )
+
+                            content_bbox_px = detect_content_bbox_pixels(
+                                pix_for_analysis,
+                                white_threshold=autocrop_white_threshold,
+                                pad=autocrop_pad_px,
+                                mask_rects_px=mask_rects_px,
                             )
 
-                        content_bbox_px = detect_content_bbox_pixels(
-                            pix_for_analysis,
-                            white_threshold=autocrop_white_threshold,
-                            pad=autocrop_pad_px,
-                            mask_rects_px=mask_rects_px,
-                        )
+                            cx0_px, cy0_px, cx1_px, cy1_px = content_bbox_px
+                            new_x0 = clip.x0 + cx0_px / scale
+                            new_y0 = clip.y0 + cy0_px / scale
+                            new_x1 = clip.x0 + cx1_px / scale
+                            new_y1 = clip.y0 + cy1_px / scale
 
-                        cx0_px, cy0_px, cx1_px, cy1_px = content_bbox_px
-                        new_x0 = clip.x0 + cx0_px / scale
-                        new_y0 = clip.y0 + cy0_px / scale
-                        new_x1 = clip.x0 + cx1_px / scale
-                        new_y1 = clip.y0 + cy1_px / scale
+                            autocrop_clip = create_rect(new_x0, new_y0, new_x1, new_y1)
 
-                        autocrop_clip = create_rect(new_x0, new_y0, new_x1, new_y1)
+                            has_far_evidence, far_limit = detect_far_side_text_evidence(
+                                clip, text_lines, direction,
+                                edge_zone=40.0,
+                                min_width_ratio=0.30,
+                            )
 
-                        has_far_evidence, far_limit = detect_far_side_text_evidence(
-                            clip, text_lines, direction,
-                            edge_zone=40.0,
-                            min_width_ratio=0.30,
-                        )
+                            if has_far_evidence and not table_band_changed:
+                                if direction == 'below':
+                                    autocrop_clip = create_rect(
+                                        autocrop_clip.x0,
+                                        autocrop_clip.y0,
+                                        autocrop_clip.x1,
+                                        min(autocrop_clip.y1, far_limit)
+                                    )
+                                else:
+                                    autocrop_clip = create_rect(
+                                        autocrop_clip.x0,
+                                        max(autocrop_clip.y0, far_limit),
+                                        autocrop_clip.x1,
+                                        autocrop_clip.y1
+                                    )
 
-                        if has_far_evidence and not table_band_changed:
-                            if direction == 'below':
-                                autocrop_clip = create_rect(
-                                    autocrop_clip.x0,
-                                    autocrop_clip.y0,
-                                    autocrop_clip.x1,
-                                    min(autocrop_clip.y1, far_limit)
+                            if not table_band_changed:
+                                autocrop_clip, _ = trim_far_side_text_iterative(
+                                    autocrop_clip, text_lines, direction,
+                                    typical_line_h=typical_line_h,
                                 )
+
+                            autocrop_h = autocrop_clip.height
+                            base_h = base_clip.height
+                            min_h_px = autocrop_min_height_px / scale
+
+                            table_band_is_valid = (
+                                table_band_changed
+                                and looks_like_table_text(autocrop_clip, text_lines)
+                            )
+                            if autocrop_h >= min_h_px and (
+                                autocrop_h >= base_h * autocrop_shrink_limit
+                                or table_band_is_valid
+                            ):
+                                final_clip = autocrop_clip
                             else:
-                                autocrop_clip = create_rect(
-                                    autocrop_clip.x0,
-                                    max(autocrop_clip.y0, far_limit),
-                                    autocrop_clip.x1,
-                                    autocrop_clip.y1
-                                )
+                                logger.debug(f"Table {ident}: autocrop rejected (h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})")
+                        except Exception as e:
+                            logger.warning(f"Table {ident}: autocrop failed: {e}")
 
-                        if not table_band_changed:
-                            autocrop_clip, _ = trim_far_side_text_iterative(
-                                autocrop_clip, text_lines, direction,
-                                typical_line_h=typical_line_h,
-                            )
+                    clip_after_D = create_rect(final_clip.x0, final_clip.y0, final_clip.x1, final_clip.y1)
 
-                        autocrop_h = autocrop_clip.height
-                        base_h = base_clip.height
-                        min_h_px = autocrop_min_height_px / scale
-
-                        table_band_is_valid = (
-                            table_band_changed
-                            and looks_like_table_text(autocrop_clip, text_lines)
-                        )
-                        if autocrop_h >= min_h_px and (
-                            autocrop_h >= base_h * autocrop_shrink_limit
-                            or table_band_is_valid
-                        ):
-                            final_clip = autocrop_clip
-                        else:
-                            logger.debug(f"Table {ident}: autocrop rejected (h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})")
-                    except Exception as e:
-                        logger.warning(f"Table {ident}: autocrop failed: {e}")
-
-                final_clip = restore_table_clip_width(
-                    final_clip,
-                    base_clip,
-                    table_band_changed=table_band_changed,
-                )
-                final_clip = expand_table_clip_to_text_bounds(
-                    final_clip,
-                    table_text_reference_clip,
-                    caption_bbox,
-                    text_lines,
-                    direction,
-                    layout_text_blocks=layout_model.text_blocks.get(pno, []) if layout_model is not None else None,
-                )
-
-                if layout_model is not None and ident not in no_refine_set:
-                    final_clip = trim_table_far_side_section_heading(
+                    final_clip = restore_table_clip_width(
                         final_clip,
-                        caption_bbox,
-                        direction,
-                        layout_model.text_blocks.get(pno, []),
-                        text_lines,
-                        typical_line_h=typical_line_h,
+                        base_clip,
+                        table_band_changed=table_band_changed,
                     )
+                    final_clip = expand_table_clip_to_text_bounds(
+                        final_clip,
+                        table_text_reference_clip,
+                        caption_bbox,
+                        text_lines,
+                        direction,
+                        layout_text_blocks=layout_model.text_blocks.get(pno, []) if layout_model is not None else None,
+                    )
+
+                    if layout_model is not None:
+                        final_clip = trim_table_far_side_section_heading(
+                            final_clip,
+                            caption_bbox,
+                            direction,
+                            layout_model.text_blocks.get(pno, []),
+                            text_lines,
+                            typical_line_h=typical_line_h,
+                        )
 
                 def save_current_debug(
                     *,
@@ -657,6 +685,7 @@ def extract_tables(
                         create_debug_stage('baseline', base_clip),
                         create_debug_stage('phase_a', clip_after_A),
                         create_debug_stage('phase_b', clip_after_B),
+                        create_debug_stage('phase_d', clip_after_D),
                         create_debug_stage(
                             'rejected' if rejected_reason else 'final',
                             final_clip,
@@ -683,58 +712,132 @@ def extract_tables(
                 # ================================================================
                 # 修复6: 增强验收检查
                 # ================================================================
-                if refine_safe and ident not in no_refine_set:
+                if refine_safe and refine_enabled:
+                    far_cov = estimate_far_side_text_coverage(
+                        base_clip,
+                        text_lines,
+                        direction,
+                        text_trim_width_ratio=text_trim_width_ratio,
+                        font_min=text_trim_font_min,
+                        font_max=text_trim_font_max,
+                    )
                     thresholds = adaptive_acceptance_thresholds(
                         base_clip.height,
                         is_table=True,
-                        far_cov=0.0,
+                        far_cov=far_cov,
                     )
 
-                    height_ratio = final_clip.height / max(1.0, base_clip.height)
-                    area_ratio = (final_clip.width * final_clip.height) / max(1.0, base_clip.width * base_clip.height)
-
-                    accepted = True
-                    fallback_reason = ""
-                    hard_reject = False
-
-                    if height_ratio < thresholds.height_ratio:
-                        accepted = False
-                        fallback_reason = f"height_ratio={height_ratio:.3f} < {thresholds.height_ratio:.3f}"
-                    elif area_ratio < thresholds.area_ratio:
-                        accepted = False
-                        fallback_reason = f"area_ratio={area_ratio:.3f} < {thresholds.area_ratio:.3f}"
-
-                    # 额外质量检查：截取区域不应过窄
-                    page_w = page_rect.width
-                    if final_clip.width < page_w * 0.15:
-                        accepted = False
-                        hard_reject = True
-                        fallback_reason = f"clip_too_narrow={final_clip.width:.0f}pt < 15% of page"
-
+                    base_metrics = compute_clip_quality_metrics(
+                        page, base_clip, image_rects, vector_rects, dpi=72,
+                    )
+                    final_metrics = compute_clip_quality_metrics(
+                        page, final_clip, image_rects, vector_rects, dpi=72,
+                    )
                     table_like_refined = looks_like_table_text(final_clip, text_lines)
+                    accepted, hard_reject, fallback_reason = evaluate_refinement_acceptance(
+                        final_clip,
+                        base_clip,
+                        thresholds,
+                        final_metrics=final_metrics,
+                        base_metrics=base_metrics,
+                        page_width=page_rect.width,
+                        allow_low_ratio_keep=table_like_refined,
+                    )
                     polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
 
                     if accepted:
                         if polluted and not table_like_refined:
                             logger.info(f"Table {ident}: rejected polluted clip ({pollution_reason})")
+                            log_event(
+                                "refine_rejected",
+                                pdf=pdf_name,
+                                page=pno + 1,
+                                kind="table",
+                                id=ident,
+                                stage="final",
+                                message=pollution_reason,
+                                reason=pollution_reason,
+                            )
                             save_current_debug(rejected_reason=pollution_reason)
                             continue
 
                     if not accepted:
                         if table_like_refined and not hard_reject:
                             logger.info(f"Table {ident}: keeping low-ratio table-like refined clip ({fallback_reason})")
+                            log_event(
+                                "refine_kept_low_ratio",
+                                pdf=pdf_name,
+                                page=pno + 1,
+                                kind="table",
+                                id=ident,
+                                stage="acceptance",
+                                message=f"keeping low-ratio table-like refined clip ({fallback_reason})",
+                                reason=fallback_reason,
+                            )
                         else:
                             logger.info(f"Table {ident}: refined clip rejected ({fallback_reason}), falling back")
-                            if clip_after_A.height >= base_clip.height * thresholds.height_ratio:
-                                final_clip = clip_after_A
-                                logger.debug(f"Table {ident}: using Phase A clip")
-                            else:
-                                final_clip = base_clip
-                                logger.debug(f"Table {ident}: using baseline clip")
+                            log_event(
+                                "refine_fallback",
+                                pdf=pdf_name,
+                                page=pno + 1,
+                                kind="table",
+                                id=ident,
+                                stage="acceptance",
+                                message=f"refined clip rejected ({fallback_reason}), falling back",
+                                reason=fallback_reason,
+                                height_ratio=final_clip.height / max(1.0, base_clip.height),
+                                area_ratio=(final_clip.width * final_clip.height) / max(1.0, base_clip.width * base_clip.height),
+                            )
+
+                            fallback_clip = None
+                            fallback_stage = ""
+                            for stage_name, candidate in (
+                                ("phase_a", clip_after_A),
+                                ("phase_b", clip_after_B),
+                                ("phase_d", clip_after_D),
+                                ("baseline", base_clip),
+                            ):
+                                candidate_polluted, _ = detect_text_pollution(candidate, text_lines)
+                                if candidate_polluted and not looks_like_table_text(candidate, text_lines):
+                                    continue
+                                if (
+                                    stage_name == "baseline"
+                                    or candidate.height >= base_clip.height * thresholds.height_ratio
+                                    or looks_like_table_text(candidate, text_lines)
+                                ):
+                                    fallback_clip = candidate
+                                    fallback_stage = stage_name
+                                    break
+
+                            if fallback_clip is None:
+                                fallback_clip = base_clip
+                                fallback_stage = "baseline"
+
+                            final_clip = fallback_clip
+                            logger.debug(f"Table {ident}: using {fallback_stage} clip")
+                            log_event(
+                                "refine_fallback_selected",
+                                pdf=pdf_name,
+                                page=pno + 1,
+                                kind="table",
+                                id=ident,
+                                stage=fallback_stage,
+                                message=f"using {fallback_stage} clip after refinement rejection",
+                            )
 
                             polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
                             if polluted and not looks_like_table_text(final_clip, text_lines):
                                 logger.info(f"Table {ident}: rejected fallback clip ({pollution_reason})")
+                                log_event(
+                                    "refine_rejected",
+                                    pdf=pdf_name,
+                                    page=pno + 1,
+                                    kind="table",
+                                    id=ident,
+                                    stage=fallback_stage,
+                                    message=pollution_reason,
+                                    reason=pollution_reason,
+                                )
                                 save_current_debug(rejected_reason=pollution_reason)
                                 continue
 

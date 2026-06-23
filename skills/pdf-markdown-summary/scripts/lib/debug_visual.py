@@ -163,7 +163,6 @@ def dump_page_candidates(
         logger.warning("PyMuPDF not available, skipping candidate dump")
         return None
 
-    temp_doc = None
     try:
         scale = 1.0
         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
@@ -229,6 +228,9 @@ def save_debug_visualization(
     if fitz is None:
         logger.warning("PyMuPDF not available, skipping debug visualization")
         return None
+
+    # 提前初始化，确保 finally 块中引用安全（即使 try 早期抛异常也不会 NameError）
+    temp_doc = None
 
     try:
         # QA-03: 使用 run_id 创建隔离的 debug 目录

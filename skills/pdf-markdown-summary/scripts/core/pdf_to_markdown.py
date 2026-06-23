@@ -64,7 +64,7 @@ def _resolve_outputs(args: argparse.Namespace) -> Dict[str, str]:
 
 
 def _paragraphs_to_document(pdf_path: str, title: str):
-    from lib.markdown_models import MarkdownBlock, MarkdownDocument
+    from lib.markdown import MarkdownBlock, MarkdownDocument
     from lib.text_extract import gather_structured_text, pre_validate_pdf
 
     validation = pre_validate_pdf(pdf_path)
@@ -136,7 +136,7 @@ def _append_asset_section(document, asset_result: Dict[str, Any], out_md: str) -
     if not asset_result.get("items"):
         return
 
-    from lib.markdown_models import MarkdownBlock
+    from lib.markdown import MarkdownBlock
 
     document.blocks.append(MarkdownBlock(type="heading", text="提取资产", level=2))
     md_dir = os.path.dirname(os.path.abspath(out_md))
@@ -178,7 +178,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     asset_result = _run_asset_extraction(args, paths)
     _append_asset_section(document, asset_result, paths["out_md"])
 
-    from lib.markdown_render import render_markdown
+    from lib.markdown import render_markdown
 
     with open(paths["out_md"], "w", encoding="utf-8") as f:
         f.write(render_markdown(document))

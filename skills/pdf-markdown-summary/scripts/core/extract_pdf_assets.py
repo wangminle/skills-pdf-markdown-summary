@@ -319,6 +319,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     if getattr(args, "include_tables", True):
         t_below = parse_comma_list(args.t_below)
         t_above = parse_comma_list(args.t_above)
+        # --no-refine 同时作用于 Figure 和 Table，保持与文档 2.1 节约定一致
         records.extend(
             extract_tables(
                 pdf_path=pdf_path,
@@ -354,6 +355,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
                 debug_visual=bool(args.debug_visual),
                 adaptive_line_height=bool(args.adaptive_line_height),
                 layout_model=layout_model,
+                no_refine_tables=no_refine_figs,
             )
         )
 

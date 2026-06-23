@@ -35,11 +35,13 @@ from lib.models import DocumentLayoutModel, EnhancedTextUnit, TextBlock
 from lib.refine import (
     detect_text_pollution,
     expand_clip_to_nearby_figure_title,
+    expand_clip_to_nearby_figure_objects,
     expand_clip_to_nearby_table_header,
     expand_table_clip_to_text_bounds,
     limit_clip_by_neighbor_captions,
     limit_clip_by_text_blocks,
     looks_like_table_text,
+    pad_figure_clip_near_caption,
     refine_clip_by_objects,
     refine_clip_to_table_band,
     restore_table_tail_after_layout_trim,
@@ -537,6 +539,32 @@ def test_final_title_recovery_ignores_large_section_title() -> None:
     )
 
     assert expanded == limited
+
+
+def test_final_title_recovery_chains_stacked_figure_headings() -> None:
+    original = fitz.Rect(26.0, 80.7, 569.3, 189.9)
+    limited = fitz.Rect(72.9, 128.4, 523.2, 193.1)
+    text_lines = [
+        (fitz.Rect(138.1, 84.7, 456.0, 95.9), 10.0, "Frontier Regime Practical Regime"),
+        (
+            fitz.Rect(93.0, 100.2, 511.4, 122.4),
+            10.0,
+            "Putnam-2025 with hybrid formal-informal Putnam-200 Pass@8 with minimal tools",
+        ),
+        (fitz.Rect(79.7, 173.7, 512.0, 180.7), 7.0, "DeepSeek-V4 DeepSeek-V4-Flash-Max"),
+    ]
+
+    expanded = expand_clip_to_nearby_figure_title(
+        original,
+        limited,
+        text_lines,
+        "above",
+        pad=4,
+        max_gap=12,
+    )
+
+    assert expanded.y0 <= original.y0 + 0.1
+    assert expanded.y1 == limited.y1
 
 
 def test_phase_a_restores_far_side_short_chart_title() -> None:
@@ -1499,6 +1527,147 @@ def test_colon_caption_is_not_reference_even_inside_long_text_block() -> None:
         long_block,
         re.compile(r"^Table\s+\d+"),
     )
+
+
+def test_pipe_caption_is_not_reference_even_inside_long_text_block() -> None:
+    long_block = {
+        "lines": [
+            {"spans": [{"text": "A long body paragraph line before the caption."}]}
+            for _ in range(8)
+        ],
+    }
+    assert not is_caption_reference(
+        "Figure 8 | Formal reasoning under practical and frontier regimes.",
+        long_block,
+        re.compile(r"^Figure\s+\d+"),
+    )
+
+
+def test_figure_baseline_recovers_connected_far_side_objects() -> None:
+    clip = fitz.Rect(26, 155, 569, 384)
+    caption = fitz.Rect(70, 390, 525, 429)
+    page_rect = fitz.Rect(0, 0, 595, 842)
+    vector_rects = [
+        fitz.Rect(350, 92, 460, 120),
+        fitz.Rect(360, 124, 450, 152),
+    ]
+
+    expanded = expand_clip_to_nearby_figure_objects(
+        clip,
+        caption,
+        "above",
+        [],
+        vector_rects,
+        page_rect,
+        [],
+        gap=6.0,
+    )
+
+    assert expanded.y0 < 90
+    assert expanded.y1 == clip.y1
+
+
+def test_figure_final_recovers_object_overlapping_far_edge() -> None:
+    clip = fitz.Rect(155.4, 106.9, 428.2, 258.5)
+    caption = fitz.Rect(71.0, 267.0, 524.0, 291.0)
+    page_rect = fitz.Rect(0, 0, 595, 842)
+    clipped_top_panel = fitz.Rect(241.5, 86.7, 382.4, 119.9)
+
+    expanded = expand_clip_to_nearby_figure_objects(
+        clip,
+        caption,
+        "above",
+        [],
+        [clipped_top_panel],
+        page_rect,
+        [],
+        gap=6.0,
+        max_expand=80.0,
+    )
+
+    assert expanded.y0 < 90
+    assert expanded.y1 == clip.y1
+
+
+def test_figure_object_recovery_respects_previous_caption_boundary() -> None:
+    clip = fitz.Rect(26, 309, 569, 516)
+    caption = fitz.Rect(70, 522, 371, 534)
+    page_rect = fitz.Rect(0, 0, 595, 842)
+    previous_caption = fitz.Rect(70, 210, 526, 303)
+    previous_figure_object = fitz.Rect(100, 175, 500, 200)
+
+    expanded = expand_clip_to_nearby_figure_objects(
+        clip,
+        caption,
+        "above",
+        [],
+        [previous_figure_object],
+        page_rect,
+        [previous_caption],
+        gap=6.0,
+    )
+
+    assert expanded == clip
+
+
+def test_figure_final_padding_keeps_gap_before_caption() -> None:
+    clip = fitz.Rect(64, 411, 532, 704.5)
+    caption = fitz.Rect(70, 710.3, 524, 735.9)
+
+    padded = pad_figure_clip_near_caption(
+        clip,
+        caption,
+        "above",
+        pad=4.0,
+        min_caption_gap=2.0,
+    )
+
+    assert padded.y1 > clip.y1
+    assert padded.y1 <= caption.y0 - 2.0
+
+
+def test_long_pipe_figure_caption_flips_above_when_next_figure_steals_direction() -> None:
+    caption = fitz.Rect(70.9, 195.9, 526.2, 275.7)
+    page = fitz.Rect(0, 0, 595, 842)
+    next_caption = fitz.Rect(70.9, 522.1, 371.0, 534.2)
+    current_top_figure = fitz.Rect(79.7, 173.7, 512.0, 180.7)
+    next_lower_figure = fitz.Rect(112.8, 311.9, 483.8, 519.6)
+
+    direction = correct_bare_figure_caption_direction(
+        "below",
+        caption,
+        "Figure 8 | Formal reasoning under practical and frontier regimes.",
+        page,
+        [],
+        [current_top_figure, next_lower_figure],
+        [next_caption],
+        clip_height=650.0,
+        caption_gap=6.0,
+    )
+
+    assert direction == "above"
+
+
+def test_long_pipe_figure_caption_keeps_below_when_lower_object_is_nearer() -> None:
+    caption = fitz.Rect(70.9, 195.9, 526.2, 235.0)
+    page = fitz.Rect(0, 0, 595, 842)
+    next_caption = fitz.Rect(70.9, 522.1, 371.0, 534.2)
+    previous_far_object = fitz.Rect(80.0, 130.0, 510.0, 150.0)
+    current_lower_figure = fitz.Rect(100.0, 241.0, 500.0, 430.0)
+
+    direction = correct_bare_figure_caption_direction(
+        "below",
+        caption,
+        "Figure 8 | Formal reasoning under practical and frontier regimes.",
+        page,
+        [],
+        [previous_far_object, current_lower_figure],
+        [next_caption],
+        clip_height=650.0,
+        caption_gap=6.0,
+    )
+
+    assert direction == "below"
 
 
 def test_limit_clip_by_neighbor_captions_bounds_same_page_items() -> None:

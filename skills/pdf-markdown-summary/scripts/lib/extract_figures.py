@@ -34,24 +34,29 @@ from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
     merge_caption_lines, is_caption_reference,
 )
-from .refine import (
-    refine_clip_by_objects,
-    detect_content_bbox_pixels,
+from .acceptance import (
     adaptive_acceptance_thresholds,
-    detect_far_side_text_evidence,
-    trim_far_side_text_post_autocrop,
-    trim_clip_head_by_text_v2,
-    trim_far_side_noise_before_content,
-    expand_clip_to_nearby_figure_title,
-    merge_rects,
-    build_text_masks_px,
-    snap_clip_edges,
-    estimate_ink_ratio,
-    refine_clip_x_range,
+    compute_clip_quality_metrics,
     detect_text_pollution,
+    estimate_far_side_text_coverage,
+    evaluate_refinement_acceptance,
+)
+from .clip_limit import (
     limit_clip_by_neighbor_captions,
     limit_clip_by_text_blocks,
+    refine_clip_x_range,
+    snap_clip_edges,
 )
+from .far_side import detect_far_side_text_evidence, trim_far_side_text_post_autocrop
+from .figure_post import (
+    expand_clip_to_nearby_figure_objects,
+    expand_clip_to_nearby_figure_title,
+    pad_figure_clip_near_caption,
+    trim_far_side_noise_before_content,
+)
+from .object_refine import merge_rects, refine_clip_by_objects
+from .pixel_detect import build_text_masks_px, detect_content_bbox_pixels, estimate_ink_ratio
+from .text_trim import trim_clip_head_by_text_v2
 from .extract_helpers import (
     collect_draw_items,
     collect_text_lines,
@@ -66,6 +71,7 @@ from .direction import (
 )
 from .layout_model import adjust_clip_with_layout
 from .debug_visual import create_debug_stage, save_debug_visualization
+from .extraction_logger import log_event
 from .models import DebugStageInfo, CaptionBlock
 from .output import get_unique_path
 
@@ -433,6 +439,16 @@ def extract_figures(
                         text_lines,
                         direction,
                     )
+                    base_clip = expand_clip_to_nearby_figure_objects(
+                        base_clip,
+                        caption_bbox,
+                        direction,
+                        image_rects,
+                        vector_rects,
+                        page_rect,
+                        figure_neighbor_caption_rects,
+                        gap=caption_gap,
+                    )
                 clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
 
                 # ============================================================
@@ -598,11 +614,29 @@ def extract_figures(
                     except Exception as e:
                         logger.warning(f"Figure {ident}: autocrop failed: {e}")
 
+                clip_after_D = create_rect(final_clip.x0, final_clip.y0, final_clip.x1, final_clip.y1)
+
                 if ident not in no_refine_set:
+                    final_clip = expand_clip_to_nearby_figure_objects(
+                        final_clip,
+                        caption_bbox,
+                        direction,
+                        image_rects,
+                        vector_rects,
+                        page_rect,
+                        figure_neighbor_caption_rects,
+                        gap=caption_gap,
+                        max_expand=80.0,
+                    )
                     final_clip = expand_clip_to_nearby_figure_title(
                         clip_after_B,
                         final_clip,
                         text_lines,
+                        direction,
+                    )
+                    final_clip = pad_figure_clip_near_caption(
+                        final_clip,
+                        caption_bbox,
                         direction,
                     )
 
@@ -610,55 +644,114 @@ def extract_figures(
                 # 修复6: 增强验收检查
                 # ================================================================
                 if refine_safe and ident not in no_refine_set:
+                    far_cov = estimate_far_side_text_coverage(
+                        base_clip,
+                        text_lines,
+                        direction,
+                        text_trim_width_ratio=text_trim_width_ratio,
+                        font_min=text_trim_font_min,
+                        font_max=text_trim_font_max,
+                    )
                     thresholds = adaptive_acceptance_thresholds(
                         base_clip.height,
                         is_table=False,
-                        far_cov=0.0,
+                        far_cov=far_cov,
                     )
 
-                    height_ratio = final_clip.height / max(1.0, base_clip.height)
-                    area_ratio = (final_clip.width * final_clip.height) / max(1.0, base_clip.width * base_clip.height)
-
-                    accepted = True
-                    fallback_reason = ""
-                    hard_reject = False
-
-                    if height_ratio < thresholds.height_ratio:
-                        accepted = False
-                        fallback_reason = f"height_ratio={height_ratio:.3f} < {thresholds.height_ratio:.3f}"
-                    elif area_ratio < thresholds.area_ratio:
-                        accepted = False
-                        fallback_reason = f"area_ratio={area_ratio:.3f} < {thresholds.area_ratio:.3f}"
-
-                    # 额外质量检查：截取区域不应过窄
-                    page_w = page_rect.width
-                    if final_clip.width < page_w * 0.15:
-                        accepted = False
-                        hard_reject = True
-                        fallback_reason = f"clip_too_narrow={final_clip.width:.0f}pt < 15% of page"
+                    base_metrics = compute_clip_quality_metrics(
+                        page, base_clip, image_rects, vector_rects, dpi=72,
+                    )
+                    final_metrics = compute_clip_quality_metrics(
+                        page, final_clip, image_rects, vector_rects, dpi=72,
+                    )
+                    accepted, hard_reject, fallback_reason = evaluate_refinement_acceptance(
+                        final_clip,
+                        base_clip,
+                        thresholds,
+                        final_metrics=final_metrics,
+                        base_metrics=base_metrics,
+                        page_width=page_rect.width,
+                        allow_low_ratio_keep=False,
+                    )
 
                     polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
                     if polluted:
                         logger.info(f"Figure {ident}: rejected polluted clip ({pollution_reason})")
+                        log_event(
+                            "refine_rejected",
+                            pdf=pdf_name,
+                            page=pno + 1,
+                            kind="figure",
+                            id=ident,
+                            stage="final",
+                            message=pollution_reason,
+                            reason=pollution_reason,
+                        )
                         continue
 
                     if not accepted:
-                        if not hard_reject:
-                            logger.info(f"Figure {ident}: keeping low-ratio refined clip ({fallback_reason})")
-                            accepted = True
-                        else:
-                            logger.info(f"Figure {ident}: refined clip rejected ({fallback_reason}), falling back")
-                            if clip_after_A.height >= base_clip.height * thresholds.height_ratio:
-                                final_clip = clip_after_A
-                                logger.debug(f"Figure {ident}: using Phase A clip")
-                            else:
-                                final_clip = base_clip
-                                logger.debug(f"Figure {ident}: using baseline clip")
+                        logger.info(
+                            f"Figure {ident}: refined clip rejected ({fallback_reason}), falling back"
+                        )
+                        log_event(
+                            "refine_fallback",
+                            pdf=pdf_name,
+                            page=pno + 1,
+                            kind="figure",
+                            id=ident,
+                            stage="acceptance",
+                            message=f"refined clip rejected ({fallback_reason}), falling back",
+                            reason=fallback_reason,
+                            height_ratio=final_clip.height / max(1.0, base_clip.height),
+                            area_ratio=(final_clip.width * final_clip.height) / max(1.0, base_clip.width * base_clip.height),
+                        )
 
-                            polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
-                            if polluted:
-                                logger.info(f"Figure {ident}: rejected fallback clip ({pollution_reason})")
+                        fallback_clip = None
+                        fallback_stage = ""
+                        for stage_name, candidate in (
+                            ("phase_a", clip_after_A),
+                            ("phase_b", clip_after_B),
+                            ("phase_d", clip_after_D),
+                            ("baseline", base_clip),
+                        ):
+                            candidate_polluted, _ = detect_text_pollution(candidate, text_lines)
+                            if candidate_polluted:
                                 continue
+                            if stage_name == "baseline" or candidate.height >= base_clip.height * thresholds.height_ratio:
+                                fallback_clip = candidate
+                                fallback_stage = stage_name
+                                break
+
+                        if fallback_clip is None:
+                            fallback_clip = base_clip
+                            fallback_stage = "baseline"
+
+                        final_clip = fallback_clip
+                        logger.debug(f"Figure {ident}: using {fallback_stage} clip")
+                        log_event(
+                            "refine_fallback_selected",
+                            pdf=pdf_name,
+                            page=pno + 1,
+                            kind="figure",
+                            id=ident,
+                            stage=fallback_stage,
+                            message=f"using {fallback_stage} clip after refinement rejection",
+                        )
+
+                        polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
+                        if polluted:
+                            logger.info(f"Figure {ident}: rejected fallback clip ({pollution_reason})")
+                            log_event(
+                                "refine_rejected",
+                                pdf=pdf_name,
+                                page=pno + 1,
+                                kind="figure",
+                                id=ident,
+                                stage=fallback_stage,
+                                message=pollution_reason,
+                                reason=pollution_reason,
+                            )
+                            continue
 
                 # ================================================================
                 # Debug 可视化（如果启用）
@@ -670,6 +763,7 @@ def extract_figures(
                             create_debug_stage('baseline', base_clip),
                             create_debug_stage('phase_a', clip_after_A),
                             create_debug_stage('phase_b', clip_after_B),
+                            create_debug_stage('phase_d', clip_after_D),
                             create_debug_stage('final', final_clip),
                         ]
                         debug_artifacts = save_debug_visualization(

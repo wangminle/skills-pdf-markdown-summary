@@ -19,7 +19,8 @@ import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from .pdf_backend import create_rect, open_pdf
-from .extract_helpers import collect_draw_items, estimate_ink_ratio
+from .extract_helpers import collect_draw_items
+from .pixel_detect import estimate_ink_ratio
 
 if TYPE_CHECKING:
     import fitz
@@ -459,16 +460,20 @@ def correct_bare_figure_caption_direction(
     clip_height: float = 400.0,
     caption_gap: float = 3.0,
 ) -> str:
-    """纠正只有 ``Figure N`` 的独立短 caption 被下方下一张图吸走的方向。
+    """纠正 caption 被下方下一张图吸走的方向。
 
-    GPT-5 System Card 中存在短 caption 单独居中的版式：真实图在 caption 上方，
-    而下方紧接下一张更大的图。普通对象覆盖率会偏向下方，因此这里要求同时满足：
-    当前已判为 below、caption 文本为裸 ``Figure N``、下方有下一张 figure caption、
-    且 caption 上方近处有实际对象证据。
+    有些页面连续摆放两张图：当前 caption 属于上方图，但下方下一张图面积更大，
+    普通对象覆盖率会把当前 caption 锚到下方。这里要求同时满足：当前已判为
+    below、下方有下一张 figure caption、当前 caption 上方有更贴近的对象证据。
     """
     if direction != "below":
         return direction
-    if not re.match(r"^\s*(?:figure|fig\.?)\s+[A-Z]?\d+\s*$", caption_text or "", re.I):
+    caption_text = caption_text or ""
+    is_bare_caption = bool(re.match(r"^\s*(?:figure|fig\.?)\s+[A-Z]?\d+\s*$", caption_text, re.I))
+    is_explicit_caption = bool(
+        re.match(r"^\s*(?:figure|fig\.?)\s+[A-Z]?\d+\s*(?:[:：]|\|)\s+", caption_text, re.I)
+    )
+    if not (is_bare_caption or is_explicit_caption):
         return direction
 
     next_caption_gaps = [
@@ -486,6 +491,7 @@ def correct_bare_figure_caption_direction(
     if near_above.height <= 1:
         return direction
 
+    above_gaps: List[float] = []
     for rect in list(image_rects) + list(vector_rects):
         inter = rect & near_above
         if inter.width <= 0 or inter.height <= 0:
@@ -495,7 +501,37 @@ def correct_bare_figure_caption_direction(
             continue
         gap = caption_bbox.y0 - rect.y1
         if 0 <= gap <= 90.0:
-            return "above"
+            above_gaps.append(gap)
+
+    if not above_gaps:
+        return direction
+    if is_bare_caption:
+        return "above"
+
+    nearest_next_caption_gap = min(next_caption_gaps)
+    search_bottom = min(
+        page_rect.y1,
+        caption_bbox.y1 + min(220.0, max(90.0, clip_height * 0.45)),
+        caption_bbox.y1 + nearest_next_caption_gap - caption_gap,
+    )
+    near_below = create_rect(page_rect.x0, caption_bbox.y1 + caption_gap, page_rect.x1, search_bottom)
+    below_gaps: List[float] = []
+    if near_below.height > 1:
+        for rect in list(image_rects) + list(vector_rects):
+            inter = rect & near_below
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            horizontal_overlap = inter.width / max(1.0, min(rect.width, near_below.width))
+            if horizontal_overlap < 0.20:
+                continue
+            gap = rect.y0 - caption_bbox.y1
+            if 0 <= gap <= near_below.height:
+                below_gaps.append(gap)
+
+    above_gap = min(above_gaps)
+    below_gap = min(below_gaps) if below_gaps else None
+    if above_gap <= 35.0 and (below_gap is None or below_gap >= above_gap + 12.0):
+        return "above"
     return direction
 
 
@@ -516,16 +552,20 @@ def determine_direction(
 
     优先级（局部优先策略）：
     1. 用户显式指定（forced_below/forced_above）
-    2. 局部方向证据（local_evidence）
-    3. 页面位置启发式
-    4. 全局锚点（仅作 tie-break）
+    2. 局部方向证据（local_evidence）高置信度（>=0.6）直接采用
+    3. 全局锚点 tie-break：局部证据弱或缺失时，优先于页面位置启发式
+    4. 页面位置启发式（作为无 global_anchor 时的回退）
     5. 默认值（Figure: above, Table: below）
+
+    修复说明：原先页面位置启发式为硬 return，会无条件覆盖 global_anchor，
+    导致全文统计得到的强全局锚点对顶部/底部 caption 失效。现在 global_anchor
+    作为真正的 tie-break，在局部证据不足时优先于页面位置启发式。
 
     Args:
         caption_bbox: Caption 边界框
         page_rect: 页面边界框
         ident: 图表编号
-        global_anchor: 全局锚点方向（仅作 tie-break）
+        global_anchor: 全局锚点方向（tie-break）
         forced_below: 强制 below 的编号集合
         forced_above: 强制 above 的编号集合
         is_table: 是否为表格
@@ -545,32 +585,37 @@ def determine_direction(
     if ident in forced_above:
         return 'above'
 
-    # 2. 局部方向证据（高置信度时直接采用）
+    # 2. 局部方向证据
     if local_evidence is not None:
         local_dir, local_conf = local_evidence
         if local_conf >= 0.6:
             return local_dir
+        if local_conf >= 0.5:
+            return local_dir
 
-    # 3. 页面位置启发式
+    # 3. 页面位置启发式（作为候选方向，不直接 return）
+    heuristic_dir: Optional[str] = None
     if page_position_heuristic:
         if is_table:
             page_quarter = page_rect.height * 0.75
             if caption_bbox.y1 > page_rect.y0 + page_quarter:
-                return 'above'
+                heuristic_dir = 'above'
         else:
             page_third = page_rect.height / 3
             if caption_bbox.y0 < page_rect.y0 + page_third:
-                return 'below'
+                heuristic_dir = 'below'
 
-    # 4. 全局锚点（仅作 tie-break：当局部证据不够强时参考）
-    if global_anchor and local_evidence is not None:
-        local_dir, local_conf = local_evidence
-        if local_conf < 0.6:
+    # 4. 全局锚点 tie-break：仅在局部证据缺失或极弱时优先于页面位置启发式
+    if global_anchor:
+        if local_evidence is None:
+            return global_anchor
+        _local_dir, local_conf = local_evidence
+        if local_conf < 0.5:
             return global_anchor
 
-    # 5. 全局锚点（无局部证据时使用，但不再覆盖页面位置启发式）
-    if global_anchor and local_evidence is None:
-        return global_anchor
+    # 5. 应用页面位置启发式（无 global_anchor 或 global_anchor 为 None 时）
+    if heuristic_dir is not None:
+        return heuristic_dir
 
     # 6. 默认值
     return 'below' if is_table else 'above'

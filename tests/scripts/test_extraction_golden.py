@@ -45,17 +45,17 @@ TESTS_DIR = PROJECT_ROOT / "tests" / "basic-benchmark"
 @dataclass
 class GoldenSpec:
     """Golden 规格定义"""
-    pdf_dir: str                   # PDF 所在目录名
-    pdf_file: str                  # PDF 文件名
-    expected_figures: int          # 期望的 Figure 数量
-    expected_tables: int           # 期望的 Table 数量
+    benchmark_group: str         # benchmark 子目录（如 回测组1）
+    pdf_file: str                # PDF 文件名
+    expected_figures: int        # 期望的 Figure 数量
+    expected_tables: int       # 期望的 Table 数量
     expected_ids: Dict[str, Set[str]] = field(default_factory=dict)  # 期望的 ID 集合
 
 
 # 核心回归集定义
 CORE_REGRESSION_SET: List[GoldenSpec] = [
     GoldenSpec(
-        pdf_dir="DeepSeek_V3_2",
+        benchmark_group="回测组1",
         pdf_file="DeepSeek_V3_2.pdf",
         expected_figures=4,
         expected_tables=1,
@@ -65,7 +65,7 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        pdf_dir="FunAudio-ASR",
+        benchmark_group="回测组1",
         pdf_file="FunAudio-ASR.pdf",
         expected_figures=4,
         expected_tables=8,
@@ -75,7 +75,7 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        pdf_dir="gpt-5-system-card",
+        benchmark_group="回测组1",
         pdf_file="gpt-5-system-card.pdf",
         expected_figures=31,
         expected_tables=26,
@@ -310,6 +310,51 @@ def compare_with_golden(
 # 测试运行器
 # ============================================================================
 
+def _resolve_golden_paths(spec: GoldenSpec) -> Tuple[Path, Path, Path, Path]:
+    """Resolve PDF path, images dir, index.json and golden_index.json."""
+    stem = Path(spec.pdf_file).stem
+    benchmark_root = TESTS_DIR / spec.benchmark_group
+    pdf_path = benchmark_root / spec.pdf_file
+    images_dir = benchmark_root / stem / "images"
+    index_path = images_dir / "index.json"
+    golden_path = images_dir / "golden_index.json"
+    return pdf_path, images_dir, index_path, golden_path
+
+
+def ensure_extracted_index(spec: GoldenSpec, verbose: bool = False) -> Tuple[bool, str]:
+    """Run extraction when index.json is missing."""
+    pdf_path, images_dir, index_path, _ = _resolve_golden_paths(spec)
+    if index_path.exists():
+        return True, ""
+    if not pdf_path.exists():
+        return False, f"PDF 不存在: {pdf_path}"
+
+    import subprocess
+
+    images_dir.mkdir(parents=True, exist_ok=True)
+    txt_dir = pdf_path.parent / Path(spec.pdf_file).stem / "txt"
+    txt_dir.mkdir(parents=True, exist_ok=True)
+    script = PROJECT_ROOT / "skills" / "pdf-markdown-summary" / "scripts" / "extract_pdf_assets.py"
+    cmd = [
+        sys.executable,
+        str(script),
+        "--pdf", str(pdf_path),
+        "--out-dir", str(images_dir),
+        "--index-json", str(index_path),
+        "--out-text", str(txt_dir / f"{Path(spec.pdf_file).stem}.txt"),
+        "--preset", "robust",
+    ]
+    if verbose:
+        print(f"  运行提取: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(PROJECT_ROOT))
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return False, f"提取失败 (exit {result.returncode}): {detail[:300]}"
+    if not index_path.exists():
+        return False, f"提取完成但 index.json 未生成: {index_path}"
+    return True, ""
+
+
 def run_golden_tests(
     verbose: bool = False,
     update_golden: bool = False,
@@ -327,16 +372,26 @@ def run_golden_tests(
     results: List[ComparisonResult] = []
 
     for spec in CORE_REGRESSION_SET:
-        pdf_dir = TESTS_DIR / spec.pdf_dir
-        images_dir = pdf_dir / "images"
-        index_path = images_dir / "index.json"
-        golden_path = images_dir / "golden_index.json"
+        pdf_path, images_dir, index_path, golden_path = _resolve_golden_paths(spec)
 
         if verbose:
             print(f"\n{'='*60}")
             print(f"测试: {spec.pdf_file}")
-            print(f"目录: {pdf_dir}")
+            print(f"PDF: {pdf_path}")
+            print(f"输出: {images_dir}")
             print('='*60)
+
+        ok, extract_msg = ensure_extracted_index(spec, verbose=verbose)
+        if not ok:
+            result = ComparisonResult(
+                pdf_name=spec.pdf_file,
+                passed=False,
+                messages=[extract_msg],
+            )
+            results.append(result)
+            if verbose:
+                print(f"  {extract_msg}")
+            continue
 
         # 检查 index.json 是否存在
         if not index_path.exists():
