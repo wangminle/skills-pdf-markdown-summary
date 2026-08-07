@@ -1,0 +1,9 @@
+# A1-3: Layout 后端可选依赖
+#
+# 安装方式：
+#   pip install -r requirements-layout.txt
+#
+# 未安装时，Layout feature flag 自动降级为 off，
+# 不影响主提取流程（pytest tests/scripts -q 仍全绿）。
+
+pymupdf4llm>=1.28.0

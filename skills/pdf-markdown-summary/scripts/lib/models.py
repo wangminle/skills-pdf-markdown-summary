@@ -108,6 +108,17 @@ class AttachmentRecord:
         out_path: 输出文件路径
         continued: 是否为续页
         debug_artifacts: QA-03 调试输出文件列表
+        final_bbox: 最终渲染用截图框 [x0, y0, x1, y1]（PDF 点坐标，None 表示未记录）
+        caption_bbox: caption 行边界框 [x0, y0, x1, y1]（PDF 点，None 表示未记录；供 Layout 配对使用）
+        content_bboxes: 资产内容框列表（多矩形，当前主链为 [final_bbox] 单元素或空列表）
+        source_signals: 证据来源列表（当前主链唯一证据源为 caption，默认 ["caption"]）
+        pairing_confidence: 配对置信度（当前主链无配对置信度概念，占位 None）
+        boundary_confidence: 边界置信度（当前主链无边界置信度概念，占位 None）
+        warnings: 告警信息列表（当前默认为空）
+        review_required: 是否需要人工复核（当前主链默认 False）
+        status: 验收状态，四态之一：
+            'accepted' | 'accepted_with_margin' | 'review_required' | 'rejected'
+            （当前主链只导出 accepted；被拒绝/未导出的资产不产生 record）
     """
     kind: str              # 'figure' | 'table'
     ident: str             # 标识：图/表号（保留原样，如 '1'/'S1'/'III'）
@@ -117,6 +128,17 @@ class AttachmentRecord:
     continued: bool = False
     # QA-03: 将 debug 输出与 index 关联（相对 out_dir / images 目录的相对路径）
     debug_artifacts: List[str] = field(default_factory=list)
+    # A0-1: 验收数据模型扩展字段（只加字段落盘，不改变任何截图行为；
+    # 全部可选并带默认值，保证旧版 index.json 仍可读）
+    final_bbox: Optional[List[float]] = None                      # 最终渲染框 [x0, y0, x1, y1]（PDF 点）
+    caption_bbox: Optional[List[float]] = None                    # caption 行框 [x0, y0, x1, y1]（PDF 点）
+    content_bboxes: List[List[float]] = field(default_factory=list)  # 多矩形内容框（当前为 [final_bbox] 或空）
+    source_signals: List[str] = field(default_factory=lambda: ["caption"])  # 证据来源（当前唯一：caption）
+    pairing_confidence: Optional[float] = None                    # 配对置信度（占位，主链暂无此概念）
+    boundary_confidence: Optional[float] = None                   # 边界置信度（占位，主链暂无此概念）
+    warnings: List[str] = field(default_factory=list)             # 告警信息（当前默认为空）
+    review_required: bool = False                                 # 是否需人工复核（当前默认 False）
+    status: str = "accepted"                                      # 四态验收状态（当前主链只导出 accepted）
 
     def num_key(self) -> float:
         """用于排序的数值键：尽量将可解析的数字排在前面。"""

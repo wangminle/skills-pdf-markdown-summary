@@ -24,9 +24,9 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--asset-dir` | str | `images` | Image asset directory (relative to the Markdown output dir) |
 | `--report-json` | str | none | Conversion report JSON output path |
 | `--blocks-json` | str | none | Markdown blocks JSON output path |
-| `--tables` | enum | `off` | Table handling: `off` / `auto` / `screenshot` / `structure` |
+| `--tables` | enum | `off` | Table handling: `off` / `auto` / `screenshot` / `structure` — `auto`, `screenshot`, and `structure` currently behave identically (screenshot export); `structure` is a roadmap placeholder, not yet implemented |
 | `--images` | enum | `off` | Image mode: `off` / `figures` |
-| `--ocr` | enum | `off` | OCR mode: `off` / `auto` / `force` (**roadmap, reserved**) |
+| `--ocr` | enum | `off` | OCR mode: `off` / `auto` / `force` — currently a pure no-op; it only records a `not_implemented` status in the conversion report |
 | `--preset` | enum | `robust` | Asset extraction preset (only `robust`) |
 | `--allow-continued` | flag | off | Allow exporting items that continue across pages |
 
@@ -50,13 +50,21 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--asset-dir` | str | `images` | Image asset directory |
 | `--preset` | enum | `robust` | Parameter preset |
 | `--allow-continued` | flag | off | Allow continued items |
-| `--ocr` | enum | `off` | OCR mode (same as above, reserved) |
+| `--ocr` | enum | `off` | OCR mode (same as above: currently a pure no-op) |
 
 `process_pdf` computes asset/text paths that match `pdf_to_markdown`, then invokes `summarize_pdf` with `--reuse-existing` so the PDF is parsed only once.
 
 ## extract_pdf_assets
 
 Flags are grouped below to match their function in the source. Most flags are already given sane defaults by `--preset robust`; adjust a group only when a specific PDF needs it.
+
+> Note on defaults: the `Default` column in the tables below shows the raw argparse defaults. `--preset robust` overrides several of them, so the values that actually take effect under the preset are:
+>
+> - `--clip-height` 520 (raw default 650), `--margin-x` 26 (raw default 20), `--caption-gap` 6 (raw default 5).
+> - `--text-trim`, `--autocrop`, and `--autocrop-mask-text` are enabled by the preset (raw default off for each).
+> - Table-specific values (`--table-clip-height` 520, `--table-margin-x` 26, `--table-caption-gap` 6) already match the raw defaults.
+>
+> The preset only fills parameters that were not explicitly passed on the command line.
 
 ### Input / Output
 
@@ -134,10 +142,8 @@ Use `--below`/`--above` to force a direction when automatic detection picks the 
 
 | Flag | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `--no-refine` | str | "" | Comma-separated figure ids to disable refinements |
-| `--refine-near-edge-only` | flag | enabled | Only adjust the near-caption edge, leave the far edge alone |
-| `--protect-far-edge-px` | int | 14 | Extra pixels to keep on the far edge |
-| `--near-edge-pad-px` | int | 32 | Extra pixels towards the caption side |
+| `--no-refine` | str | "" | Comma-separated figure/table ids to disable refinements (applies to both Figure and Table paths) |
+| `--refine-near-edge-only` / `--no-refine-near-edge-only` | flag | enabled (`--refine-near-edge-only` default True) | Only adjust the near-caption edge, leave the far edge alone; use `--no-refine-near-edge-only` to allow far-edge adjustments |
 
 ### Tables
 
@@ -163,6 +169,7 @@ Use `--below`/`--above` to force a direction when automatic detection picks the 
 | `--debug-visual` | flag | off | Emit debug overlay images showing clip regions |
 | `--adaptive-line-height` / `--no-adaptive-line-height` | flag | enabled | Adaptive line height |
 | `--layout-driven` | enum | `on` | Layout-driven mode: `auto` / `on` / `off` (column detection, double-column awareness) |
+| `--layout-backend` | enum | `off` | Optional semantic layout backend: `off` / `pymupdf4llm` (default `off`; also `PDF_SUMMARY_LAYOUT_BACKEND`). When enabled, emits shadow reports (`layout_integration.json`, `layout_pairing.json`, `layout_refinement.json`) and may refine crops; dependency via `requirements-layout.txt`, missing dep falls back to `off` |
 
 ### Logging
 
@@ -182,7 +189,7 @@ Use `--below`/`--above` to force a direction when automatic detection picks the 
 
 ## Roadmap Flags (Reserved)
 
-These flags are accepted but not yet fully wired into the pipeline:
+These flags are accepted but not yet wired into the pipeline:
 
-- `--ocr` (all entry points) — OCR fallback for scanned PDFs; currently a no-op aside from detection hints.
-- `--tables structure` — structured table parsing; `screenshot` is the supported fallback today.
+- `--ocr` (all entry points) — OCR fallback for scanned PDFs; currently a pure no-op that only records a `not_implemented` status in the conversion report.
+- `--tables structure` — structured table parsing; today `structure` behaves the same as `auto`/`screenshot` (screenshot export) and remains a roadmap placeholder.

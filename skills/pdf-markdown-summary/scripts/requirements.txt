@@ -4,5 +4,12 @@ pymupdf
 # 可选依赖（表格结构分析增强）
 # pdfplumber
 
-# 可选依赖（LLM 优化输出）
+# 可选依赖（双栏检测 / 留白区域检测，lib/layout_model.py 按需 import；
+# 缺失时静默降级为单栏处理，不影响主流程）
+# numpy
+# scipy
+
+# 可选依赖（Layout 语义区域提取，A1 feature flag；
+# 安装方式：pip install -r requirements-layout.txt
+# 缺失时 --layout-backend 自动降级为 off，不影响主流程）
 # pymupdf4llm

@@ -68,8 +68,16 @@ docs/_build/
 __pypackages__/
 cython_debug/
 
-# Test results (提取脚本输出，不上传 GitHub)
+# 测试运行产物（不上传 GitHub）
+# 注意：不要忽略整个 tests/ —— 下列内容应保留可提交：
+#   tests/scripts/          pytest
+#   tests/eval/             版本化评测器
+#   tests/basic-benchmark/  回测 PDF 与 golden_index.json
 tests/results/
+# 人工标注 GT（bootstrap，待人工复核替换）
+tests/annotations/
+# 冻结 holdout 集（PDF + 标注 + 评估结果）
+tests/holdout/
 
-# Benchmark 输入数据 (tests/basic-benchmark/) 为测试输入 PDF，已纳入版本控制，不忽略
-/tests/some-verification
+# 实验目录（含大量 PNG/debug/Layout 产物，本地保留，不上传 GitHub）
+docs/3-experiments/

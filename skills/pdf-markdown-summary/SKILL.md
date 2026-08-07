@@ -38,6 +38,19 @@ For crop diagnostics:
 python3 scripts/extract_pdf_assets.py --pdf "<paper>.pdf" --preset robust --debug-visual --debug-captions
 ```
 
+Layout-backend (optional, experimental):
+
+```bash
+python3 scripts/extract_pdf_assets.py --pdf "<paper>.pdf" --preset robust --layout-backend pymupdf4llm
+```
+
+`--layout-backend` (or env `PDF_SUMMARY_LAYOUT_BACKEND`): `off` (default) / `pymupdf4llm`.
+When enabled, extracts semantic layout regions for figure/table candidate seeding,
+full-page pairing, and boundary refinement. Emits shadow reports
+(`layout_integration.json`, `layout_pairing.json`, `layout_refinement.json`).
+Requires `pip install -r requirements-layout.txt`; missing dependency falls back to `off`.
+See `references/cli-options.md` for details.
+
 ## Output Rules
 
 - Use relative image links in generated Markdown.
@@ -56,7 +69,7 @@ The asset extractor includes:
 - Baseline limiting by neighboring captions and layout text blocks.
 - Figure refinement for text trimming, object alignment, column-aware X clipping, layout adjustment, autocrop, and figure-title recovery.
 - Table refinement for multiline header recovery, rendered horizontal-rule compensation, table-band detection, width restoration, text-bbox padding, wrapped-tail preservation, and far-side section-heading trimming.
-- Debug overlays showing `baseline`, `phase_a`, `phase_b`, and `final` regions.
+- Debug overlays showing `baseline`, `phase_a`, `phase_b`, `phase_d` (post-autocrop), and `final` regions.
 
 ## References
 

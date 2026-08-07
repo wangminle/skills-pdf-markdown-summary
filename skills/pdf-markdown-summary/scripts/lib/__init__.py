@@ -21,6 +21,16 @@ scripts/lib/ 模块入口
 - extract_helpers: 提取辅助函数 (Commit 12)
 - extract_figures: Figure 提取主循环 (Commit 12)
 - extract_tables: Table 提取主循环 (Commit 12)
+- acceptance: 精裁验收与质量指标
+- clip_limit: 裁剪窗口限制与吸附
+- direction: Caption 方向判定与全局锚点
+- far_side: 远端文本证据检测与裁切
+- figure_post: Figure 裁剪后处理（扩展/填充/去噪）
+- markdown / markdown_models / markdown_render: Markdown 文档模型与渲染
+- object_refine: 对象区域合并与对齐精裁
+- pixel_detect: 像素级内容检测（白边裁切/文本掩码/油墨率）
+- table_refine: Table 专属精裁（表带/表头/表宽恢复）
+- text_trim: 文本行裁切（Phase A）
 """
 
 # 导出所有公共 API

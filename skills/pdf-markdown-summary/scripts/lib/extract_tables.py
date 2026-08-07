@@ -94,8 +94,6 @@ def extract_tables(
     table_caption_gap: float = 6.0,
     max_caption_chars: int = 160,
     max_caption_words: int = 12,
-    min_table: Optional[str] = None,
-    max_table: Optional[str] = None,
     autocrop: bool = True,
     autocrop_pad_px: int = 20,
     autocrop_white_threshold: int = 250,
@@ -114,7 +112,6 @@ def extract_tables(
     far_text_trim_mode: str = "aggressive",
     far_side_min_dist: float = 50.0,
     far_side_para_min_ratio: float = 0.12,
-    table_far_side_width_ratio: float = 0.7,
     # B: object connectivity options
     object_pad: float = 8.0,
     object_min_area_ratio: float = 0.005,
@@ -130,7 +127,6 @@ def extract_tables(
     autocrop_shrink_limit: float = 0.35,
     autocrop_min_height_px: int = 80,
     allow_continued: bool = True,
-    protect_far_edge_px: int = 10,
     no_refine_tables: Optional[List[str]] = None,
     # Smart caption detection
     smart_caption_detection: bool = True,
@@ -264,7 +260,7 @@ def extract_tables(
                 if bbox:
                     image_rects.append(create_rect(*bbox))
 
-# 查找 Table captions
+        # 查找 Table captions
         for blk in dict_data.get("blocks", []):
             if blk.get("type", 0) != 0:
                 continue
@@ -458,6 +454,12 @@ def extract_tables(
                         final_clip.y1,
                     )
                     clip_after_B = create_rect(
+                        final_clip.x0,
+                        final_clip.y0,
+                        final_clip.x1,
+                        final_clip.y1,
+                    )
+                    clip_after_D = create_rect(
                         final_clip.x0,
                         final_clip.y0,
                         final_clip.x1,
@@ -858,6 +860,14 @@ def extract_tables(
                     pix = page.get_pixmap(dpi=dpi, clip=final_clip)
                     pix.save(out_path)
 
+                    # A0-1: 落盘最终渲染框（只记录，不改变任何截图行为）
+                    final_bbox = [final_clip.x0, final_clip.y0, final_clip.x1, final_clip.y1]
+                    caption_bbox_list = [
+                        float(caption_bbox.x0),
+                        float(caption_bbox.y0),
+                        float(caption_bbox.x1),
+                        float(caption_bbox.y1),
+                    ]
                     records.append(AttachmentRecord(
                         kind='table',
                         ident=ident,
@@ -866,6 +876,9 @@ def extract_tables(
                         out_path=out_path,
                         continued=is_continued,
                         debug_artifacts=debug_artifacts,
+                        final_bbox=final_bbox,
+                        caption_bbox=caption_bbox_list,
+                        content_bboxes=[list(final_bbox)],
                     ))
 
                     logger.info(f"Extracted Table {ident} from page {pno + 1}: {out_path}")

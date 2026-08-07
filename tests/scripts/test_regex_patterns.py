@@ -89,7 +89,7 @@ S_PREFIX_RE = re.compile(r"\bS\s*(\d+|[IVX]{1,6})", re.IGNORECASE)
 # ============================================================================
 
 @dataclass
-class TestCase:
+class RegexCase:
     """测试用例"""
     input_text: str
     expected_ident: str
@@ -97,7 +97,7 @@ class TestCase:
 
 
 @dataclass
-class TestResult:
+class RegexResult:
     """测试结果"""
     name: str
     passed: bool
@@ -109,89 +109,89 @@ class TestResult:
 # ============================================================================
 
 # Figure 标识符提取测试用例
-FIGURE_IDENT_CASES: List[TestCase] = [
+FIGURE_IDENT_CASES: List[RegexCase] = [
     # 常规数字编号
-    TestCase("Figure 1: Overview of the system", "1", "常规编号"),
-    TestCase("Figure 2", "2", "仅编号"),
-    TestCase("Fig. 3 shows the results", "3", "缩写形式"),
-    TestCase("Fig 4: Architecture", "4", "无句点缩写"),
+    RegexCase("Figure 1: Overview of the system", "1", "常规编号"),
+    RegexCase("Figure 2", "2", "仅编号"),
+    RegexCase("Fig. 3 shows the results", "3", "缩写形式"),
+    RegexCase("Fig 4: Architecture", "4", "无句点缩写"),
 
     # 子图标签
-    TestCase("Figure 1A: First part", "1", "大写子图标签"),
-    TestCase("Figure 2a: Second part", "2", "小写子图标签"),
-    TestCase("Fig. 3-a: With hyphen", "3", "连字符子图"),
-    TestCase("Figure 4(a): With parenthesis", "4", "括号子图"),
+    RegexCase("Figure 1A: First part", "1", "大写子图标签"),
+    RegexCase("Figure 2a: Second part", "2", "小写子图标签"),
+    RegexCase("Fig. 3-a: With hyphen", "3", "连字符子图"),
+    RegexCase("Figure 4(a): With parenthesis", "4", "括号子图"),
 
     # 罗马数字编号
-    TestCase("Figure I: Introduction", "I", "罗马数字 I"),
-    TestCase("Figure II: Methods", "II", "罗马数字 II"),
-    TestCase("Figure III: Results", "III", "罗马数字 III"),
-    TestCase("Figure IV: Discussion", "IV", "罗马数字 IV"),
-    TestCase("Figure V: Conclusion", "V", "罗马数字 V"),
-    TestCase("Figure VI", "VI", "罗马数字 VI"),
-    TestCase("Figure VII", "VII", "罗马数字 VII"),
-    TestCase("Figure VIII", "VIII", "罗马数字 VIII"),
-    TestCase("Figure IX", "IX", "罗马数字 IX"),
-    TestCase("Figure X", "X", "罗马数字 X"),
+    RegexCase("Figure I: Introduction", "I", "罗马数字 I"),
+    RegexCase("Figure II: Methods", "II", "罗马数字 II"),
+    RegexCase("Figure III: Results", "III", "罗马数字 III"),
+    RegexCase("Figure IV: Discussion", "IV", "罗马数字 IV"),
+    RegexCase("Figure V: Conclusion", "V", "罗马数字 V"),
+    RegexCase("Figure VI", "VI", "罗马数字 VI"),
+    RegexCase("Figure VII", "VII", "罗马数字 VII"),
+    RegexCase("Figure VIII", "VIII", "罗马数字 VIII"),
+    RegexCase("Figure IX", "IX", "罗马数字 IX"),
+    RegexCase("Figure X", "X", "罗马数字 X"),
 
     # Supplementary 前缀（数字）
-    TestCase("Figure S1: Supplementary data", "S1", "S前缀数字"),
-    TestCase("Figure S2", "S2", "S前缀数字2"),
-    TestCase("Figure S 3: With space", "S3", "S前缀带空格"),
-    TestCase("Supplementary Figure 3: Full label", "S3", "完整 Supplementary 标签"),
-    TestCase("Supplementary Fig. 4", "S4", "Supplementary 缩写"),
+    RegexCase("Figure S1: Supplementary data", "S1", "S前缀数字"),
+    RegexCase("Figure S2", "S2", "S前缀数字2"),
+    RegexCase("Figure S 3: With space", "S3", "S前缀带空格"),
+    RegexCase("Supplementary Figure 3: Full label", "S3", "完整 Supplementary 标签"),
+    RegexCase("Supplementary Fig. 4", "S4", "Supplementary 缩写"),
 
     # Supplementary 前缀（罗马数字）
-    TestCase("Figure SIV: Supplementary Roman", "SIV", "S前缀罗马数字"),
-    TestCase("Figure S IV: With space", "SIV", "S前缀罗马带空格"),
-    TestCase("Supplementary Figure IV", "SIV", "Supplementary 罗马"),
-    TestCase("Supplementary Figure III", "SIII", "Supplementary 罗马 III"),
+    RegexCase("Figure SIV: Supplementary Roman", "SIV", "S前缀罗马数字"),
+    RegexCase("Figure S IV: With space", "SIV", "S前缀罗马带空格"),
+    RegexCase("Supplementary Figure IV", "SIV", "Supplementary 罗马"),
+    RegexCase("Supplementary Figure III", "SIII", "Supplementary 罗马 III"),
 
     # 中文编号
-    TestCase("图1: 系统架构", "1", "中文图"),
-    TestCase("图 2", "2", "中文图带空格"),
-    TestCase("附图3", "3", "附图"),
-    TestCase("图表4", "4", "图表"),
+    RegexCase("图1: 系统架构", "1", "中文图"),
+    RegexCase("图 2", "2", "中文图带空格"),
+    RegexCase("附图3", "3", "附图"),
+    RegexCase("图表4", "4", "图表"),
 
     # 续页标记
-    TestCase("Figure 5 (continued)", "5", "续页标记英文"),
-    TestCase("图6 续", "6", "续页标记中文"),
-    TestCase("Figure 7 接上页", "7", "接上页标记"),
+    RegexCase("Figure 5 (continued)", "5", "续页标记英文"),
+    RegexCase("图6 续", "6", "续页标记中文"),
+    RegexCase("Figure 7 接上页", "7", "接上页标记"),
 ]
 
 # Table 标识符提取测试用例
-TABLE_IDENT_CASES: List[TestCase] = [
+TABLE_IDENT_CASES: List[RegexCase] = [
     # 常规数字编号
-    TestCase("Table 1: Performance metrics", "1", "常规编号"),
-    TestCase("Table 2", "2", "仅编号"),
-    TestCase("Tab. 3: Results", "3", "缩写形式"),
+    RegexCase("Table 1: Performance metrics", "1", "常规编号"),
+    RegexCase("Table 2", "2", "仅编号"),
+    RegexCase("Tab. 3: Results", "3", "缩写形式"),
 
     # 罗马数字编号
-    TestCase("Table I: Introduction", "I", "罗马数字 I"),
-    TestCase("Table II: Methods", "II", "罗马数字 II"),
-    TestCase("Table III: Results", "III", "罗马数字 III"),
-    TestCase("Table IV: Discussion", "IV", "罗马数字 IV"),
-    TestCase("Table V", "V", "罗马数字 V"),
+    RegexCase("Table I: Introduction", "I", "罗马数字 I"),
+    RegexCase("Table II: Methods", "II", "罗马数字 II"),
+    RegexCase("Table III: Results", "III", "罗马数字 III"),
+    RegexCase("Table IV: Discussion", "IV", "罗马数字 IV"),
+    RegexCase("Table V", "V", "罗马数字 V"),
 
     # Supplementary 前缀
-    TestCase("Table S1: Supplementary data", "S1", "S前缀数字"),
-    TestCase("Table S2", "S2", "S前缀数字2"),
-    TestCase("Supplementary Table 2: Full label", "S2", "完整 Supplementary 标签"),
-    TestCase("Table SIV", "SIV", "S前缀罗马数字"),
-    TestCase("Supplementary Table IV", "SIV", "Supplementary 罗马"),
+    RegexCase("Table S1: Supplementary data", "S1", "S前缀数字"),
+    RegexCase("Table S2", "S2", "S前缀数字2"),
+    RegexCase("Supplementary Table 2: Full label", "S2", "完整 Supplementary 标签"),
+    RegexCase("Table SIV", "SIV", "S前缀罗马数字"),
+    RegexCase("Supplementary Table IV", "SIV", "Supplementary 罗马"),
 
     # 附录表编号（字母+数字）
-    TestCase("Table A1: Appendix table", "A1", "附录表 A1"),
-    TestCase("Table B2: Second appendix", "B2", "附录表 B2"),
-    TestCase("Table C3", "C3", "附录表 C3"),
+    RegexCase("Table A1: Appendix table", "A1", "附录表 A1"),
+    RegexCase("Table B2: Second appendix", "B2", "附录表 B2"),
+    RegexCase("Table C3", "C3", "附录表 C3"),
 
     # 中文编号
-    TestCase("表1: 性能指标", "1", "中文表"),
-    TestCase("表 2", "2", "中文表带空格"),
+    RegexCase("表1: 性能指标", "1", "中文表"),
+    RegexCase("表 2", "2", "中文表带空格"),
 
     # 续页标记
-    TestCase("Table 4 (continued)", "4", "续页标记"),
-    TestCase("表5 续", "5", "续页标记中文"),
+    RegexCase("Table 4 (continued)", "4", "续页标记"),
+    RegexCase("表5 续", "5", "续页标记中文"),
 ]
 
 # 罗马数字转换测试用例
@@ -234,14 +234,21 @@ PARSE_IDENT_CASES: List[Tuple[str, bool, int]] = [
 # 测试函数
 # ============================================================================
 
-def test_figure_idents() -> List[TestResult]:
+def _assert_all_passed(results: List[RegexResult]) -> List[RegexResult]:
+    """pytest 入口必须真正断言；standalone runner 仍可复用返回的结果列表。"""
+    failed = [r for r in results if not r.passed]
+    assert not failed, "; ".join(f"{r.name}: {r.message}" for r in failed)
+    return results
+
+
+def _collect_figure_idents() -> List[RegexResult]:
     """测试 Figure 标识符提取"""
     results = []
 
     for case in FIGURE_IDENT_CASES:
         m = FIGURE_LINE_RE.match(case.input_text)
         if not m:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"Figure: {case.description}",
                 passed=False,
                 message=f"正则不匹配: '{case.input_text}'"
@@ -251,19 +258,19 @@ def test_figure_idents() -> List[TestResult]:
         try:
             got = extract_figure_ident(m)
             if got == case.expected_ident:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"Figure: {case.description}",
                     passed=True,
                     message=f"'{case.input_text}' -> '{got}'"
                 ))
             else:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"Figure: {case.description}",
                     passed=False,
                     message=f"期望 '{case.expected_ident}'，得到 '{got}'"
                 ))
         except Exception as e:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"Figure: {case.description}",
                 passed=False,
                 message=f"异常: {e}"
@@ -272,14 +279,14 @@ def test_figure_idents() -> List[TestResult]:
     return results
 
 
-def test_table_idents() -> List[TestResult]:
+def _collect_table_idents() -> List[RegexResult]:
     """测试 Table 标识符提取"""
     results = []
 
     for case in TABLE_IDENT_CASES:
         m = TABLE_LINE_RE.match(case.input_text)
         if not m:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"Table: {case.description}",
                 passed=False,
                 message=f"正则不匹配: '{case.input_text}'"
@@ -289,19 +296,19 @@ def test_table_idents() -> List[TestResult]:
         try:
             got = extract_table_ident(m)
             if got == case.expected_ident:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"Table: {case.description}",
                     passed=True,
                     message=f"'{case.input_text}' -> '{got}'"
                 ))
             else:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"Table: {case.description}",
                     passed=False,
                     message=f"期望 '{case.expected_ident}'，得到 '{got}'"
                 ))
         except Exception as e:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"Table: {case.description}",
                 passed=False,
                 message=f"异常: {e}"
@@ -310,7 +317,7 @@ def test_table_idents() -> List[TestResult]:
     return results
 
 
-def test_roman_numerals() -> List[TestResult]:
+def _collect_roman_numerals() -> List[RegexResult]:
     """测试罗马数字转换"""
     results = []
 
@@ -318,19 +325,19 @@ def test_roman_numerals() -> List[TestResult]:
         try:
             got = roman_to_int(roman)
             if got == expected:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"Roman: {roman}",
                     passed=True,
                     message=f"'{roman}' -> {got}"
                 ))
             else:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"Roman: {roman}",
                     passed=False,
                     message=f"期望 {expected}，得到 {got}"
                 ))
         except Exception as e:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"Roman: {roman}",
                 passed=False,
                 message=f"异常: {e}"
@@ -342,13 +349,13 @@ def test_roman_numerals() -> List[TestResult]:
 
     for r in valid_romans:
         if is_roman_numeral(r):
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"IsRoman: {r}",
                 passed=True,
                 message=f"'{r}' 正确识别为罗马数字"
             ))
         else:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"IsRoman: {r}",
                 passed=False,
                 message=f"'{r}' 应该是罗马数字"
@@ -356,13 +363,13 @@ def test_roman_numerals() -> List[TestResult]:
 
     for r in invalid_romans:
         if not is_roman_numeral(r):
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"NotRoman: {r or '(empty)'}",
                 passed=True,
                 message=f"'{r}' 正确识别为非罗马数字"
             ))
         else:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"NotRoman: {r or '(empty)'}",
                 passed=False,
                 message=f"'{r}' 不应该是罗马数字"
@@ -371,7 +378,7 @@ def test_roman_numerals() -> List[TestResult]:
     return results
 
 
-def test_parse_figure_ident() -> List[TestResult]:
+def _collect_parse_figure_ident() -> List[RegexResult]:
     """测试 parse_figure_ident 函数"""
     results = []
 
@@ -379,20 +386,20 @@ def test_parse_figure_ident() -> List[TestResult]:
         try:
             is_supp, numeric = parse_figure_ident(ident)
             if is_supp == expected_is_supp and numeric == expected_numeric:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"ParseIdent: {ident}",
                     passed=True,
                     message=f"'{ident}' -> (supp={is_supp}, num={numeric})"
                 ))
             else:
-                results.append(TestResult(
+                results.append(RegexResult(
                     name=f"ParseIdent: {ident}",
                     passed=False,
                     message=f"期望 (supp={expected_is_supp}, num={expected_numeric})，"
                             f"得到 (supp={is_supp}, num={numeric})"
                 ))
         except Exception as e:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"ParseIdent: {ident}",
                 passed=False,
                 message=f"异常: {e}"
@@ -441,7 +448,7 @@ def _local_count_text_references(text: str) -> Dict[str, Set[str]]:
     return {"figures": figures, "tables": tables}
 
 
-def test_qc_reference_counting() -> List[TestResult]:
+def _collect_qc_reference_counting() -> List[RegexResult]:
     """测试 QC 引用统计（QA-06 增强版）"""
     results = []
 
@@ -502,14 +509,14 @@ def test_qc_reference_counting() -> List[TestResult]:
         refs = count_text_references(text)
 
         if refs["figures"] >= expected_figures:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"QC Figures ({desc})",
                 passed=True,
                 message=f"正确检测到: {refs['figures']}"
             ))
         else:
             missing = expected_figures - refs["figures"]
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"QC Figures ({desc})",
                 passed=False,
                 message=f"缺失: {missing}，检测到: {refs['figures']}"
@@ -517,14 +524,14 @@ def test_qc_reference_counting() -> List[TestResult]:
 
         detected_tables = refs["tables"]
         if expected_tables.issubset(detected_tables):
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"QC Tables ({desc})",
                 passed=True,
                 message=f"正确检测到: {detected_tables}"
             ))
         else:
             missing = expected_tables - detected_tables
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"QC Tables ({desc})",
                 passed=False,
                 message=f"缺失: {missing}，检测到: {detected_tables}"
@@ -533,7 +540,7 @@ def test_qc_reference_counting() -> List[TestResult]:
     return results
 
 
-def test_implementation_consistency() -> List[TestResult]:
+def _collect_implementation_consistency() -> List[RegexResult]:
     """测试主脚本与本地参照实现的一致性"""
     results = []
 
@@ -562,7 +569,7 @@ def test_implementation_consistency() -> List[TestResult]:
             })
 
     if all_consistent:
-        results.append(TestResult(
+        results.append(RegexResult(
             name="实现一致性检查",
             passed=True,
             message=f"主脚本与本地参照实现完全一致 ({len(test_texts)} 个测试用例)"
@@ -572,7 +579,7 @@ def test_implementation_consistency() -> List[TestResult]:
             f"'{c['text']}': main={c['main']} vs local={c['local']}"
             for c in inconsistent_cases[:3]
         ])
-        results.append(TestResult(
+        results.append(RegexResult(
             name="实现一致性检查",
             passed=False,
             message=f"发现 {len(inconsistent_cases)} 处不一致: {details}"
@@ -581,7 +588,7 @@ def test_implementation_consistency() -> List[TestResult]:
     return results
 
 
-def test_qc_categorization() -> List[TestResult]:
+def _collect_qc_categorization() -> List[RegexResult]:
     """测试 QA-06 标识符分类功能"""
     results = []
 
@@ -604,13 +611,13 @@ def test_qc_categorization() -> List[TestResult]:
     for category, expected in checks.items():
         actual = categorized.get(category, set())
         if actual == expected:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"QA-06 分类: {category}",
                 passed=True,
                 message=f"正确分类: {actual}"
             ))
         else:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"QA-06 分类: {category}",
                 passed=False,
                 message=f"期望 {expected}, 得到 {actual}"
@@ -619,20 +626,20 @@ def test_qc_categorization() -> List[TestResult]:
     return results
 
 
-def test_edge_cases() -> List[TestResult]:
+def _collect_edge_cases() -> List[RegexResult]:
     """测试边界情况"""
     results = []
 
     # 空字符串
     m = FIGURE_LINE_RE.match("")
     if m is None:
-        results.append(TestResult(
+        results.append(RegexResult(
             name="Edge: 空字符串",
             passed=True,
             message="正确不匹配空字符串"
         ))
     else:
-        results.append(TestResult(
+        results.append(RegexResult(
             name="Edge: 空字符串",
             passed=False,
             message="不应匹配空字符串"
@@ -641,13 +648,13 @@ def test_edge_cases() -> List[TestResult]:
     # 仅有标签无编号
     m = FIGURE_LINE_RE.match("Figure: Overview")
     if m is None:
-        results.append(TestResult(
+        results.append(RegexResult(
             name="Edge: 无编号",
             passed=True,
             message="正确不匹配无编号的 Figure"
         ))
     else:
-        results.append(TestResult(
+        results.append(RegexResult(
             name="Edge: 无编号",
             passed=False,
             message="不应匹配无编号的 Figure"
@@ -664,13 +671,13 @@ def test_edge_cases() -> List[TestResult]:
     for text in non_figure_texts:
         m = FIGURE_LINE_RE.match(text)
         if m is None:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"Edge: 非图注",
                 passed=True,
                 message=f"正确不匹配: '{text[:30]}...'"
             ))
         else:
-            results.append(TestResult(
+            results.append(RegexResult(
                 name=f"Edge: 非图注",
                 passed=False,
                 message=f"不应匹配: '{text[:30]}...'"
@@ -679,23 +686,60 @@ def test_edge_cases() -> List[TestResult]:
     return results
 
 
+
+# =============================================================================
+# pytest 入口（返回 None，避免 PytestReturnNotNoneWarning）
+# =============================================================================
+
+def test_figure_idents() -> None:
+    """pytest: 断言 _collect_figure_idents 全部通过。"""
+    _assert_all_passed(_collect_figure_idents())
+
+def test_table_idents() -> None:
+    """pytest: 断言 _collect_table_idents 全部通过。"""
+    _assert_all_passed(_collect_table_idents())
+
+def test_roman_numerals() -> None:
+    """pytest: 断言 _collect_roman_numerals 全部通过。"""
+    _assert_all_passed(_collect_roman_numerals())
+
+def test_parse_figure_ident() -> None:
+    """pytest: 断言 _collect_parse_figure_ident 全部通过。"""
+    _assert_all_passed(_collect_parse_figure_ident())
+
+def test_qc_reference_counting() -> None:
+    """pytest: 断言 _collect_qc_reference_counting 全部通过。"""
+    _assert_all_passed(_collect_qc_reference_counting())
+
+def test_implementation_consistency() -> None:
+    """pytest: 断言 _collect_implementation_consistency 全部通过。"""
+    _assert_all_passed(_collect_implementation_consistency())
+
+def test_qc_categorization() -> None:
+    """pytest: 断言 _collect_qc_categorization 全部通过。"""
+    _assert_all_passed(_collect_qc_categorization())
+
+def test_edge_cases() -> None:
+    """pytest: 断言 _collect_edge_cases 全部通过。"""
+    _assert_all_passed(_collect_edge_cases())
+
 # ============================================================================
 # 主测试运行器
 # ============================================================================
 
-def run_all_tests(verbose: bool = False) -> Tuple[int, int, List[TestResult]]:
+def run_all_tests(verbose: bool = False) -> Tuple[int, int, List[RegexResult]]:
     """运行所有测试"""
-    all_results: List[TestResult] = []
+    all_results: List[RegexResult] = []
 
     test_suites = [
-        ("Figure 标识符提取", test_figure_idents),
-        ("Table 标识符提取", test_table_idents),
-        ("罗马数字转换", test_roman_numerals),
-        ("标识符解析", test_parse_figure_ident),
-        ("QC 引用统计 (QA-06)", test_qc_reference_counting),
-        ("实现一致性检查 (Bug-5)", test_implementation_consistency),
-        ("QA-06 分类功能", test_qc_categorization),
-        ("边界情况", test_edge_cases),
+        ("Figure 标识符提取", _collect_figure_idents),
+        ("Table 标识符提取", _collect_table_idents),
+        ("罗马数字转换", _collect_roman_numerals),
+        ("标识符解析", _collect_parse_figure_ident),
+        ("QC 引用统计 (QA-06)", _collect_qc_reference_counting),
+        ("实现一致性检查 (Bug-5)", _collect_implementation_consistency),
+        ("QA-06 分类功能", _collect_qc_categorization),
+        ("边界情况", _collect_edge_cases),
     ]
 
     for suite_name, test_func in test_suites:

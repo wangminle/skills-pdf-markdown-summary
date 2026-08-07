@@ -9,7 +9,7 @@ For the full list of command-line flags, see `cli-options.md`.
 1. Run `scripts/summarize_pdf.py` to prepare text and image assets.
 2. Read `text/<paper>.txt`.
 3. Read `images/index.json` and inspect all `images/*.png`.
-4. If any crop looks suspicious, rerun the asset extractor with `--debug-visual --debug-captions` and inspect the overlay images.
+4. If any crop looks suspicious, rerun the asset extractor with `--debug-visual --debug-captions` and inspect the overlay images written to `images/debug/<run_id>/`.
 5. Write `<paper>_阅读摘要-YYYYMMDD.md`.
 
 ## Command

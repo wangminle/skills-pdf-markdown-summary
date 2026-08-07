@@ -169,8 +169,8 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 双栏版式感知与伪双栏几何防护。
 - 完整流程复用首次提取产物，避免重复解析 PDF。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 七份 PDF 已完成多轮逐图 debug 排查，图表选取策略记录见 `docs/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
-- 当前图表提取代码流程说明见 `docs/PDF图表提取流程逻辑说明-20260621.md`。
+- Basic Benchmark 八份 PDF 已完成多轮逐图 debug 排查，图表选取策略记录见 `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
+- 当前图表提取代码流程说明见 `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
 
 继续改进方向：
@@ -258,7 +258,7 @@ python3 -m pip install --user pdfplumber
 
 ### Usage
 
-> For the full list of command-line flags across all entry points (figure clipping, tables, layout-driven tuning), see `skills/pdf-markdown-summary/references/cli-options.md`.
+> For the full list of command-line flags across all entry points (figure clipping, tables, layout-driven tuning, optional `--layout-backend`), see `skills/pdf-markdown-summary/references/cli-options.md`.
 
 #### PDF to Markdown
 
@@ -340,8 +340,8 @@ Implemented:
 - Double-column layout awareness and false-double-column geometry guards.
 - Full pipeline reuses the first extraction to avoid re-parsing the PDF.
 - Complete CLI options reference (`references/cli-options.md`).
-- Multi-round Basic Benchmark visual review is recorded in `docs/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
-- Current extraction flow diagrams are documented in `docs/PDF图表提取流程逻辑说明-20260621.md`.
+- Multi-round Basic Benchmark visual review is recorded in `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
+- Current extraction flow diagrams are documented in `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.
 
 Planned:
@@ -354,4 +354,4 @@ Planned:
 
 ### License
 
-MIT License. See [LICENSE](LICENSE).
+Apache-2.0 License. See [LICENSE](LICENSE).

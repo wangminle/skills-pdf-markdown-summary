@@ -257,7 +257,11 @@ def write_index_json(
     if pdf_path and os.path.exists(pdf_path):
         try:
             with open(pdf_path, 'rb') as f:
-                pdf_hash = f"sha256:{hashlib.sha256(f.read()).hexdigest()[:16]}"
+                # 分块读取，避免一次性把整个 PDF 读入内存
+                hasher = hashlib.sha256()
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    hasher.update(chunk)
+                pdf_hash = f"sha256:{hasher.hexdigest()[:16]}"
             # 延迟导入以避免循环依赖
             from .pdf_backend import open_pdf
             with open_pdf(pdf_path) as doc:
@@ -284,6 +288,18 @@ def write_index_json(
             "original_file": rel,
             "current_file": rel,
             "continued": bool(r.continued),
+            # A0-1: 验收数据模型扩展字段（坐标 round 到 1 位小数，与 layout 序列化风格一致）
+            "final_bbox": [round(v, 1) for v in r.final_bbox] if r.final_bbox is not None else None,
+            "caption_bbox": (
+                [round(v, 1) for v in r.caption_bbox] if getattr(r, "caption_bbox", None) is not None else None
+            ),
+            "content_bboxes": [[round(v, 1) for v in bbox] for bbox in r.content_bboxes],
+            "source_signals": list(r.source_signals),
+            "pairing_confidence": r.pairing_confidence,
+            "boundary_confidence": r.boundary_confidence,
+            "warnings": list(r.warnings),
+            "review_required": bool(r.review_required),
+            "status": r.status,
         }
         if getattr(r, "debug_artifacts", None):
             entry["debug_artifacts"] = list(r.debug_artifacts)

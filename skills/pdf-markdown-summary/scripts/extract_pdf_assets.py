@@ -26,7 +26,6 @@ Architecture (V0.3.x):
 - scripts/lib/: 模块化组件库
 - scripts/core/: 核心入口
 - scripts/extract_pdf_assets.py: 兼容导出层（本文件）
-- scripts-old/: 旧版完整实现（过渡期保留）
 """
 
 from __future__ import annotations

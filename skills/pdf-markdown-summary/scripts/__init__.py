@@ -9,4 +9,4 @@ V0.3.x: 模块化重构完成版
 - extract_pdf_assets.py: 兼容导出层
 """
 
-__version__ = "0.3.1"  # V0.3.1 模块化完成版
+__version__ = "0.5.10"  # 对应 git tag V0.5.10-Build0481-20260623

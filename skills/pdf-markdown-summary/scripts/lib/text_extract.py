@@ -9,8 +9,9 @@ Commit 10: 文本提取
 - try_extract_text: 尝试提取 PDF 文本
 - pre_validate_pdf: PDF 预验证
 - gather_structured_text: 结构化文本提取
-- build_figure_contexts: 构建图表上下文
 - extract_text_with_format: 带格式的文本提取（构建版式模型）
+
+注：图表上下文构建（build_figure_contexts）已迁移至 figure_contexts.py。
 """
 
 from __future__ import annotations

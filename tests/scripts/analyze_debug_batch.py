@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-"""Analyze debug-visual batch output for tuning signals."""
+"""Analyze debug-visual batch output for tuning signals.
+
+用法:
+    python3 tests/scripts/analyze_debug_batch.py tests/results/20260622-001
+
+参数:
+    batch   tests/results/ 下的批次目录（如 20260622-001）
+"""
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[2]
-BATCH = PROJECT / "tests" / "results" / "20260622-001"
 
 
 @dataclass
@@ -138,9 +146,26 @@ def scan_logs(pdf_dir: Path) -> list[str]:
     return out
 
 
-def main() -> None:
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="分析 debug-visual 批次输出，统计调参信号。",
+    )
+    parser.add_argument(
+        "batch",
+        type=Path,
+        help="批次目录路径（如 tests/results/20260622-001）",
+    )
+    args = parser.parse_args()
+
+    batch: Path = args.batch
+    if not batch.is_dir():
+        # 友好报错，不抛 traceback
+        print(f"错误: 批次目录不存在: {batch}", file=sys.stderr)
+        print(f"用法: python3 {Path(__file__).name} <批次目录>", file=sys.stderr)
+        return 1
+
     all_items: list[LegendAnalysis] = []
-    for pdf_dir in sorted(BATCH.iterdir()):
+    for pdf_dir in sorted(batch.iterdir()):
         if not pdf_dir.is_dir():
             continue
         dbg = pdf_dir / "images" / "debug"
@@ -171,7 +196,8 @@ def main() -> None:
     print("GLOBAL NOTE COUNTS")
     for k, v in sorted(note_counts.items(), key=lambda x: -x[1]):
         print(f"  {k}: {v}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -287,7 +287,7 @@ def print_effective_params(
         print(f"[{level}] {msg}")
 
 
-def apply_preset_robust(args: Any) -> None:
+def apply_preset_robust(args: Any, argv: Optional[List[str]] = None) -> None:
     """
     应用 'robust' 预设参数。
 
@@ -297,6 +297,10 @@ def apply_preset_robust(args: Any) -> None:
 
     Args:
         args: argparse.Namespace 对象
+        argv: 用于判定"显式传参"的命令行参数列表；
+              为 None 时退回 sys.argv（命令行直接运行的场景）。
+              程序化调用方必须传入实际使用的 argv，
+              否则外层 sys.argv 会导致显式参数被 preset 覆盖。
     """
     # 预设参数映射
     robust_defaults = {
@@ -320,8 +324,6 @@ def apply_preset_robust(args: Any) -> None:
         "mask_font_max": 14,
         "mask_width_ratio": 0.5,
         "mask_top_frac": 0.6,
-        "near_edge_pad_px": 32,
-        "protect_far_edge_px": 18,
         # 表格特化
         "table_clip_height": 520,
         "table_margin_x": 26,
@@ -334,7 +336,7 @@ def apply_preset_robust(args: Any) -> None:
     }
 
     # 收集显式传递的参数
-    explicit_args = collect_explicit_args()
+    explicit_args = collect_explicit_args(argv)
 
     # 只设置未显式传递的参数
     for key, value in robust_defaults.items():

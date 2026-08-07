@@ -127,10 +127,6 @@ def extract_figures(
     refine_safe: bool = True,
     autocrop_shrink_limit: float = 0.35,
     autocrop_min_height_px: int = 80,
-    # Heuristics tuners
-    text_trim_min_para_ratio: float = 0.18,
-    protect_far_edge_px: int = 12,
-    near_edge_pad_px: int = 18,
     # Continuation handling
     allow_continued: bool = False,
     # Smart caption detection
@@ -257,7 +253,7 @@ def extract_figures(
                 if bbox:
                     image_rects.append(create_rect(*bbox))
 
-# 查找 Figure captions
+        # 查找 Figure captions
         for blk in dict_data.get("blocks", []):
             if blk.get("type", 0) != 0:
                 continue
@@ -786,6 +782,14 @@ def extract_figures(
                     pix = page.get_pixmap(dpi=dpi, clip=final_clip)
                     pix.save(out_path)
 
+                    # A0-1: 落盘最终渲染框（只记录，不改变任何截图行为）
+                    final_bbox = [final_clip.x0, final_clip.y0, final_clip.x1, final_clip.y1]
+                    caption_bbox_list = [
+                        float(caption_bbox.x0),
+                        float(caption_bbox.y0),
+                        float(caption_bbox.x1),
+                        float(caption_bbox.y1),
+                    ]
                     records.append(AttachmentRecord(
                         kind='figure',
                         ident=ident,
@@ -794,6 +798,9 @@ def extract_figures(
                         out_path=out_path,
                         continued=is_continued,
                         debug_artifacts=debug_artifacts,
+                        final_bbox=final_bbox,
+                        caption_bbox=caption_bbox_list,
+                        content_bboxes=[list(final_bbox)],
                     ))
 
                     logger.info(f"Extracted Figure {ident} from page {pno + 1}: {out_path}")

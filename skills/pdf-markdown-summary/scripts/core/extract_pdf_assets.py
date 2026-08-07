@@ -33,7 +33,7 @@ if _scripts_dir not in sys.path:
     sys.path.insert(0, _scripts_dir)
 
 # 从 lib 导入核心组件
-from lib.env_priority import apply_preset_robust, parse_comma_list
+from lib.env_priority import apply_preset_robust, get_env_str, parse_comma_list
 from lib.extract_figures import extract_figures
 from lib.extract_tables import extract_tables
 from lib.figure_contexts import build_figure_contexts
@@ -154,10 +154,14 @@ Examples:
         "--refine-near-edge-only",
         action="store_true",
         default=True,
-        help="Only adjust near-caption edge",
+        help="Only adjust near-caption edge (default: enabled)",
     )
-    p.add_argument("--protect-far-edge-px", type=int, default=14, help="Extra pixels to keep on far edge")
-    p.add_argument("--near-edge-pad-px", type=int, default=32, help="Extra pixels towards caption side")
+    p.add_argument(
+        "--no-refine-near-edge-only",
+        action="store_false",
+        dest="refine_near_edge_only",
+        help="Allow adjusting both edges during refinement",
+    )
 
     # === 表格选项 ===
     p.add_argument(
@@ -199,6 +203,15 @@ Examples:
     p.add_argument("--no-adaptive-line-height", action="store_false", dest="adaptive_line_height")
     p.add_argument("--layout-driven", default="on", choices=["auto", "on", "off"], help="Layout driven mode")
 
+    # === A1: Layout 语义区域后端（feature flag，默认关闭） ===
+    p.add_argument(
+        "--layout-backend",
+        default=None,
+        choices=["off", "pymupdf4llm"],
+        help="Layout backend for semantic region extraction (default: off, "
+        "env: PDF_SUMMARY_LAYOUT_BACKEND)",
+    )
+
     # === 日志 ===
     p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     p.add_argument("--log-file", default=None)
@@ -216,7 +229,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     args = parse_args_modular(argv)
 
     if getattr(args, "preset", None) == "robust":
-        apply_preset_robust(args)
+        apply_preset_robust(args, argv=argv)
 
     pdf_path = os.path.abspath(args.pdf)
     if not os.path.exists(pdf_path):
@@ -268,6 +281,40 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
 
         layout_model = extract_text_with_format(pdf_path, out_json=layout_model_json)
 
+    # === A1: Layout 语义区域后端（feature flag） ===
+    layout_backend_name = args.layout_backend
+    if layout_backend_name is None:
+        layout_backend_name = get_env_str("PDF_SUMMARY_LAYOUT_BACKEND", "off")
+
+    layout_result = None
+    layout_report = None
+    if layout_backend_name and layout_backend_name.lower() != "off":
+        try:
+            from lib.backends import get_backend
+            from lib.layout_integration import build_integration_report
+
+            backend = get_backend(layout_backend_name)
+            if backend is not None:
+                logger.info(
+                    "Layout backend '%s' v%s enabled for %s",
+                    backend.name, backend.version, pdf_path,
+                )
+                layout_result = backend.extract(pdf_path)
+                logger.info(
+                    "Layout extracted: %d pages, %d regions, %.3fs (cached=%s)",
+                    len(layout_result.pages),
+                    sum(len(pr.regions) for pr in layout_result.pages.values()),
+                    layout_result.elapsed_sec,
+                    layout_result.cached,
+                )
+            else:
+                logger.warning(
+                    "Layout backend '%s' not available, falling back to off",
+                    layout_backend_name,
+                )
+        except Exception as e:
+            logger.warning("Layout backend error: %s, falling back to off", e)
+
     below_figs = parse_comma_list(args.below)
     above_figs = parse_comma_list(args.above)
     no_refine_figs = parse_comma_list(args.no_refine)
@@ -305,8 +352,6 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
             mask_top_frac=args.mask_top_frac,
             refine_near_edge_only=bool(args.refine_near_edge_only),
             no_refine_figs=no_refine_figs,
-            protect_far_edge_px=args.protect_far_edge_px,
-            near_edge_pad_px=args.near_edge_pad_px,
             allow_continued=bool(args.allow_continued),
             smart_caption_detection=bool(args.smart_caption_detection),
             debug_captions=bool(args.debug_captions),
@@ -366,6 +411,111 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
         out_json=figure_contexts_json,
     )
 
+    # === A1/A2/A3: Layout 后端开启时的影子报告 + 可选精修 ===
+    pairing_results = None
+    if layout_result is not None:
+        # 统一从 records 提取 caption 候选：优先真实 caption_bbox，禁止用 final_bbox 冒充
+        def _caption_candidates_for_pairing(with_kind: bool):
+            out = []
+            for r in records:
+                page = getattr(r, "page", 0)
+                text = getattr(r, "caption", "") or getattr(r, "caption_text", "") or ""
+                bbox = getattr(r, "caption_bbox", None)
+                kind = getattr(r, "kind", "figure")
+                if not (page and text and bbox):
+                    continue
+                if with_kind:
+                    out.append((page, text, bbox, kind))
+                else:
+                    out.append((page, text, bbox))
+            return out
+
+        # A1: Layout 集成报告
+        try:
+            from lib.layout_integration import build_integration_report
+
+            figure_records = [r for r in records if getattr(r, "kind", "figure") == "figure"]
+            table_records = [r for r in records if getattr(r, "kind", "") == "table"]
+            caption_candidates = _caption_candidates_for_pairing(with_kind=False)
+
+            layout_report = build_integration_report(
+                layout_result=layout_result,
+                legacy_figure_records=figure_records,
+                legacy_table_records=table_records,
+                caption_candidates=caption_candidates,
+            )
+            report_path = os.path.join(out_dir, "layout_integration.json")
+            import json as _json
+
+            with open(report_path, "w", encoding="utf-8") as f:
+                _json.dump(layout_report.to_dict(), f, ensure_ascii=False, indent=2)
+            logger.info(
+                "Layout integration report: %d conflicts, %d captions filtered -> %s",
+                len(layout_report.conflicts),
+                layout_report.captions_filtered,
+                report_path,
+            )
+        except Exception as e:
+            logger.warning("Layout integration report failed: %s", e)
+
+        # A2: 全页配对与多框（结果供 A3 复用，避免重复配对）
+        try:
+            from lib.pairing import pair_layout_regions, pairing_report
+
+            caption_candidates = _caption_candidates_for_pairing(with_kind=True)
+            # 若 records 尚无 caption_bbox，退回 Layout 自带 caption_regions（传 None）
+            pairing_results = pair_layout_regions(
+                layout_result,
+                caption_candidates if caption_candidates else None,
+            )
+            pair_report = pairing_report(pairing_results)
+
+            pair_report_path = os.path.join(out_dir, "layout_pairing.json")
+            import json as _json2
+
+            with open(pair_report_path, "w", encoding="utf-8") as f:
+                _json2.dump(pair_report, f, ensure_ascii=False, indent=2)
+            logger.info(
+                "Layout pairing: %d pairs, %d multi-frame, %d duplicate groups -> %s",
+                pair_report["total_pairs"],
+                pair_report["multi_frame_count"],
+                pair_report["duplicate_occupancy"]["n_groups"],
+                pair_report_path,
+            )
+        except Exception as e:
+            logger.warning("Layout pairing failed: %s", e)
+            pairing_results = None
+
+        # A3: 精修改造（复用 A2 pairing_results）
+        if pairing_results is not None:
+            try:
+                from lib.pipeline import run_refinement_pipeline
+
+                refinement_report = run_refinement_pipeline(
+                    records=records,
+                    pairing_results=pairing_results,
+                    pdf_path=pdf_path,
+                    out_dir=out_dir,
+                    dpi=args.dpi,
+                )
+
+                refine_report_path = os.path.join(out_dir, "layout_refinement.json")
+                import json as _json3
+
+                with open(refine_report_path, "w", encoding="utf-8") as f:
+                    _json3.dump(refinement_report.to_dict(), f, ensure_ascii=False, indent=2)
+                logger.info(
+                    "A3 refinement: %d/%d matched, %d refined, %d applied, %d kept legacy -> %s",
+                    refinement_report.matched,
+                    refinement_report.total_records,
+                    refinement_report.refined,
+                    refinement_report.applied,
+                    refinement_report.kept_legacy,
+                    refine_report_path,
+                )
+            except Exception as e:
+                logger.warning("A3 refinement failed: %s", e)
+
     write_manifest(records, manifest_path)
     write_index_json(
         records,
@@ -404,94 +554,18 @@ __all__ = [
 ]
 
 
-_LEGACY_MODULE = None
-
-
-def _pop_engine_arg(argv_list: List[str]) -> tuple[str, List[str]]:
-    """
-    解析并移除 `--engine legacy|modular` 参数（不交给 argparse，避免 legacy CLI 报未知参数）。
-    """
-    engine = os.environ.get("PDF_SUMMARY_AGENT_ENGINE", "modular").strip().lower()
-    cleaned: List[str] = []
-    i = 0
-    while i < len(argv_list):
-        a = argv_list[i]
-        if a.startswith("--engine="):
-            engine = a.split("=", 1)[1].strip().lower()
-            i += 1
-            continue
-        if a == "--engine":
-            if i + 1 < len(argv_list):
-                engine = argv_list[i + 1].strip().lower()
-                i += 2
-                continue
-            # 参数不完整时，交给后续解析报错（这里不吞掉）
-        cleaned.append(a)
-        i += 1
-    return engine, cleaned
-
-
-def _load_legacy_module():
-    """
-    过渡期委托旧版完整实现（优先 old-version/scripts-old/extract_pdf_assets.py）。
-    """
-    global _LEGACY_MODULE
-    if _LEGACY_MODULE is not None:
-        return _LEGACY_MODULE
-
-    import importlib.util
-
-    repo_root = os.path.dirname(_scripts_dir)
-    legacy_candidates = [
-        os.path.join(repo_root, "old-version", "scripts-old", "extract_pdf_assets.py"),
-        os.path.join(repo_root, "scripts-old", "extract_pdf_assets.py"),
-    ]
-    legacy_path = next((p for p in legacy_candidates if os.path.exists(p)), legacy_candidates[0])
-    if not os.path.exists(legacy_path):
-        raise RuntimeError(f"Legacy script not found: {legacy_candidates}")
-    spec = importlib.util.spec_from_file_location("_legacy_extract_pdf_assets", legacy_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Failed to load legacy module: {legacy_path}")
-    module = importlib.util.module_from_spec(spec)
-    # dataclasses 在装饰阶段会通过 sys.modules 反查 __module__ 对应的模块命名空间
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    _LEGACY_MODULE = module
-    return module
-
-
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """
-    兼容入口：默认走模块化主流程；可用 `--engine legacy` 切换到旧版完整实现。
+    命令行参数解析入口（模块化实现）。
     """
-    if argv is None:
-        argv_list = sys.argv[1:]
-    else:
-        argv_list = list(argv)
-
-    engine, cleaned = _pop_engine_arg(argv_list)
-    if engine == "legacy":
-        legacy = _load_legacy_module()
-        return legacy.parse_args(cleaned)
-
-    return parse_args_modular(cleaned)
+    return parse_args_modular(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     """
-    兼容入口：默认走模块化主流程；可用 `--engine legacy` 切换到旧版完整实现。
+    主入口（模块化实现）。
     """
-    if argv is None:
-        argv_list = sys.argv[1:]
-    else:
-        argv_list = list(argv)
-
-    engine, cleaned = _pop_engine_arg(argv_list)
-    if engine == "legacy":
-        legacy = _load_legacy_module()
-        return legacy.main(cleaned)
-
-    return main_modular(cleaned)
+    return main_modular(argv)
 
 
 if __name__ == "__main__":
