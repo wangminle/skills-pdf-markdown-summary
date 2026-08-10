@@ -22,11 +22,17 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from .models import AttachmentRecord
-from .quality import QualityAssessment, STATUS_ACCEPTED, STATUS_ACCEPTED_WITH_MARGIN
+from .quality import (
+    QualityAssessment,
+    STATUS_ACCEPTED,
+    STATUS_ACCEPTED_WITH_MARGIN,
+    STATUS_REJECTED,
+    STATUS_REVIEW_REQUIRED,
+)
 
 logger = logging.getLogger(__name__)
 
-# 质量阈值：只有 accepted / accepted_WITH_MARGIN 才覆盖 legacy
+# 质量阈值：只有 accepted / accepted_with_margin 才用精修框覆盖 legacy 几何
 _ACCEPTABLE_STATUSES = {STATUS_ACCEPTED, STATUS_ACCEPTED_WITH_MARGIN}
 
 # IoU 阈值：精修结果与 legacy 结果 IoU 过低时不覆盖（防止大幅改变）
@@ -116,76 +122,112 @@ def _bbox_coverage(small: List[float], big: List[float]) -> float:
     return inter / area_big if area_big > 0 else 0.0
 
 
+def _union_bboxes(bboxes: List[List[float]]) -> List[float]:
+    return [
+        min(b[0] for b in bboxes),
+        min(b[1] for b in bboxes),
+        max(b[2] for b in bboxes),
+        max(b[3] for b in bboxes),
+    ]
+
+
 def _match_records_to_candidates(
     records: List[AttachmentRecord],
     pairing_results: Dict[int, Any],
-) -> Dict[int, List[float]]:
-    """将 records 与 A2 配对结果匹配，返回 record_index -> candidate_bbox 映射。
+) -> Dict[int, Dict[str, Any]]:
+    """将 records 与 A2 配对结果一对一匹配。
 
-    匹配逻辑：按页码和 kind 匹配配对结果中的 content bbox。
-    pairing_results 是 Dict[int, PairingResult]（page_no -> PairingResult）。
-    PairingResult.pairs 是 List[Tuple[AssetCandidate, List[AssetCandidate]]]。
+    返回 record_index -> {
+        "bbox": union bbox,
+        "content_bboxes": 原始多框列表,
+        "caption_bbox": 可选 caption 框,
+    }
+
+    约束：每个候选 pair 最多绑定一个 record（标记已使用，禁止重复占用）。
     """
-    mapping: Dict[int, List[float]] = {}
+    mapping: Dict[int, Dict[str, Any]] = {}
 
-    # 构建配对索引：(page, kind) -> list of content_bbox (union)
-    pair_index: Dict[Tuple[int, str], List[List[float]]] = {}
+    # 构建候选池：(page, kind) -> list of candidate dicts
+    pair_index: Dict[Tuple[int, str], List[Dict[str, Any]]] = {}
     for page_no, pr in pairing_results.items():
         if pr is None:
             continue
-        # PairingResult.page is 1-based
         page = getattr(pr, "page", page_no)
         for pair in getattr(pr, "pairs", []):
-            # pair is (caption_candidate, content_candidates_list)
-            if isinstance(pair, (list, tuple)) and len(pair) >= 2:
-                caption_cand, content_list = pair[0], pair[1]
-                # 优先 caption/content 候选上的 kind；禁止默认落到 figure 造成跨类混池
-                kind = getattr(caption_cand, "kind", None) or "figure"
-                if content_list:
-                    kind = getattr(content_list[0], "kind", None) or kind
-                if kind not in ("figure", "table"):
-                    kind = "figure"
-                # Collect all content_bboxes from content candidates
-                all_bboxes: List[List[float]] = []
-                for cc in content_list:
-                    cc_kind = getattr(cc, "kind", kind)
-                    if cc_kind not in (kind, "figure", "table"):
-                        continue
-                    if cc_kind != kind:
-                        continue  # 禁止跨 kind 并入同一候选
-                    bboxes = getattr(cc, "content_bboxes", [])
-                    all_bboxes.extend(bboxes)
-                if all_bboxes:
-                    all_x0 = min(b[0] for b in all_bboxes)
-                    all_y0 = min(b[1] for b in all_bboxes)
-                    all_x1 = max(b[2] for b in all_bboxes)
-                    all_y1 = max(b[3] for b in all_bboxes)
-                    key = (page, kind)
-                    pair_index.setdefault(key, []).append([all_x0, all_y0, all_x1, all_y1])
+            if not (isinstance(pair, (list, tuple)) and len(pair) >= 2):
+                continue
+            caption_cand, content_list = pair[0], pair[1]
+            kind = getattr(caption_cand, "kind", None) or "figure"
+            if content_list:
+                kind = getattr(content_list[0], "kind", None) or kind
+            if kind not in ("figure", "table"):
+                kind = "figure"
 
-    # 匹配 records 到配对结果（records page is 1-based, pairing page is 1-based）
+            all_bboxes: List[List[float]] = []
+            for cc in content_list:
+                cc_kind = getattr(cc, "kind", kind)
+                if cc_kind != kind:
+                    continue
+                bboxes = getattr(cc, "content_bboxes", []) or []
+                all_bboxes.extend([list(b) for b in bboxes])
+
+            # 兼容：有的测试把 content 直接放在 caption_cand 上
+            if not all_bboxes:
+                bboxes = getattr(caption_cand, "content_bboxes", []) or []
+                all_bboxes.extend([list(b) for b in bboxes])
+
+            if not all_bboxes:
+                continue
+
+            # 去重（保留顺序）
+            dedup: List[List[float]] = []
+            seen = set()
+            for b in all_bboxes:
+                key_b = tuple(round(v, 2) for v in b)
+                if key_b in seen:
+                    continue
+                seen.add(key_b)
+                dedup.append(list(b))
+
+            cap_bb = getattr(caption_cand, "caption_bbox", None)
+            entry = {
+                "bbox": _union_bboxes(dedup),
+                "content_bboxes": dedup,
+                "caption_bbox": list(cap_bb) if cap_bb else None,
+            }
+            pair_index.setdefault((page, kind), []).append(entry)
+
+    # 贪心一对一：按 (rec_idx, cand_idx, iou) 降序分配
+    scored: List[Tuple[float, int, int, Tuple[int, str]]] = []
     for i, rec in enumerate(records):
         rec_page = getattr(rec, "page", 0)
         rec_kind = getattr(rec, "kind", "figure")
         rec_bbox = getattr(rec, "final_bbox", None)
-
+        if rec_bbox is None:
+            continue
         key = (rec_page, rec_kind)
         candidates = pair_index.get(key, [])
+        for ci, cand in enumerate(candidates):
+            iou = _bbox_iou(rec_bbox, cand["bbox"])
+            if iou >= _MIN_MATCH_IOU:
+                scored.append((iou, i, ci, key))
 
-        if not candidates or rec_bbox is None:
+    scored.sort(key=lambda x: x[0], reverse=True)
+    used_recs: set = set()
+    used_cands: set = set()  # (key, cand_idx)
+    used_bbox_ids: set = set()  # (page, kind, rounded union bbox) 防同框重复占用
+
+    for iou, ri, ci, key in scored:
+        if ri in used_recs or (key, ci) in used_cands:
             continue
-
-        # 找 IoU 最高的候选；低于阈值则不绑定
-        best_iou = 0.0
-        best_bbox = None
-        for cand in candidates:
-            iou = _bbox_iou(rec_bbox, cand)
-            if iou > best_iou:
-                best_iou = iou
-                best_bbox = cand
-
-        if best_bbox is not None and best_iou >= _MIN_MATCH_IOU:
-            mapping[i] = best_bbox
+        cand = pair_index[key][ci]
+        bbox_id = (key[0], key[1], tuple(round(v, 2) for v in cand["bbox"]))
+        if bbox_id in used_bbox_ids:
+            continue
+        used_recs.add(ri)
+        used_cands.add((key, ci))
+        used_bbox_ids.add(bbox_id)
+        mapping[ri] = cand
 
     return mapping
 
@@ -276,7 +318,17 @@ def run_refinement_pipeline(
         return report
 
     with open_pdf(pdf_path) as doc:
-        for rec_idx, cand_bbox in candidate_map.items():
+        for rec_idx, cand_info in candidate_map.items():
+            # 兼容旧映射（纯 list bbox）与新映射（dict）
+            if isinstance(cand_info, dict):
+                cand_bbox = list(cand_info["bbox"])
+                cand_frames = [list(b) for b in (cand_info.get("content_bboxes") or [cand_bbox])]
+                cand_caption = cand_info.get("caption_bbox")
+            else:
+                cand_bbox = list(cand_info)
+                cand_frames = [list(cand_bbox)]
+                cand_caption = None
+
             rec = records[rec_idx]
             rec_record = RefinementRecord(
                 ident=rec.ident,
@@ -301,7 +353,6 @@ def run_refinement_pipeline(
                 text_lines = collect_text_lines(text_dict)
                 draw_items = collect_draw_items(page.raw)
 
-                # Separate into image_rects and vector_rects (same as extract_figures.py)
                 from .pdf_backend import create_rect
                 image_rects: List = []
                 vector_rects: List = []
@@ -309,26 +360,22 @@ def run_refinement_pipeline(
                     if item.orient == 'O':
                         vector_rects.append(item.rect)
                 for blk in text_dict.get("blocks", []):
-                    if blk.get("type") == 1:  # image block
+                    if blk.get("type") == 1:
                         bbox = blk.get("bbox")
                         if bbox:
                             image_rects.append(create_rect(*bbox))
 
-                # 方向与 caption：优先使用 record 上真实 caption_bbox
-                real_caption = getattr(rec, "caption_bbox", None)
+                real_caption = getattr(rec, "caption_bbox", None) or cand_caption
                 if real_caption and len(real_caption) == 4:
                     cap_cy = (real_caption[1] + real_caption[3]) / 2.0
                     cand_cy = (cand_bbox[1] + cand_bbox[3]) / 2.0
-                    # content 在 caption 上方 → direction=above（与 legacy 语义一致）
                     direction = "above" if cand_cy <= cap_cy else "below"
                     caption_rect = create_rect(*real_caption)
                 else:
-                    direction = "above"
                     if cand_bbox[1] < legacy_bbox[1]:
                         direction = "below"
                     else:
                         direction = "above"
-                    # 无真实 caption 时，从候选框边缘推导伪 caption（兼容旧路径）
                     if direction == "above":
                         caption_rect = create_rect(
                             cand_bbox[0], cand_bbox[3] + 1,
@@ -344,6 +391,7 @@ def run_refinement_pipeline(
                     page=page,
                     page_rect=page_rect,
                     candidate_bbox=list(cand_bbox),
+                    candidate_bboxes=[list(b) for b in cand_frames],
                     caption_bbox=caption_rect,
                     direction=direction,
                     kind=rec.kind,
@@ -356,7 +404,6 @@ def run_refinement_pipeline(
                     extra={'legacy_bbox': list(legacy_bbox) if legacy_bbox else None},
                 )
 
-                # 选择精修器
                 if rec.kind == "table":
                     refiner = TableRefiner()
                 else:
@@ -370,9 +417,23 @@ def run_refinement_pipeline(
                 if result.quality:
                     rec_record.quality = result.quality.to_dict()
 
-                # 决定是否应用
+                q_status = result.quality.status if result.quality else STATUS_REVIEW_REQUIRED
+                q_warnings = list(result.quality.warnings) if result.quality else []
+                q_conf = result.quality.confidence if result.quality else None
+                q_review = q_status in (STATUS_REVIEW_REQUIRED, STATUS_REJECTED)
+
+                def _apply_quality_meta(target_status: str, extra_warnings: Optional[List[str]] = None) -> None:
+                    """四态元数据始终写回 record（几何是否覆盖另议）。"""
+                    warns = list(extra_warnings or [])
+                    # 合并去重
+                    merged = list(dict.fromkeys(list(rec.warnings) + q_warnings + warns))
+                    rec.warnings = merged
+                    rec.review_required = target_status in (STATUS_REVIEW_REQUIRED, STATUS_REJECTED) or q_review
+                    rec.status = target_status
+                    if q_conf is not None:
+                        rec.boundary_confidence = q_conf
+
                 if result.quality and result.quality.status in _ACCEPTABLE_STATUSES:
-                    # 检查与 legacy 的差异是否合理
                     legacy_iou = _bbox_iou(legacy_bbox, result.bbox)
                     legacy_cov = _bbox_coverage(result.bbox, legacy_bbox)
                     if legacy_iou < _MAX_LEGACY_IOU_DIFF:
@@ -381,6 +442,11 @@ def run_refinement_pipeline(
                             f"legacy_iou={legacy_iou:.2f} < {_MAX_LEGACY_IOU_DIFF}"
                             f", status={result.quality.status}"
                         )
+                        # 几何保留 legacy，但质量告警仍落盘为 review_required
+                        _apply_quality_meta(
+                            STATUS_REVIEW_REQUIRED,
+                            [f"legacy_iou_too_low={legacy_iou:.2f}"],
+                        )
                         report.kept_legacy += 1
                     elif legacy_cov < _MIN_LEGACY_COVERAGE:
                         rec_record.applied = False
@@ -388,24 +454,30 @@ def run_refinement_pipeline(
                             f"legacy_cov={legacy_cov:.2f} < {_MIN_LEGACY_COVERAGE}"
                             f" (refined too tight vs legacy), kept legacy"
                         )
+                        _apply_quality_meta(
+                            STATUS_REVIEW_REQUIRED,
+                            [f"legacy_cov_too_low={legacy_cov:.2f}"],
+                        )
                         report.kept_legacy += 1
                     else:
-                        # 应用精修结果：更新 record 并重新渲染
                         legacy_signals = list(rec.source_signals)
                         legacy_boundary = rec.boundary_confidence
                         legacy_warnings = list(rec.warnings)
                         legacy_review = rec.review_required
                         legacy_status = rec.status
+                        legacy_content = list(rec.content_bboxes) if rec.content_bboxes else (
+                            [list(legacy_bbox)] if legacy_bbox else []
+                        )
 
                         rec.final_bbox = list(result.bbox)
-                        rec.content_bboxes = [list(result.bbox)]
+                        # 多 panel：保留 A2 多框；单框时与 final 对齐
+                        if len(cand_frames) > 1:
+                            rec.content_bboxes = [list(b) for b in cand_frames]
+                        else:
+                            rec.content_bboxes = [list(result.bbox)]
                         rec.source_signals = legacy_signals + ["layout_refiner"]
-                        rec.boundary_confidence = result.quality.confidence
-                        rec.warnings = list(result.quality.warnings)
-                        rec.review_required = result.quality.status == "review_required"
-                        rec.status = result.quality.status
+                        _apply_quality_meta(result.quality.status)
 
-                        # 重新渲染
                         if rec.out_path:
                             out_path = rec.out_path
                             if not os.path.isabs(out_path):
@@ -419,9 +491,8 @@ def run_refinement_pipeline(
                                 rec_record.reason = f"applied, status={result.quality.status}"
                                 report.applied += 1
                             else:
-                                # 回退：几何与元数据一并恢复，避免 index 与 PNG 不一致
                                 rec.final_bbox = legacy_bbox
-                                rec.content_bboxes = [legacy_bbox] if legacy_bbox else []
+                                rec.content_bboxes = legacy_content
                                 rec.source_signals = legacy_signals
                                 rec.boundary_confidence = legacy_boundary
                                 rec.warnings = legacy_warnings
@@ -435,9 +506,11 @@ def run_refinement_pipeline(
                             rec_record.reason = "applied (no rerender, no out_path)"
                             report.applied += 1
                 else:
+                    # 非 acceptable：几何保留 legacy，四态元数据必须写回
                     rec_record.applied = False
-                    status = result.quality.status if result.quality else "no_quality"
-                    rec_record.reason = f"status={status}, kept legacy"
+                    status = q_status
+                    rec_record.reason = f"status={status}, kept legacy geometry"
+                    _apply_quality_meta(status)
                     report.kept_legacy += 1
 
             except Exception as e:

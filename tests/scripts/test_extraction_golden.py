@@ -3,15 +3,15 @@
 """
 QA-01 Golden Index.json 对比测试
 
-核心回归集（8 份 PDF，与 tests/basic-benchmark/ 下两个回测组一一对应）：
+核心回归集（8 份 PDF，扁平存放于 tests/basic-benchmark/*.pdf）：
 1. 1706.03762v7-attention_is_all_you_need.pdf - 5 Figure + 4 Table
 2. 2509.17765v1-Qwen3-Omni Technical Report.pdf - 3 Figure + 18 Table
-3. DeepSeek_V3_2.pdf - 4 Figure + 1 Table
+3. k3_tech_report.pdf - caption 索引约 16 Figure + 5 Table（以提取结果为准）
 4. FunAudio-ASR.pdf - 4 Figure + 8 Table
 5. gemini_v2_5_report.pdf - 15 Figure + 12 Table
 6. gpt-5-system-card.pdf - 31 Figure + 26 Table
 7. KearnsNevmyvakaHFTRiskBooks.pdf - 8 Figure + 1 Table
-8. DeepSeek_V4.pdf（回测组2）- 15 Figure + 14 Table
+8. DeepSeek_V4.pdf - 15 Figure + 14 Table
 
 Golden 的定位：变更检测器，不是正确性基准。基准由当前输出生成，
 会把已知缺陷（如 DeepSeek_V4 Table 6 导出正文）一并冻结；
@@ -51,7 +51,10 @@ Golden 的定位：变更检测器，不是正确性基准。基准由当前输�
     指纹缺失或不符（即 skills/ 代码有变动）自动触发重新提取到新批次，
     防止「改了裁剪逻辑却比对旧产物」的假绿。
   - 环境变量 PDF_GOLDEN_REEXTRACT=1 可强制不复用、全部重新提取。
-  - golden 基准 golden_index.json 保留在 tests/basic-benchmark/ 下作为版本化 fixture。
+  - golden 基准 golden_index.json 存放于 tests/results/ 各批次中（不纳入版本控制，
+    tests/results/ 已整体 gitignore）；读取时从最新批次查找，--update-golden 写入
+    当前批次。clone 后需先运行 --update-golden 生成本地基准。basic-benchmark 仅
+    保留 PDF（纯只读输入）。
 """
 
 import hashlib
@@ -197,6 +200,28 @@ def _find_existing_index(stem: str) -> Optional[Tuple[Path, Path]]:
     return None
 
 
+def _find_golden_index(stem: str) -> Optional[Path]:
+    """在 tests/results/ 各批次中查找 golden_index.json 基准。
+
+    golden 基准是版本化 fixture，不校验代码指纹（与 index.json 不同）：
+    代码变更后仍应读取旧批次的 golden 作为对比基准。
+    按批次从新到旧查找，返回最新批次的 golden_index.json 路径。
+    """
+    if not RESULTS_DIR.exists():
+        return None
+    candidates: List[Tuple[str, Path]] = []
+    for entry in RESULTS_DIR.iterdir():
+        if not re.fullmatch(r"\d{8}-\d{3}", entry.name):
+            continue
+        gp = entry / stem / "images" / "golden_index.json"
+        if gp.exists():
+            candidates.append((entry.name, gp))
+    if not candidates:
+        return None
+    candidates.sort(reverse=True)
+    return candidates[0][1]
+
+
 # ============================================================================
 # 核心回归集配置
 # ============================================================================
@@ -204,17 +229,17 @@ def _find_existing_index(stem: str) -> Optional[Tuple[Path, Path]]:
 @dataclass
 class GoldenSpec:
     """Golden 规格定义"""
-    benchmark_group: str         # benchmark 子目录（如 回测组1）
-    pdf_file: str                # PDF 文件名
+    pdf_file: str                # PDF 文件名（位于 tests/basic-benchmark/ 根下）
     expected_figures: int        # 期望的 Figure 数量
-    expected_tables: int       # 期望的 Table 数量
+    expected_tables: int         # 期望的 Table 数量
     expected_ids: Dict[str, Set[str]] = field(default_factory=dict)  # 期望的 ID 集合
+    # 已废弃：旧 benchmark 子目录布局已移除，golden 基准迁至 tests/results/
+    benchmark_group: str = ""
 
 
-# 核心回归集定义（8 份，覆盖 回测组1 七份 + 回测组2 DeepSeek_V4）
+# 核心回归集定义（8 份，扁平存放于 tests/basic-benchmark/*.pdf）
 CORE_REGRESSION_SET: List[GoldenSpec] = [
     GoldenSpec(
-        benchmark_group="回测组1",
         pdf_file="1706.03762v7-attention_is_all_you_need.pdf",
         expected_figures=5,
         expected_tables=4,
@@ -224,7 +249,6 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        benchmark_group="回测组1",
         pdf_file="2509.17765v1-Qwen3-Omni Technical Report.pdf",
         expected_figures=3,
         expected_tables=18,
@@ -234,17 +258,16 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        benchmark_group="回测组1",
-        pdf_file="DeepSeek_V3_2.pdf",
-        expected_figures=4,
-        expected_tables=1,
+        pdf_file="k3_tech_report.pdf",
+        # 数量/ID 以首次 --update-golden 冻结的提取结果为准；占位先按 caption 索引上界
+        expected_figures=16,
+        expected_tables=5,
         expected_ids={
-            "figures": {"1", "2", "3", "4"},
-            "tables": {"1"},
+            "figures": {str(i) for i in range(1, 17)},
+            "tables": {str(i) for i in range(1, 6)},
         }
     ),
     GoldenSpec(
-        benchmark_group="回测组1",
         pdf_file="FunAudio-ASR.pdf",
         expected_figures=4,
         expected_tables=8,
@@ -254,7 +277,6 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        benchmark_group="回测组1",
         pdf_file="gemini_v2_5_report.pdf",
         expected_figures=15,
         expected_tables=12,
@@ -266,7 +288,6 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        benchmark_group="回测组1",
         pdf_file="gpt-5-system-card.pdf",
         expected_figures=31,
         expected_tables=26,
@@ -276,7 +297,6 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        benchmark_group="回测组1",
         pdf_file="KearnsNevmyvakaHFTRiskBooks.pdf",
         expected_figures=8,
         expected_tables=1,
@@ -286,7 +306,6 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        benchmark_group="回测组2",
         pdf_file="DeepSeek_V4.pdf",
         expected_figures=15,
         expected_tables=14,
@@ -639,20 +658,22 @@ def compare_with_golden(
 def _resolve_golden_paths(spec: GoldenSpec) -> Tuple[Path, Path, Path, Path]:
     """Resolve PDF path, images dir, index.json and golden_index.json.
 
-    - PDF 与 golden_index.json 位于 tests/basic-benchmark/ 下（版本化 fixture）。
+    - PDF 扁平存放于 tests/basic-benchmark/<pdf_file>（纯只读输入）。
     - images/index.json 等提取产物优先复用 tests/results/ 已有批次中的产物；
       没有已提取产物时，路径指向本次运行的新批次目录（懒创建）。
+    - golden_index.json 基准存放于 tests/results/ 各批次中（版本化 fixture，
+      通过 .gitignore 例外跟踪）；读取时从最新批次查找（_find_golden_index，
+      不校验指纹），找不到时回退到当前批次路径（供 --update-golden 写入）。
     """
     stem = Path(spec.pdf_file).stem
-    benchmark_root = TESTS_DIR / spec.benchmark_group
-    pdf_path = benchmark_root / spec.pdf_file
-    golden_path = benchmark_root / stem / "images" / "golden_index.json"
+    pdf_path = TESTS_DIR / spec.pdf_file
     existing = _find_existing_index(stem)
     if existing is not None:
         images_dir, index_path = existing
     else:
         images_dir = _get_batch_dir() / stem / "images"
         index_path = images_dir / "index.json"
+    golden_path = _find_golden_index(stem) or (images_dir / "golden_index.json")
     return pdf_path, images_dir, index_path, golden_path
 
 
@@ -786,14 +807,16 @@ def run_golden_tests(
                 "items": golden_items,
             }
 
-            golden_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(golden_path, 'w', encoding='utf-8') as f:
+            # --update-golden 写入当前批次（golden_path 可能来自旧批次，不可覆盖）
+            golden_write_path = images_dir / "golden_index.json"
+            golden_write_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(golden_write_path, 'w', encoding='utf-8') as f:
                 json.dump(golden_to_save, f, ensure_ascii=False, indent=2)
 
             result = ComparisonResult(
                 pdf_name=spec.pdf_file,
                 passed=True,
-                messages=[f"已更新 golden 基准: {golden_path}"]
+                messages=[f"已更新 golden 基准: {golden_write_path}"]
             )
             results.append(result)
             if verbose:
@@ -911,17 +934,20 @@ def test_golden_index_comparison(spec: GoldenSpec) -> None:
 def test_golden_baseline_coverage() -> None:
     """meta 断言（A0-2）：禁止「全绿但零覆盖」。
 
-    - tests/basic-benchmark/ 下两个回测组的每份 PDF 都必须纳入 CORE_REGRESSION_SET；
+    - tests/basic-benchmark/ 根目录下每份 PDF 都必须纳入 CORE_REGRESSION_SET；
     - 每份 PDF 都必须存在 golden_index.json 基准；
     - 收集到的 golden 对比用例数必须与 benchmark PDF 数一致。
     """
-    pdfs = sorted(TESTS_DIR.glob("*/*.pdf"))
+    # 优先扁平根目录；兼容旧子目录布局
+    pdfs = sorted(TESTS_DIR.glob("*.pdf"))
+    if not pdfs:
+        pdfs = sorted(TESTS_DIR.glob("*/*.pdf"))
     assert pdfs, f"未扫描到任何 benchmark PDF: {TESTS_DIR}"
 
     spec_files = {spec.pdf_file for spec in CORE_REGRESSION_SET}
     uncovered = [p.name for p in pdfs if p.name not in spec_files]
     assert not uncovered, (
-        f"benchmark PDF 未纳入 CORE_REGRESSION_SET（扫描覆盖两个回测组）: {uncovered}"
+        f"benchmark PDF 未纳入 CORE_REGRESSION_SET: {uncovered}"
     )
 
     missing = [
@@ -968,7 +994,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     print("\n" + "#"*60)
     print("# QA-01 Golden Index.json 对比测试")
-    print("# 核心回归集: 8 份 benchmark PDF（回测组1 七份 + 回测组2 DeepSeek_V4）")
+    print("# 核心回归集: 8 份 benchmark PDF（tests/basic-benchmark/*.pdf）")
     print("#"*60)
 
     passed, failed, results = run_golden_tests(

@@ -17,7 +17,8 @@ from ..pdf_backend import create_rect
 from ..text_trim import trim_clip_head_by_text_v2
 from ..object_refine import refine_clip_by_objects
 from ..pixel_detect import build_text_masks_px, detect_content_bbox_pixels
-from ..quality import assess_quality
+from ..acceptance import detect_text_pollution
+from ..quality import assess_quality, detect_truncation
 from .base import (
     LegacyBoundaryGuardStep,
     RefinementContext,
@@ -337,13 +338,24 @@ class TableRefiner:
             step_results.append(result)
             current_bbox = result.bbox
 
+        try:
+            clip = create_rect(*current_bbox)
+            polluted, _pollution_reason = detect_text_pollution(clip, ctx.text_lines or [])
+        except Exception:
+            polluted = any("text_pollution" in (r.notes or "") for r in step_results)
+
+        object_rects = list(ctx.image_rects or []) + list(ctx.vector_rects or [])
+        truncated, _trunc_reason = detect_truncation(
+            final_bbox=current_bbox,
+            candidate_bbox=ctx.candidate_bbox,
+            object_rects=object_rects,
+        )
+
         quality = assess_quality(
             final_bbox=current_bbox,
             candidate_bbox=ctx.candidate_bbox,
-            text_pollution=any(
-                "text_pollution" in (r.notes or "") for r in step_results
-            ),
-            truncation=False,
+            text_pollution=bool(polluted),
+            truncation=bool(truncated),
             warnings=[f"{r.step_name}: {r.direction}({r.move_amount:.1f}pt)" for r in step_results if r.moved],
         )
 

@@ -140,9 +140,10 @@ def pair_page(
             confidence=max(0.0, 1.0 - abs(cost) / 10.0),
         )
 
-        # 多框分组：查找附近同 kind 的未使用 content（按对象身份标记索引，避免相等 bbox 误标）
+        # 多框分组：仅合并「没有更近 caption」的邻近同 kind 框，避免吞掉独立图表
         extra_frames = _find_multi_frames(
-            content, contents, used_contents, page_height
+            content, contents, used_contents, page_height,
+            captions=captions, primary_caption=cap,
         )
         extra_ids = {id(ef) for ef in extra_frames}
         for ef_i, ef in enumerate(contents):
@@ -177,6 +178,8 @@ def _find_multi_frames(
     all_contents: List[RegionBBox],
     used: set,
     page_height: float,
+    captions: Optional[List[RegionBBox]] = None,
+    primary_caption: Optional[RegionBBox] = None,
 ) -> List[RegionBBox]:
     """查找主 content 框附近的额外同 kind 框（多 panel）。
 
@@ -185,12 +188,15 @@ def _find_multi_frames(
     2. 与主框距离 <= _MULTI_FRAME_MAX_GAP
     3. 尺寸 >= _MULTI_FRAME_MIN_SIZE
     4. 水平或垂直对齐（共享边或投影重叠）
+    5. 不存在比 primary_caption 更近的其他 caption（避免吞并独立图）
 
     Args:
         primary: 主 content 框
         all_contents: 全部 content 框
         used: 已使用的索引集合
         page_height: 页面高度
+        captions: 本页全部 caption（用于归属检查）
+        primary_caption: 当前主配对 caption
 
     Returns:
         额外框列表
@@ -205,6 +211,19 @@ def _find_multi_frames(
         dist = primary.edge_distance(content)
         if dist > _MULTI_FRAME_MAX_GAP:
             continue
+
+        # 若相邻框有更近的其他 caption，应留给该 caption，不并入 multi-frame
+        if captions and primary_caption is not None:
+            primary_dist = primary_caption.edge_distance(content)
+            better_other = False
+            for cap in captions:
+                if cap is primary_caption:
+                    continue
+                if cap.edge_distance(content) + 1e-6 < primary_dist:
+                    better_other = True
+                    break
+            if better_other:
+                continue
 
         # 水平或垂直对齐检查
         h_overlap = primary.horizontal_overlap(content)
@@ -268,9 +287,8 @@ def pair_layout_regions(
             if not content_regions:
                 continue
 
-            # 获取 caption 区域
+            # 获取 caption 区域：外部 caption 按页过滤；本页无外部时回退 Layout
             if caption_candidates:
-                # 使用外部 caption 候选
                 caps = [
                     RegionBBox(
                         bbox[0], bbox[1], bbox[2], bbox[3],
@@ -279,8 +297,9 @@ def pair_layout_regions(
                     for p, text, bbox, k in caption_candidates
                     if p == page_no and k == kind
                 ]
+                if not caps:
+                    caps = list(page_region.caption_regions)
             else:
-                # 使用 Layout caption 区域
                 caps = list(page_region.caption_regions)
 
             if not caps and not content_regions:

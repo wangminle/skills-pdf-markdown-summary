@@ -72,7 +72,7 @@ cython_debug/
 # 注意：不要忽略整个 tests/ —— 下列内容应保留可提交：
 #   tests/scripts/          pytest
 #   tests/eval/             版本化评测器
-#   tests/basic-benchmark/  回测 PDF 与 golden_index.json
+#   tests/basic-benchmark/  回测 PDF（纯只读输入）
 tests/results/
 # 人工标注 GT（bootstrap，待人工复核替换）
 tests/annotations/
