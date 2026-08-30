@@ -64,7 +64,7 @@ Flags are grouped below to match their function in the source. Most flags are al
 > - `--text-trim`, `--autocrop`, and `--autocrop-mask-text` are enabled by the preset (raw default off for each).
 > - Table-specific values (`--table-clip-height` 520, `--table-margin-x` 26, `--table-caption-gap` 6) already match the raw defaults.
 >
-> The preset only fills parameters that were not explicitly passed on the command line.
+> The preset only fills parameters that were not explicitly passed on the command line, including negative flags and aliases mapped to a different argparse `dest`.
 
 ### Input / Output
 
@@ -89,6 +89,7 @@ Flags are grouped below to match their function in the source. Most flags are al
 | `--max-caption-chars` | int | 160 | Max caption chars used in filename |
 | `--max-caption-words` | int | 12 | Max words used in filename |
 | `--min-figure` / `--max-figure` | int | 1 / 999 | Figure number range to extract |
+| `--include-figures` / `--no-figures` | flag | enabled | Enable or disable Figure extraction; high-level `pdf_to_markdown --images off` passes `--no-figures` automatically |
 
 ### Autocrop
 

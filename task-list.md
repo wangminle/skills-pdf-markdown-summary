@@ -80,6 +80,13 @@
 | BUG-067 | 修复 | Minor: RegionBBox.vertical_gap 文档与实现不符 | 2026-08-07 10:30 | 2026-08-07 10:30 | 已修复 | 文档写"上方为负"，实现两侧都返回正值。修复文档为"other 在 self 上方或下方时均返回正值" |
 | BUG-068 | 修复 | Minor: filter_text_reference_captions 注释与实现矛盾 | 2026-08-07 10:30 | 2026-08-07 10:30 | 已修复 | 注释写"不删除"，实现会从返回列表去掉。修复注释为"从结果中移除可疑引用" |
 | BUG-069 | 修复 | Minor: --layout-backend 未写入 SKILL.md | 2026-08-07 10:30 | 2026-08-07 10:30 | 已修复 | SKILL.md 新增 `--layout-backend` 命令示例和说明；README.md 补充引用 |
+| BUG-070 | 修复 | Critical: `--preset robust` 静默覆盖显式 `--no-*` 关闭参数 | 2026-08-29 00:00 | 2026-08-29 00:00 | 已修复 | 全项目深度审查确认。`collect_explicit_args` 把 `--no-table-autocrop` 归一化为 `no_table_autocrop`，而 `robust_defaults` 键为 `table_autocrop`，匹配失败致 `apply_preset_robust` 把用户显式关闭的开关 `setattr` 翻回 True（端到端复现：`--no-table-autocrop` 解析后 False→preset 后 True）。修复 `env_priority.py` 匹配时同时检查 `no_<key>`；实测 6 个 `--no-*` 旗标全部尊重显式值，未显式传参时 preset 仍正常生效。新增回归 `test_apply_preset_robust_respects_no_flag_explicit` |
+| BUG-071 | 修复 | Important: `pdf_to_markdown.py` 资产提取失败仍返回 0（静默失败） | 2026-08-29 00:00 | 2026-08-29 00:00 | 已修复 | 深度审查确认。`_run_asset_extraction` 的 `exit_code` 只写进 report，`main()` 无条件 `return 0`，下游 `process_pdf.py` 依赖该退出码，导致提取失败时输出无图 md 且无失败信号。修复：资产启用且提取失败时向 stderr 报错并返回提取退出码；`report.assets` 增记 `exit_code`。新增回归 `test_asset_extraction_failure_propagates_exit_code`、`test_assets_disabled_returns_zero` |
+| BUG-072 | 修复 | Important: `run_all.py` 套件清单遗漏 `test_a2_a3_fixes.py` | 2026-08-29 00:00 | 2026-08-29 00:00 | 已修复 | 深度审查确认。`run_all.py` 自称「单命令跑全套」，但 8 套件清单未含 A2/A3 核心回归（一对一配对/多框/四态落盘，9 用例），仅裸 `pytest tests/` 才覆盖，无机制保证持续回归。修复：套件清单补入该文件并同步 docstring（8→9 套件） |
+| BUG-073 | 修复 | Important: `--preset robust` 覆盖显式 CLI 别名 | 2026-08-30 12:59 | 2026-08-30 13:06 | 已修复 | `--autocrop-white-threshold 123` 解析 dest 为 `autocrop_white_th=123`，但 `collect_explicit_args` 只收集旗标名，preset 改回 250。修复：`collect_explicit_args`/`apply_preset_robust` 接受 parser，按 dest 识别别名；`extract_pdf_assets.main_modular` 传入 parser。新增 `test_collect_explicit_args_maps_option_alias_to_dest`、`test_apply_preset_robust_respects_option_alias_dest`；修复为 parser action.dest 映射，build_parser_modular 与 apply_preset_robust 共用 parser；别名回归已通过。 |
+| BUG-074 | 修复 | Important: `--images off --tables screenshot` 仍导出并插入 Figure | 2026-08-30 12:59 | 2026-08-30 13:06 | 已修复 | 编排层仅支持 `--no-tables`，提取器无禁用 Figure 旗标且不过滤 figure items。修复：提取层新增 `--include-figures`/`--no-figures`；编排层 images=off 时传 `--no-figures` 并按 mode 过滤 items。新增 `test_extract_parser_accepts_no_figures`、`test_images_off_tables_on_does_not_insert_figures`；提取层新增 --include-figures/--no-figures，高层编排传递 --no-figures 并二次过滤 items；混合模式回归已通过。 |
+| BUG-075 | 修复 | Important: 资产提取失败时报告顶层 `status` 仍为 ready | 2026-08-30 12:59 | 2026-08-30 13:06 | 已修复 | CLI 已传播非零退出码且 `assets.exit_code` 可用，但顶层 status 无条件写 ready。修复：提取启用且 exit_code 非 0 时 `status=failed`；`test_asset_extraction_failure_propagates_exit_code` 补断言；报告顶层 status 现根据 assets.exit_code 写 ready/failed，非零退出码仍向上游传播；回归已通过。 |
+| BUG-076 | 修复 | Important: `run_all.py` 将测试文件缺失或 pytest 零收集当作 skip 并可返回 0 | 2026-08-30 12:59 | 2026-08-30 13:06 | 已修复 | 清单内套件路径错误或零收集时统一入口可假绿。修复：除用户显式授权的排除模式外，缺失/零收集一律失败；新增 `test_run_all.py` 并纳入套件清单（9→10）；清单内脚本缺失与 pytest exit 5 现均判失败；新增 test_run_all.py 4 项防假绿回归并纳入统一入口。 |
 
 ## 调整事项
 
@@ -168,6 +175,9 @@
 | TST-039 | 检查 | A0-2：golden 纳入 bbox/文件指纹并生成 8 份基准 + 反向验证 | 2026-07-31 15:30 | 2026-07-31 15:30 | 已完成 | `ItemSignature` 增加 `final_bbox`（≤0.5pt 容差）+ PNG 尺寸/sha256 严格比对；meta 断言禁止空跑（基准缺失即红）；golden 默认纳入 pytest 普通运行；8 份基准生成（产物 `tests/results/20260731-001/`），各 PDF 资产数：Attention 5F4T、Qwen3-Omni 3F18T、DeepSeek_V3_2 4F1T、FunAudio 4F8T、Gemini 15F12T、GPT-5 31F26T、Kearns 8F1T、DeepSeek_V4 15F14T；基准为初始冻结（变更检测器），已知缺陷 gemini 缺 Figure 9、DeepSeek_V4 Table 6 类问题按方案预期一并冻结；反向验证：篡改 bbox +5pt 与篡改 sha256 均报红、恢复后转绿；`pytest tests/scripts -q` 为 135 passed、0 skipped，`run_all.py` 9 套件全 OK |
 | TST-040 | 检查 | Basic Benchmark 8 PDF `--debug-visual` 全量跑批与效果评估 | 2026-07-31 19:37 | 2026-07-31 19:45 | 已完成 | 产物 `tests/results/20260731-003/`；8/8 exit=0，约 2m17s；提取 85F+84T=169，与 CORE/golden 数量与 `final_bbox` 完全一致（bbox_diff=0）；debug 画线 169 张；`refine_fallback` 49 次（约 29%），主因 object_coverage/area_ratio；`analyze_debug_batch` 有大量 shrink/fallback flag（信号偏多，不全等于缺陷）；目视：Attention Fig1/Table2、Qwen Table3、FunAudio Table1、DeepSeek_V4 Fig4 可用；DeepSeek_V4 Table6 仍为正文引用假 caption（与 TST-029/039 已知冻结一致）；Attention 冒烟 GT eval：alignment/pairing/truncation=1.0/1.0/0，purity mean=0.43（框偏松）、excess_body 1/3；`pytest -m 'not golden'` 126 通过，`tests/eval/selfcheck` 通过 |
 | TST-041 | 检查 | A2/A3 缺陷修复全量回归：新增 test_a2_a3_fixes + 重建 8 份 golden 并验证全绿 | 2026-08-10 14:30 | 2026-08-10 15:08 | 已完成 | test_a2_a3_fixes.py 9 passed；pytest tests/scripts -q → 144 passed 0 skipped（含 8 golden+coverage）；compileall 与四入口 --help 通过；tests/eval/selfcheck 全 PASS；提取批次 tests/results/20260810-001/；golden 位于 tests/basic-benchmark/*/images/golden_index.json（变更检测器，随本轮修复单独冻结） |
+| TST-042 | 检查 | 全项目深度审查（4 并行审查 agent）+ BUG-070~072 修复验证 | 2026-08-29 00:00 | 2026-08-29 00:00 | 已完成 | 审查 agent 报告 ~60 条发现，逐条对抗性验证：确认 4 条真实缺陷（BUG-070/071/072 + 过期 docstring），推翻 13+ 条高危误报（含 off-by-one、prune 误删、双写覆盖、指纹位置/覆盖、方向反转、monkeypatch 错位等，均有代码/执行证据）；修复后验证：compileall OK、`pytest tests/ -q` → 147 passed 0 skipped（144 基线 + 3 新回归；skills/ 改动触发指纹变化，golden 按设计自动重提取新批次并与 20260810-001 基准比对通过，确认提取行为零变化）；四入口 `--help` 全过；`--no-*` 六旗标端到端复验全部尊重显式值且无显式传参时 preset 正常生效 |
+| TST-043 | 检查 | 验证 BUG-073~076 与 Golden 顶层说明修复 | 2026-08-30 13:20 | 2026-08-30 13:20 | 已完成 | TDD 先红后绿：针对性 10 通过；`pytest tests/ -q` → 155 passed 0 skipped（147 基线 + 8 新回归）；compileall 通过；四入口 `--help` 通过；`git diff --check` 通过；skills 改动触发 golden 指纹变化并自动重提取，比对通过 |
+| TST-044 | 检查 | 0.6.2 版本与文档审计全量验证 | 2026-08-30 13:00 | 2026-08-30 13:06 | 已完成 | pytest tests/ -q 为 155 passed、0 skipped（含 8 PDF Golden 重提取比较）；run_all.py 为 10 常规套件 + Golden 全 OK，155 通过、0 失败、0 跳过；compileall、四入口 --help、eval selfcheck、23 项针对性回归、CLI 87 旗标文档对照、10 份当前 Markdown 本地链接检查与 git diff --check 均通过。 |
 
 ## 文档维护
 
@@ -227,7 +237,10 @@
 | DOC-054 | 检查 | 评审技术迭代实施方案并按评审结论重写为 v2 | 2026-07-31 10:05 | 2026-07-31 10:20 | 已完成 | 核对结果：方案对四份依据文档的数字引用（8 份 PDF/270 页/180 资产、0.68 与 1.25 s/页、22.8% 空白率、56 例 legacy_loose、7.8%/5.6%、95.6% 仅为候选覆盖率、42.5MB、并集 7/7、299 样本量）逐条无误，技术方向成立。发现三类问题并已修订 `docs/PDF图表提取技术迭代实施方案-20260731.md`：①**回归网空跑**——仓库 `golden_index.json` 数量为 0，`_golden_available_specs()` 返回空列表致 golden 用例被 pytest 跳过（实测为 126 通过 **1 跳过**，非 v1 所述「126 通过 0 失败」），且 `ItemSignature` 仅比较 `(type,id,page,continued)`、`index.json` 无 bbox 字段，框位移动检测不到 → 新增 A0-2「让 golden 真正可比较」（先落 bbox 字段、再扩比较器、再生成基准、并对空跑判失败）；②**评测器不可版本化**——v1 将评测口径修正限定在已 gitignore 的 `docs/3-experiments/`，丢失了源文档「固化成 tests/ 评测入口」的要求 → A0-3 迁入 `tests/eval/`；③**验收口径自相矛盾**——「>1 行混正文」定级不一致、coverage≥0.99 与截断零容忍互斥、`review_required` 是否导出未定义 → §2 重写为四类硬失败（新增「过量混正文」作防退化护栏）、截断改二值判据、coverage 回到 0.995 且降级为筛查器、四态结果一律导出图片。另：阶段编号 P0~P4 改 A0~A4（避开仓库既有 `test_p0_env_priority.py`/`test_p1_ident_parsing.py` 命名）并补 §8.6 映射表；补 A0-4 标注可执行细节（LabelMe + `tests/annotations/` + schema + 双人复核）、A1 flag 打开时的退出条件、`requirements-layout.txt` 依赖 extras 形态、工作量粗估与 KPI 未达标降级路径、golden 为「变更检测器非正确性基准」的说明；`pytest` 全绿标准收紧为「golden 不得 0 收集或跳过」。验证命令：`python3 -m pytest tests/scripts -q` → 126 passed, 1 skipped；`find tests -name golden_index.json` → 0 个 |
 | DOC-052 | 文档 | （方案 A0-6）`AGENTS.md` 事实对齐 | 2026-07-31 10:20 | 2026-07-31 10:20 | 已完成 | §8 验证规则：「三个入口脚本」更正为四个并点名（`extract_pdf_assets.py`/`pdf_to_markdown.py`/`process_pdf.py`/`summarize_pdf.py`）；「7 个 PDF 测试文件夹」更正为 8 份（回测组1 七份 + 回测组2 `DeepSeek_V4.pdf`） |
 | DOC-053 | 文档 | task-list 同步本轮 A2/A3 验收缺陷修复与 golden 重建记录 | 2026-08-10 15:08 | 2026-08-10 15:10 | 已完成 | 补记 BUG-055~060 与 TST-041；对应审查结论：截断/污染未实现、四态未落盘、一对一/多框/逐页回退、Golden 断链 |
-| DOC-055 | 文档 | AGENTS.md §8 遗留 stale 引用：benchmark PDF 已扁平化为 tests/basic-benchmark/*.pdf，仍写「回测组1 七份 + 回测组2 的 DeepSeek_V4.pdf」（BUG-060 修复时漏同步） | 2026-08-10 16:01 | 2026-08-10 16:00 | 已完成 | AGENTS.md:71 改为 8 份 PDF 扁平路径并点名全部文件；其余引用（实施方案 A0-6、task-list 历史记录）为历史快照保留 |
+| DOC-055 | 文档 | AGENTS.md §8 遗留 stale 引用：benchmark PDF 已扁平化为 tests/basic-benchmark/*.pdf，仍写「回测组1 七份 + 回测组2 的 DeepSeek_V4.pdf」（BUG-060 修复时漏同步） | 2026-08-10 16:01 | 2026-08-10 16:22 | 已完成 | AGENTS.md:71 改为 8 份 PDF 扁平路径并点名全部文件；其余引用（实施方案 A0-6、task-list 历史记录）为历史快照保留；时间校正证据：git log -S DOC-055 与 git blame 均指向提交 978473b（2026-08-10 16:22），以该提交时间作为完成时间。 |
+| DOC-056 | 文档 | 深度审查发现 `test_extraction_golden.py` 两处过期 docstring 与「tests/results/ 整体 gitignore」决议矛盾 | 2026-08-29 00:00 | 2026-08-29 00:00 | 已完成 | `_find_golden_index` 与 `_resolve_golden_paths` docstring 原称 golden 为「版本化 fixture，通过 .gitignore 例外跟踪」；改为「本地基准，不纳入版本控制（tests/results/ 已整体 gitignore）」，并补充新 clone 需先运行 `--update-golden` 生成基准的说明 |
+| DOC-057 | 文档 | Golden 模块顶层说明仍要求「基准更新必须单独提交」，与 tests/results 整体 gitignore 冲突 | 2026-08-30 12:53 | 2026-08-30 13:20 | 已完成 | 顶层说明与命令示例改为：基准更新后在 task-list.md 记录差异原因；基准由本地 `--update-golden` 生成，不纳入版本控制 |
+| DOC-058 | 文档 | 版本升级到 0.6.2 并审计所有当前可维护文档 | 2026-08-30 12:59 | 2026-08-30 13:06 | 已完成 | 更新 scripts/__init__.py、README、SKILL、CLI/workflow reference、技术迭代方案、架构历史快照声明、eval README 与 Golden 说明；归档、docs/2-ref 和 old-version 未改。 |
 
 ## 功能开发
 
@@ -260,11 +273,11 @@
 
 | 分类 | 总数 | 已完成 | 待开发/待修复 | 完成率 |
 | --- | --- | --- | --- | --- |
-| 代码 Bug | 69 | 69 | 0 | 100% |
+| 代码 Bug | 76 | 76 | 0 | 100% |
 | 调整事项 | 13 | 12 | 1 | 92.3% |
 | 检查事项 | 19 | 19 | 0 | 100% |
-| 测试数据 | 41 | 41 | 0 | 100% |
-| 文档维护 | 55 | 55 | 0 | 100% |
+| 测试数据 | 44 | 44 | 0 | 100% |
+| 文档维护 | 58 | 58 | 0 | 100% |
 | 功能开发 | 15 | 13 | 2 | 86.7% |
 | 配置运维 | 2 | 2 | 0 | 100% |
-| **总计** | 214 | 211 | 3 | 98.6% |
+| **总计** | 227 | 224 | 3 | 98.7% |

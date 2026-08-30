@@ -67,16 +67,8 @@ except ImportError:
 logger = get_logger(__name__)
 
 
-def parse_args_modular(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    """
-    命令行参数解析。
-
-    Args:
-        argv: 命令行参数列表，默认使用 sys.argv[1:]
-
-    Returns:
-        argparse.Namespace
-    """
+def build_parser_modular() -> argparse.ArgumentParser:
+    """构建 extract_pdf_assets 的 argparse parser（供 parse 与 preset dest 映射共用）。"""
     p = argparse.ArgumentParser(
         description="Extract text and figure/table images from a PDF",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -112,6 +104,19 @@ Examples:
     p.add_argument("--max-caption-words", type=int, default=12, help="Max words for filename")
     p.add_argument("--min-figure", type=int, default=1, help="Minimum figure number")
     p.add_argument("--max-figure", type=int, default=999, help="Maximum figure number")
+    p.add_argument(
+        "--include-figures",
+        dest="include_figures",
+        action="store_true",
+        default=True,
+        help="Enable figure extraction (default: enabled)",
+    )
+    p.add_argument(
+        "--no-figures",
+        dest="include_figures",
+        action="store_false",
+        help="Disable figure extraction",
+    )
 
     # === Autocrop ===
     p.add_argument("--autocrop", action="store_true", default=False, help="Enable autocrop for figures")
@@ -217,7 +222,20 @@ Examples:
     p.add_argument("--log-file", default=None)
     p.add_argument("--log-jsonl", default=None)
 
-    return p.parse_args(argv)
+    return p
+
+
+def parse_args_modular(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """
+    命令行参数解析。
+
+    Args:
+        argv: 命令行参数列表，默认使用 sys.argv[1:]
+
+    Returns:
+        argparse.Namespace
+    """
+    return build_parser_modular().parse_args(argv)
 
 
 def main_modular(argv: Optional[List[str]] = None) -> int:
@@ -226,10 +244,11 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
 
     解析参数 → 文本提取 → 图像提取 → 写出索引
     """
-    args = parse_args_modular(argv)
+    parser = build_parser_modular()
+    args = parser.parse_args(argv)
 
     if getattr(args, "preset", None) == "robust":
-        apply_preset_robust(args, argv=argv)
+        apply_preset_robust(args, argv=argv, parser=parser)
 
     pdf_path = os.path.abspath(args.pdf)
     if not os.path.exists(pdf_path):
@@ -320,46 +339,47 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     no_refine_figs = parse_comma_list(args.no_refine)
 
     records: List[AttachmentRecord] = []
-    records.extend(
-        extract_figures(
-            pdf_path=pdf_path,
-            out_dir=out_dir,
-            dpi=args.dpi,
-            clip_height=args.clip_height,
-            margin_x=args.margin_x,
-            caption_gap=args.caption_gap,
-            max_caption_chars=args.max_caption_chars,
-            max_caption_words=args.max_caption_words,
-            min_figure=args.min_figure,
-            max_figure=args.max_figure,
-            autocrop=bool(args.autocrop),
-            autocrop_pad_px=args.autocrop_pad,
-            autocrop_white_threshold=args.autocrop_white_th,
-            below_figs=below_figs,
-            above_figs=above_figs,
-            text_trim=bool(args.text_trim),
-            text_trim_width_ratio=args.text_trim_width_ratio,
-            text_trim_font_min=args.text_trim_font_min,
-            text_trim_font_max=args.text_trim_font_max,
-            text_trim_gap=args.text_trim_gap,
-            adjacent_th=args.adjacent_th,
-            object_pad=args.object_pad,
-            object_min_area_ratio=args.object_min_area_ratio,
-            object_merge_gap=args.object_merge_gap,
-            autocrop_mask_text=bool(args.autocrop_mask_text),
-            mask_font_max=args.mask_font_max,
-            mask_width_ratio=args.mask_width_ratio,
-            mask_top_frac=args.mask_top_frac,
-            refine_near_edge_only=bool(args.refine_near_edge_only),
-            no_refine_figs=no_refine_figs,
-            allow_continued=bool(args.allow_continued),
-            smart_caption_detection=bool(args.smart_caption_detection),
-            debug_captions=bool(args.debug_captions),
-            debug_visual=bool(args.debug_visual),
-            adaptive_line_height=bool(args.adaptive_line_height),
-            layout_model=layout_model,
+    if getattr(args, "include_figures", True):
+        records.extend(
+            extract_figures(
+                pdf_path=pdf_path,
+                out_dir=out_dir,
+                dpi=args.dpi,
+                clip_height=args.clip_height,
+                margin_x=args.margin_x,
+                caption_gap=args.caption_gap,
+                max_caption_chars=args.max_caption_chars,
+                max_caption_words=args.max_caption_words,
+                min_figure=args.min_figure,
+                max_figure=args.max_figure,
+                autocrop=bool(args.autocrop),
+                autocrop_pad_px=args.autocrop_pad,
+                autocrop_white_threshold=args.autocrop_white_th,
+                below_figs=below_figs,
+                above_figs=above_figs,
+                text_trim=bool(args.text_trim),
+                text_trim_width_ratio=args.text_trim_width_ratio,
+                text_trim_font_min=args.text_trim_font_min,
+                text_trim_font_max=args.text_trim_font_max,
+                text_trim_gap=args.text_trim_gap,
+                adjacent_th=args.adjacent_th,
+                object_pad=args.object_pad,
+                object_min_area_ratio=args.object_min_area_ratio,
+                object_merge_gap=args.object_merge_gap,
+                autocrop_mask_text=bool(args.autocrop_mask_text),
+                mask_font_max=args.mask_font_max,
+                mask_width_ratio=args.mask_width_ratio,
+                mask_top_frac=args.mask_top_frac,
+                refine_near_edge_only=bool(args.refine_near_edge_only),
+                no_refine_figs=no_refine_figs,
+                allow_continued=bool(args.allow_continued),
+                smart_caption_detection=bool(args.smart_caption_detection),
+                debug_captions=bool(args.debug_captions),
+                debug_visual=bool(args.debug_visual),
+                adaptive_line_height=bool(args.adaptive_line_height),
+                layout_model=layout_model,
+            )
         )
-    )
 
     if getattr(args, "include_tables", True):
         t_below = parse_comma_list(args.t_below)

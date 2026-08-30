@@ -120,11 +120,152 @@ def test_asset_extraction_text_output_uses_markdown_text_dir() -> None:
         assert out_text == text_dir / "paper.txt"
 
 
+def test_asset_extraction_failure_propagates_exit_code() -> None:
+    """回归（2026-08-29 深度审查确认缺陷②）：资产提取失败必须传播退出码。
+
+    修复前：extract 返回非 0 时，main() 仍输出 "Wrote Markdown..." 并 return 0，
+    下游拿到无图 md 且无失败信号（静默失败）。
+    修复后：main() 返回提取的退出码，report.assets 记录 exit_code。
+    """
+    import json
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        _make_text_pdf(pdf_path)
+
+        def fake_extract_main(argv):
+            return 3  # 模拟提取失败
+
+        original_main = extract_pdf_assets_module.main
+        extract_pdf_assets_module.main = fake_extract_main
+        try:
+            exit_code = main(["--pdf", str(pdf_path), "--images", "figures"])
+        finally:
+            extract_pdf_assets_module.main = original_main
+
+        assert exit_code == 3, f"提取失败应传播退出码，实际 {exit_code}"
+        # Markdown 仍写出（部分成功），但 report 必须记录失败码
+        report_path = pdf_path.parent / "text" / "conversion_report.json"
+        assert report_path.exists()
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["assets"]["exit_code"] == 3
+        assert report["status"] != "ready", (
+            f"提取失败时报告顶层 status 不应为 ready，实际 {report.get('status')!r}"
+        )
+
+
+def test_extract_parser_accepts_no_figures() -> None:
+    """提取层必须支持禁用 Figure，才能落实 --images off。"""
+    from core.extract_pdf_assets import parse_args_modular
+
+    args = parse_args_modular(["--pdf", "paper.pdf", "--no-figures"])
+    assert getattr(args, "include_figures", True) is False
+
+
+def test_images_off_tables_on_does_not_insert_figures() -> None:
+    """回归：--images off --tables screenshot 不得导出或插入 Figure。
+
+    修复前编排层只传 --no-tables，images=off 时仍跑完整提取并把 Figure
+    写进 Markdown。现有测试只覆盖 images、tables 同时关闭。
+    """
+    import json
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        out_md = root / "paper.md"
+        _make_text_pdf(pdf_path)
+
+        captured_args = []
+
+        def fake_extract_main(argv):
+            captured_args.extend(argv)
+            out_dir = Path(argv[argv.index("--out-dir") + 1])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "index.json").write_text(
+                json.dumps(
+                    {
+                        "items": [
+                            {
+                                "type": "figure",
+                                "id": "1",
+                                "file": "Figure_1.png",
+                                "caption": "A figure",
+                            },
+                            {
+                                "type": "table",
+                                "id": "1",
+                                "file": "Table_1.png",
+                                "caption": "A table",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return 0
+
+        original_main = extract_pdf_assets_module.main
+        extract_pdf_assets_module.main = fake_extract_main
+        try:
+            exit_code = main(
+                [
+                    "--pdf", str(pdf_path),
+                    "--out", str(out_md),
+                    "--images", "off",
+                    "--tables", "screenshot",
+                ]
+            )
+        finally:
+            extract_pdf_assets_module.main = original_main
+
+        assert exit_code == 0
+        assert "--no-figures" in captured_args, (
+            f"images=off 应向提取器传递 --no-figures，实际 argv={captured_args}"
+        )
+        assert "--no-tables" not in captured_args
+
+        markdown = out_md.read_text(encoding="utf-8").lower()
+        assert "figure_1.png" not in markdown, "images=off 时 Markdown 不得插入 Figure"
+        assert "a figure" not in markdown
+        assert "table_1.png" in markdown
+        assert "a table" in markdown
+
+        report_path = out_md.parent / "text" / "conversion_report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["assets"]["count"] == 1
+
+
+def test_assets_disabled_returns_zero() -> None:
+    """资产提取未启用时（--images off --tables off），退出码保持 0。"""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        _make_text_pdf(pdf_path)
+
+        def fake_extract_main(argv):  # pragma: no cover - 不应被调用
+            raise AssertionError("extract 不应在资产关闭时被调用")
+
+        original_main = extract_pdf_assets_module.main
+        extract_pdf_assets_module.main = fake_extract_main
+        try:
+            exit_code = main(["--pdf", str(pdf_path)])
+        finally:
+            extract_pdf_assets_module.main = original_main
+
+        assert exit_code == 0
+
+
 def main_test() -> int:
     tests = [
         test_relative_asset_dir_resolves_next_to_markdown,
         test_custom_json_parent_dirs_are_created,
         test_asset_extraction_text_output_uses_markdown_text_dir,
+        test_asset_extraction_failure_propagates_exit_code,
+        test_extract_parser_accepts_no_figures,
+        test_images_off_tables_on_does_not_insert_figures,
+        test_assets_disabled_returns_zero,
     ]
     passed = 0
     failed = 0

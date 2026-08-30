@@ -225,18 +225,26 @@ def was_arg_explicitly_passed(arg_name: str, argv: Optional[List[str]] = None) -
     return False
 
 
-def collect_explicit_args(argv: Optional[List[str]] = None) -> Set[str]:
+def collect_explicit_args(
+    argv: Optional[List[str]] = None,
+    parser: Optional[Any] = None,
+) -> Set[str]:
     """
     收集命令行中所有显式传递的参数名。
 
     Args:
         argv: 命令行参数列表
+        parser: 可选 argparse.ArgumentParser；传入时按 action.dest
+                把别名（如 --autocrop-white-threshold）映射到 dest
+                （autocrop_white_th），避免 preset 覆盖显式别名。
 
     Returns:
-        显式传递的参数名集合（统一为下划线形式）
+        显式传递的参数名集合（统一为下划线形式；含 dest）
     """
     if argv is None:
         argv = sys.argv
+
+    option_actions = getattr(parser, "_option_string_actions", None) or {}
 
     explicit = set()
     for arg in argv:
@@ -244,10 +252,15 @@ def collect_explicit_args(argv: Optional[List[str]] = None) -> Set[str]:
             # 去除前缀和可能的值
             name = arg[2:]
             if "=" in name:
-                name = name.split("=")[0]
+                name = name.split("=", 1)[0]
+            flag = f"--{name}"
             # 统一为下划线形式
-            name = name.replace("-", "_")
-            explicit.add(name)
+            dest_like = name.replace("-", "_")
+            explicit.add(dest_like)
+            action = option_actions.get(flag)
+            action_dest = getattr(action, "dest", None) if action is not None else None
+            if action_dest:
+                explicit.add(action_dest)
 
     return explicit
 
@@ -287,7 +300,11 @@ def print_effective_params(
         print(f"[{level}] {msg}")
 
 
-def apply_preset_robust(args: Any, argv: Optional[List[str]] = None) -> None:
+def apply_preset_robust(
+    args: Any,
+    argv: Optional[List[str]] = None,
+    parser: Optional[Any] = None,
+) -> None:
     """
     应用 'robust' 预设参数。
 
@@ -301,6 +318,8 @@ def apply_preset_robust(args: Any, argv: Optional[List[str]] = None) -> None:
               为 None 时退回 sys.argv（命令行直接运行的场景）。
               程序化调用方必须传入实际使用的 argv，
               否则外层 sys.argv 会导致显式参数被 preset 覆盖。
+        parser: 可选 argparse.ArgumentParser；传入时按 dest 识别别名，
+                避免 --autocrop-white-threshold 这类显式别名被 preset 覆盖。
     """
     # 预设参数映射
     robust_defaults = {
@@ -335,12 +354,15 @@ def apply_preset_robust(args: Any, argv: Optional[List[str]] = None) -> None:
         "table_adjacent_th": 28,
     }
 
-    # 收集显式传递的参数
-    explicit_args = collect_explicit_args(argv)
+    # 收集显式传递的参数（含 argparse dest，覆盖 CLI 别名）
+    explicit_args = collect_explicit_args(argv, parser=parser)
 
-    # 只设置未显式传递的参数
+    # 只设置未显式传递的参数。
+    # 注意：argparse 的 --no-<key> 旗标（action="store_false", dest=<key>）
+    # 在无 parser 时会被归一化为 no_<key>，因此同时检查 no_<key>；
+    # 传入 parser 时 dest 已计入 explicit_args。
     for key, value in robust_defaults.items():
-        if key not in explicit_args:
+        if key not in explicit_args and f"no_{key}" not in explicit_args:
             setattr(args, key, value)
 
 

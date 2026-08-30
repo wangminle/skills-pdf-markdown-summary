@@ -2,6 +2,8 @@
 
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
+>
+> 当前版本 / Current version: **0.6.2**
 
 ---
 
@@ -168,8 +170,11 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - Table 专用多行表头回收、渲染横线补偿、强结构表格行带识别、宽度恢复、末行/换行尾行保护和远端章节标题裁除。
 - 双栏版式感知与伪双栏几何防护。
 - 完整流程复用首次提取产物，避免重复解析 PDF。
+- 可选 PyMuPDF4LLM Layout 后端，支持语义区域证据、全页一对一配对、多框合并与保守边界精修。
+- 资产记录包含 `final_bbox`、候选证据、配对/边界置信度、warnings、review_required 和四态质量结果。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 八份 PDF 已完成多轮逐图 debug 排查，图表选取策略记录见 `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
+- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；当前回归基线为 155 passed、0 skipped（2026-08-30 复验）。
+- Basic Benchmark 已完成多轮逐图 debug 排查，图表选取策略记录见 `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
 - 当前图表提取代码流程说明见 `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
 
@@ -178,7 +183,7 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 图片按 caption 位置插入 Markdown。
 - pdfplumber 表格结构化输出。
 - OCR fallback（当前 CLI 保留 `--ocr` 参数，但生产流程仍依赖 PDF 文本层）。
-- 更完整的测试集与 benchmark。
+- 完成独立 holdout PDF 与人工 GT 标注，执行 A4 正式 KPI 评估。
 - 清理确认无引用的旧代码。
 
 ### 开发与归档
@@ -339,7 +344,10 @@ Implemented:
 - Table-specific multiline header recovery, rendered-rule compensation, strong table-band detection, width restoration, tail-row protection, wrapped-tail preservation, and far-side section-heading trimming.
 - Double-column layout awareness and false-double-column geometry guards.
 - Full pipeline reuses the first extraction to avoid re-parsing the PDF.
+- Optional PyMuPDF4LLM Layout backend for semantic-region evidence, full-page one-to-one pairing, multi-frame grouping, and conservative boundary refinement.
+- Asset records include final bounding boxes, source signals, pairing/boundary confidence, warnings, review flags, and four-state quality outcomes.
 - Complete CLI options reference (`references/cli-options.md`).
+- Eight Basic Benchmark PDFs are covered by local Golden change detection; the current regression baseline is 155 passed and 0 skipped (reverified on 2026-08-30).
 - Multi-round Basic Benchmark visual review is recorded in `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
 - Current extraction flow diagrams are documented in `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.
@@ -349,7 +357,7 @@ Planned:
 - Better asset placement in Markdown.
 - Structured table extraction.
 - OCR fallback (`--ocr` is reserved; production extraction currently relies on the PDF text layer).
-- Broader tests and benchmarks.
+- An independently annotated holdout set and the formal A4 KPI evaluation.
 - Safe cleanup of unused legacy code.
 
 ### License

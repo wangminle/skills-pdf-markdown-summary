@@ -16,7 +16,8 @@ QA-01 Golden Index.json 对比测试
 Golden 的定位：变更检测器，不是正确性基准。基准由当前输出生成，
 会把已知缺陷（如 DeepSeek_V4 Table 6 导出正文）一并冻结；
 后续修好这些缺陷时 golden 必然报红，这是预期行为。
-基准更新必须单独提交，并在 task-list.md 逐条说明差异原因。
+基准更新必须在 task-list.md 逐条说明差异原因。基准位于已忽略的
+tests/results/ 中，仅作本地变更检测，不纳入版本控制。
 
 对比策略：
 - 忽略不稳定字段：meta.extracted_at, meta.pdf_hash
@@ -33,7 +34,7 @@ Golden 的定位：变更检测器，不是正确性基准。基准由当前输�
   # 运行 golden 对比测试
   python3 tests/scripts/test_extraction_golden.py
 
-  # 更新 golden 基准（当前提取结果作为新基准；必须单独提交）
+  # 更新本地 golden 基准（当前提取结果作为新基准）
   python3 tests/scripts/test_extraction_golden.py --update-golden
 
   # 详细输出
@@ -203,7 +204,8 @@ def _find_existing_index(stem: str) -> Optional[Tuple[Path, Path]]:
 def _find_golden_index(stem: str) -> Optional[Path]:
     """在 tests/results/ 各批次中查找 golden_index.json 基准。
 
-    golden 基准是版本化 fixture，不校验代码指纹（与 index.json 不同）：
+    golden 基准是本地变更检测基准，不纳入版本控制（tests/results/ 已整体
+    gitignore），也不校验代码指纹（与 index.json 不同）：
     代码变更后仍应读取旧批次的 golden 作为对比基准。
     按批次从新到旧查找，返回最新批次的 golden_index.json 路径。
     """
@@ -661,9 +663,10 @@ def _resolve_golden_paths(spec: GoldenSpec) -> Tuple[Path, Path, Path, Path]:
     - PDF 扁平存放于 tests/basic-benchmark/<pdf_file>（纯只读输入）。
     - images/index.json 等提取产物优先复用 tests/results/ 已有批次中的产物；
       没有已提取产物时，路径指向本次运行的新批次目录（懒创建）。
-    - golden_index.json 基准存放于 tests/results/ 各批次中（版本化 fixture，
-      通过 .gitignore 例外跟踪）；读取时从最新批次查找（_find_golden_index，
-      不校验指纹），找不到时回退到当前批次路径（供 --update-golden 写入）。
+    - golden_index.json 基准存放于 tests/results/ 各批次中（本地基准，不纳入
+      版本控制——tests/results/ 已整体 gitignore）；读取时从最新批次查找
+      （_find_golden_index，不校验指纹），找不到时回退到当前批次路径
+      （供 --update-golden 写入；新 clone 需先运行 --update-golden 生成基准）。
     """
     stem = Path(spec.pdf_file).stem
     pdf_path = TESTS_DIR / spec.pdf_file

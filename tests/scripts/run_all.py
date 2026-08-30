@@ -19,10 +19,11 @@ QA-01 统一测试入口
 执行方式：
   各套件统一以 `python -m pytest <file> -q` 执行，保证 pytest 收集到的
   全量用例都被执行（而非各文件 main() 的手工清单）；通过 pytest 退出码
-  判定套件成败（0=通过，非 0=失败，5=未收集到用例按跳过处理），
+  判定套件成败（0=通过，非 0=失败；清单内套件缺失或 pytest 未收集到用例
+  一律失败，仅用户显式授权的排除模式可跳过），
   通过/失败数从 pytest 输出解析，解析不到标记"数量未知"。
 
-测试套件（共 8 个）：
+测试套件（共 10 个）：
 1. P0 环境变量优先级测试 (test_p0_env_priority.py)
 2. P1 标识符解析测试 (test_p1_ident_parsing.py)
 3. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
@@ -31,6 +32,8 @@ QA-01 统一测试入口
 6. QA-06 PDF-to-Markdown CLI 输出路径测试 (test_pdf_to_markdown_cli.py)
 7. 健壮性与一致性修复测试 (test_maintenance_fixes.py)
 8. 正则表达式测试 (test_regex_patterns.py)
+9. A2/A3 配对与精修回归测试 (test_a2_a3_fixes.py)
+10. 统一测试入口假绿防护 (test_run_all.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -43,7 +46,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import ClassVar, List, Optional, Tuple
 
 # 项目根目录：tests/scripts/ -> 向上三级
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -64,6 +67,7 @@ class TestSuiteResult:
     exit_code: int = 0
     duration_ms: int = 0
     messages: List[str] = field(default_factory=list)
+    __test__: ClassVar[bool] = False  # 避免 pytest 把本数据类当测试类收集
 
     @property
     def total(self) -> int:
@@ -133,7 +137,7 @@ def run_pytest_suite(
     result = TestSuiteResult(name=name)
 
     if not script_path.exists():
-        result.skipped = True
+        result.exit_code = 1
         result.messages.append(f"脚本不存在: {script_path}")
         return result
 
@@ -148,9 +152,11 @@ def run_pytest_suite(
     output = stdout + stderr
 
     if exit_code == 5:
-        # pytest 未收集到任何用例
-        result.skipped = True
+        # pytest 未收集到任何用例：清单内套件零收集一律失败，禁止假绿
         result.messages.append("pytest 未收集到用例")
+        _fill_counts(result, output)
+        if verbose:
+            result.messages.append(output)
         return result
 
     _fill_counts(result, output)
@@ -175,7 +181,7 @@ def run_script_suite(
     result = TestSuiteResult(name=name)
 
     if not script_path.exists():
-        result.skipped = True
+        result.exit_code = 1
         result.messages.append(f"脚本不存在: {script_path}")
         return result
 
@@ -296,6 +302,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             "name": "正则表达式测试",
             "path": TESTS_SCRIPTS_DIR / "test_regex_patterns.py",
         })
+
+    # A2/A3 配对与精修回归（一对一、多框、逐页回退、四态落盘）
+    test_suites.append({
+        "name": "A2/A3 配对与精修回归测试",
+        "path": TESTS_SCRIPTS_DIR / "test_a2_a3_fixes.py",
+    })
+
+    test_suites.append({
+        "name": "统一测试入口假绿防护",
+        "path": TESTS_SCRIPTS_DIR / "test_run_all.py",
+    })
 
     # 运行所有 pytest 套件
     for suite in test_suites:

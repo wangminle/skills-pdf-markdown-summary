@@ -99,6 +99,22 @@ def _paragraphs_to_document(pdf_path: str, title: str):
     )
 
 
+def _filter_assets_by_mode(
+    items: List[Dict[str, Any]],
+    args: argparse.Namespace,
+) -> List[Dict[str, Any]]:
+    """按 --images / --tables 过滤提取结果，关闭的类型不得进入 Markdown。"""
+    filtered: List[Dict[str, Any]] = []
+    for item in items:
+        kind = str(item.get("type") or "").lower()
+        if kind == "figure" and args.images == "off":
+            continue
+        if kind == "table" and args.tables == "off":
+            continue
+        filtered.append(item)
+    return filtered
+
+
 def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Dict[str, Any]:
     if args.images == "off" and args.tables == "off":
         return {"enabled": False, "items": [], "index_json": ""}
@@ -118,12 +134,15 @@ def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Di
     ]
     if args.allow_continued:
         extraction_args.append("--allow-continued")
+    if args.images == "off":
+        extraction_args.append("--no-figures")
     if args.tables == "off":
         extraction_args.append("--no-tables")
 
     exit_code = extract_main(extraction_args)
     index_json = os.path.join(paths["asset_dir"], "index.json")
     items = load_index_json_items(index_json) if exit_code == 0 and os.path.exists(index_json) else []
+    items = _filter_assets_by_mode(items, args)
     return {
         "enabled": True,
         "exit_code": exit_code,
@@ -186,9 +205,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     with open(paths["blocks_json"], "w", encoding="utf-8") as f:
         json.dump(document.to_dict(), f, ensure_ascii=False, indent=2)
 
+    asset_exit = asset_result.get("exit_code")
+    asset_failed = bool(asset_result.get("enabled") and asset_exit)
     report = {
         "version": 1,
-        "status": "ready",
+        "status": "failed" if asset_failed else "ready",
         "source_pdf": paths["pdf_path"],
         "markdown": paths["out_md"],
         "blocks_json": paths["blocks_json"],
@@ -197,6 +218,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "enabled": asset_result.get("enabled", False),
             "count": len(asset_result.get("items", [])),
             "index_json": asset_result.get("index_json", ""),
+            "exit_code": asset_exit,
         },
         "ocr": {
             "mode": args.ocr,
@@ -210,6 +232,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"Wrote Markdown: {paths['out_md']}")
     print(f"Wrote blocks: {paths['blocks_json']}")
     print(f"Wrote report: {paths['report_json']}")
+
+    # 资产提取启用但失败时，必须向上游传播失败信号（避免静默产出无图 md）
+    if asset_failed:
+        print(
+            f"ERROR: asset extraction failed (exit {asset_exit}); "
+            f"Markdown written without figures/tables: {paths['out_md']}",
+            file=sys.stderr,
+        )
+        return int(asset_exit)
     return 0
 
 

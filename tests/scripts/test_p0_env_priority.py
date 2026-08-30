@@ -15,6 +15,8 @@ P0-01 环境变量优先级修复验证测试
 6. apply_preset_robust 不覆盖显式参数
 7. apply_preset_robust(args, argv=...) 程序化调用回归：
    外层 sys.argv 不含某参数时，显式传入的 argv 仍应生效
+8. apply_preset_robust 按 argparse dest 识别 CLI 别名，避免
+   --autocrop-white-threshold 被 robust preset 覆盖
 
 环境变量与 sys.argv 的修改统一通过 pytest monkeypatch 完成，
 测试结束后自动还原，避免泄漏到其他测试。
@@ -176,6 +178,82 @@ def test_apply_preset_robust_programmatic_argv_not_overridden(monkeypatch):
     print("  OK: apply_preset_robust(args, argv=...) 不覆盖程序化显式传参")
 
 
+def test_apply_preset_robust_respects_no_flag_explicit(monkeypatch):
+    """回归（2026-08-29 深度审查确认缺陷①）：--no-* 显式关闭不应被 preset 翻回。
+
+    缺陷链：collect_explicit_args 把 --no-table-autocrop 归一化为
+    no_table_autocrop，而 robust_defaults 的键是 table_autocrop，
+    匹配失败导致 setattr 把用户显式关闭的 table_autocrop 覆盖回 True。
+    """
+    monkeypatch.setattr(sys, "argv", ["pytest", "-q"])
+
+    args = argparse.Namespace(
+        table_autocrop=False,  # 用户显式传了 --no-table-autocrop（argparse dest）
+        autocrop_pad=30,
+    )
+    apply_preset_robust(
+        args,
+        argv=["--pdf", "paper.pdf", "--preset", "robust", "--no-table-autocrop"],
+    )
+
+    assert args.table_autocrop is False, (
+        f"显式 --no-table-autocrop 不应被 preset 覆盖，期望 False，实际 {args.table_autocrop}"
+    )
+    # 未显式传递的布尔参数仍应被 preset 赋值
+    assert args.autocrop_pad == 30
+    print("  OK: apply_preset_robust 尊重显式 --no-* 关闭参数")
+
+
+def test_collect_explicit_args_maps_option_alias_to_dest():
+    """CLI 别名应按 argparse dest 计入显式参数，而不是只留别名本身。
+
+    --autocrop-white-threshold 的 dest 是 autocrop_white_th；
+    若只收集归一化旗标名 autocrop_white_threshold，preset 会误覆盖 dest。
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--autocrop-white-th", dest="autocrop_white_th", type=int)
+    parser.add_argument("--autocrop-white-threshold", dest="autocrop_white_th", type=int)
+
+    if "parser" not in inspect.signature(collect_explicit_args).parameters:
+        pytest.fail("collect_explicit_args 应按 parser action/dest 识别显式参数")
+
+    explicit = collect_explicit_args(
+        ["--pdf", "paper.pdf", "--autocrop-white-threshold", "123"],
+        parser=parser,
+    )
+    assert "autocrop_white_th" in explicit, (
+        f"别名 --autocrop-white-threshold 应映射到 dest autocrop_white_th，实际 {explicit}"
+    )
+    print("  OK: collect_explicit_args 将别名映射到 argparse dest")
+
+
+def test_apply_preset_robust_respects_option_alias_dest(monkeypatch):
+    """回归：显式 CLI 别名不应被 robust preset 覆盖。
+
+    --autocrop-white-threshold 123 解析后 dest 为 autocrop_white_th=123；
+    若只按旗标名匹配，preset 会把 dest 改回 250。
+    """
+    monkeypatch.setattr(sys, "argv", ["pytest", "-q"])
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--autocrop-white-th", dest="autocrop_white_th", type=int, default=250)
+    parser.add_argument("--autocrop-white-threshold", dest="autocrop_white_th", type=int)
+    parser.add_argument("--preset", default="robust")
+
+    argv = ["--preset", "robust", "--autocrop-white-threshold", "123"]
+    args = parser.parse_args(argv)
+    assert args.autocrop_white_th == 123
+
+    if "parser" not in inspect.signature(apply_preset_robust).parameters:
+        pytest.fail("apply_preset_robust 应按 parser dest 判断显式参数")
+
+    apply_preset_robust(args, argv=argv, parser=parser)
+    assert args.autocrop_white_th == 123, (
+        f"显式别名 --autocrop-white-threshold 123 不应被 preset 覆盖，实际 {args.autocrop_white_th}"
+    )
+    print("  OK: apply_preset_robust 尊重 CLI 别名 dest")
+
+
 def main():
     print("\n" + "#"*60)
     print("# P0-01 环境变量优先级修复验证测试")
@@ -192,6 +270,9 @@ def main():
         test_env_type_helpers,
         test_apply_preset_robust_no_override_explicit,
         test_apply_preset_robust_programmatic_argv_not_overridden,
+        test_apply_preset_robust_respects_no_flag_explicit,
+        test_collect_explicit_args_maps_option_alias_to_dest,
+        test_apply_preset_robust_respects_option_alias_dest,
     ]
 
     passed = 0

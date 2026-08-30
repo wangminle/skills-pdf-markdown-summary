@@ -10,6 +10,7 @@ For the full list of command-line flags, see `cli-options.md`.
 2. Check the generated Markdown.
 3. Check `conversion_report.json`.
 4. Verify image links if images were exported.
+5. Treat a non-zero `assets.exit_code` and top-level `status: failed` as a failed/partial conversion.
 
 ## Command
 
@@ -57,4 +58,5 @@ Check:
 - Markdown file exists and is non-empty.
 - `markdown_blocks.json` is valid JSON.
 - `conversion_report.json` is valid JSON.
+- `assets.exit_code` is `0` when asset extraction was enabled and completed successfully; it is `null` when assets were disabled. A non-zero value must be paired with top-level `status: failed`.
 - Every `images/...` link points to an existing file.

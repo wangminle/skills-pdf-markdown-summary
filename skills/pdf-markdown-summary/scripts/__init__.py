@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-pdf-summary-agent/scripts 模块入口
+"""PDF Markdown Summary Skill 脚本包。"""
 
-V0.3.x: 模块化重构完成版
-- lib/: 模块化组件库
-- core/: 核心入口
-- extract_pdf_assets.py: 兼容导出层
-"""
-
-__version__ = "0.5.10"  # 对应 git tag V0.5.10-Build0481-20260623
+__version__ = "0.6.2"
