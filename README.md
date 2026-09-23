@@ -3,7 +3,7 @@
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
 >
-> 当前版本 / Current version: **0.6.2**
+> 当前版本 / Current version: **0.6.3**
 
 ---
 
@@ -172,8 +172,12 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 完整流程复用首次提取产物，避免重复解析 PDF。
 - 可选 PyMuPDF4LLM Layout 后端，支持语义区域证据、全页一对一配对、多框合并与保守边界精修。
 - 资产记录包含 `final_bbox`、候选证据、配对/边界置信度、warnings、review_required 和四态质量结果。
+- 四态质量评估（`lib/assess.py`）：截断与完整性质疑基于可见墨迹探测而非矢量路径外框，`review_required` / `rejected` 资产不进入 Markdown。
+- 跨页无题注续表自动恢复：续页标记、重复表头与横线三重证据一致时回收相邻页表格片段，未通过边界检查的片段标记待复核。
+- 题注对账（caption inventory）：显式题注与裸 `Figure N` / `Table N` 标签自动对账导出资产，缺口补裁后写入索引。
+- `--prune-images` 安全化：仅清理运行前已存在且未被修改、未被当前索引引用的 PNG。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；当前回归基线为 155 passed、0 skipped（2026-08-30 复验）。
+- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份），当前回归基线为 249 passed、0 failed、0 skipped（2026-09-23 复验）。
 - Basic Benchmark 已完成多轮逐图 debug 排查，图表选取策略记录见 `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
 - 当前图表提取代码流程说明见 `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
@@ -346,8 +350,12 @@ Implemented:
 - Full pipeline reuses the first extraction to avoid re-parsing the PDF.
 - Optional PyMuPDF4LLM Layout backend for semantic-region evidence, full-page one-to-one pairing, multi-frame grouping, and conservative boundary refinement.
 - Asset records include final bounding boxes, source signals, pairing/boundary confidence, warnings, review flags, and four-state quality outcomes.
+- Four-state quality assessment (`lib/assess.py`): truncation and completeness signals use visible-ink probes instead of raw vector path bounds; `review_required` / `rejected` assets stay out of Markdown.
+- Captionless cross-page table continuation recovery when continuation markers, repeated headers, and horizontal rules agree; fragments failing boundary checks are flagged for review.
+- Caption inventory reconciliation: explicit captions and bare `Figure N` / `Table N` labels are reconciled against exported assets; gaps get recovery crops and are indexed.
+- Safe `--prune-images`: only PNGs that existed before the run, are unchanged, and are unreferenced by the current index are removed.
 - Complete CLI options reference (`references/cli-options.md`).
-- Eight Basic Benchmark PDFs are covered by local Golden change detection; the current regression baseline is 155 passed and 0 skipped (reverified on 2026-08-30).
+- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs), and the current regression baseline is 249 passed, 0 failed, 0 skipped (reverified on 2026-09-23).
 - Multi-round Basic Benchmark visual review is recorded in `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
 - Current extraction flow diagrams are documented in `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.

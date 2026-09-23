@@ -6,15 +6,15 @@ QA-01 Golden Index.json 对比测试
 核心回归集（8 份 PDF，扁平存放于 tests/basic-benchmark/*.pdf）：
 1. 1706.03762v7-attention_is_all_you_need.pdf - 5 Figure + 4 Table
 2. 2509.17765v1-Qwen3-Omni Technical Report.pdf - 3 Figure + 18 Table
-3. k3_tech_report.pdf - caption 索引约 16 Figure + 5 Table（以提取结果为准）
+3. 2607.24653v2-Kimi-K3.pdf - caption 索引约 16 Figure + 5 Table（以提取结果为准）
 4. FunAudio-ASR.pdf - 4 Figure + 8 Table
-5. gemini_v2_5_report.pdf - 15 Figure + 12 Table
+5. gemini_v2_5_report.pdf - 16 Figure + 15 Table fragments (12 IDs)
 6. gpt-5-system-card.pdf - 31 Figure + 26 Table
 7. KearnsNevmyvakaHFTRiskBooks.pdf - 8 Figure + 1 Table
-8. DeepSeek_V4.pdf - 15 Figure + 14 Table
+8. DeepSeek_V41_Tech_Report.pdf - 12 Figure + 5 Table
 
 Golden 的定位：变更检测器，不是正确性基准。基准由当前输出生成，
-会把已知缺陷（如 DeepSeek_V4 Table 6 导出正文）一并冻结；
+会把已知缺陷（如历史版本中的表格截图误含正文）一并冻结；
 后续修好这些缺陷时 golden 必然报红，这是预期行为。
 基准更新必须在 task-list.md 逐条说明差异原因。基准位于已忽略的
 tests/results/ 中，仅作本地变更检测，不纳入版本控制。
@@ -118,20 +118,20 @@ def _current_code_fingerprint() -> str:
     return _CURRENT_FINGERPRINT
 
 
-def _write_code_fingerprint(batch_dir: Path) -> None:
-    """提取完成后在批次目录写入代码指纹文件"""
+def _write_code_fingerprint(stem_dir: Path) -> None:
+    """提取完成后在该 PDF 的产物目录（<batch>/<stem>/）写入代码指纹文件"""
     payload = {
         "skills_scripts_sha256": _current_code_fingerprint(),
         "generated_at": datetime.now().isoformat(),
     }
-    batch_dir.mkdir(parents=True, exist_ok=True)
-    with open(batch_dir / FINGERPRINT_FILENAME, "w", encoding="utf-8") as f:
+    stem_dir.mkdir(parents=True, exist_ok=True)
+    with open(stem_dir / FINGERPRINT_FILENAME, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
-def _read_code_fingerprint(batch_dir: Path) -> Optional[str]:
-    """读取批次目录的代码指纹；文件缺失或损坏返回 None"""
-    fp_path = batch_dir / FINGERPRINT_FILENAME
+def _read_code_fingerprint(stem_dir: Path) -> Optional[str]:
+    """读取该 PDF 产物目录的代码指纹；文件缺失或损坏返回 None"""
+    fp_path = stem_dir / FINGERPRINT_FILENAME
     if not fp_path.exists():
         return None
     try:
@@ -175,8 +175,8 @@ def _find_existing_index(stem: str) -> Optional[Tuple[Path, Path]]:
 
     复用条件（防止「改了 skills/ 却比对旧产物」的假绿）：
     - 环境变量 PDF_GOLDEN_REEXTRACT=1 时不复用任何批次（强制重新提取）；
-    - 批次目录必须带 _code_fingerprint.json，且指纹与当前 skills 代码一致；
-      指纹缺失或不符的批次直接跳过。
+    - 该 PDF 的产物目录必须带 _code_fingerprint.json，且指纹与当前 skills 代码
+      一致；指纹缺失或不符的产物直接跳过。
 
     按批次从新到旧检查，找到则返回 (images_dir, index_path)，否则返回 None。
     """
@@ -191,10 +191,10 @@ def _find_existing_index(stem: str) -> Optional[Tuple[Path, Path]]:
         index_path = entry / stem / "images" / "index.json"
         if index_path.exists():
             candidates.append((entry.name, index_path))
-    # 从新到旧逐一校验指纹
+    # 从新到旧逐一校验指纹（指纹按 PDF 目录记录，见 _write_code_fingerprint）
     for _, index_path in sorted(candidates, reverse=True):
-        batch_dir = index_path.parent.parent  # <batch>/<stem>/images/index.json -> <batch>
-        fingerprint = _read_code_fingerprint(batch_dir)
+        stem_dir = index_path.parent.parent  # <batch>/<stem>/images/index.json -> <batch>/<stem>
+        fingerprint = _read_code_fingerprint(stem_dir)
         if fingerprint is None or fingerprint != _current_code_fingerprint():
             continue
         return index_path.parent, index_path
@@ -260,7 +260,7 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        pdf_file="k3_tech_report.pdf",
+        pdf_file="2607.24653v2-Kimi-K3.pdf",
         # 数量/ID 以首次 --update-golden 冻结的提取结果为准；占位先按 caption 索引上界
         expected_figures=16,
         expected_tables=5,
@@ -280,12 +280,10 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
     ),
     GoldenSpec(
         pdf_file="gemini_v2_5_report.pdf",
-        expected_figures=15,
-        expected_tables=12,
+        expected_figures=16,
+        expected_tables=15,  # Table 11 跨4页，12个ID共15个表格片段
         expected_ids={
-            # 当前提取结果缺 Figure 9（变更检测器如实冻结现状）
-            "figures": {"1", "2", "3", "4", "5", "6", "7", "8",
-                        "10", "11", "12", "13", "14", "15", "16"},
+            "figures": {str(i) for i in range(1,17)},
             "tables": {str(i) for i in range(1, 13)},
         }
     ),
@@ -308,12 +306,12 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
         }
     ),
     GoldenSpec(
-        pdf_file="DeepSeek_V4.pdf",
-        expected_figures=15,
-        expected_tables=14,
+        pdf_file="DeepSeek_V41_Tech_Report.pdf",
+        expected_figures=12,
+        expected_tables=5,
         expected_ids={
-            "figures": {str(i) for i in range(1, 16)},
-            "tables": {str(i) for i in range(1, 15)},
+            "figures": {str(i) for i in range(1, 13)},
+            "tables": {str(i) for i in range(1, 6)},
         }
     ),
 ]
@@ -327,7 +325,8 @@ CORE_REGRESSION_SET: List[GoldenSpec] = [
 class ItemSignature:
     """图表条目签名（用于对比）。
 
-    身份键为 (type, id, page, continued)，hash/eq 只用这四项；
+    身份键为 (type, id, page, continued, occurrence)，hash/eq 只用这五项；
+    occurrence 是同一四元组在 items 中的出现序号，用于区分重复条目。
     final_bbox / file_size / file_sha256 是比对负载，不参与 hash/eq：
     bbox 用 ≤0.5pt 容差逐元素比较（容差比较无法放进 __eq__），
     文件尺寸与 sha256 严格相等。
@@ -339,10 +338,11 @@ class ItemSignature:
     final_bbox: Optional[List[float]] = None   # [x0, y0, x1, y1]（PDF 点）
     file_size: Optional[int] = None            # 输出 PNG 字节尺寸
     file_sha256: Optional[str] = None          # 输出 PNG sha256
+    occurrence: int = 0                        # 同身份四元组内的出现序号
 
-    def identity(self) -> Tuple[str, str, int, bool]:
+    def identity(self) -> Tuple[str, str, int, bool, int]:
         """身份键（集合比对与负载配对都用它）"""
-        return (self.type, self.id, self.page, self.continued)
+        return (self.type, self.id, self.page, self.continued, self.occurrence)
 
     def __hash__(self):
         return hash(self.identity())
@@ -409,7 +409,8 @@ def extract_item_signatures(
             from_golden=True 时忽略（golden 不存 PNG，尺寸/哈希取自基准记录字段）
         from_golden: 是否解析 golden 基准（尺寸/哈希读 golden_file_* 字段）
     """
-    signatures: Dict[Tuple[str, str, int, bool], ItemSignature] = {}
+    signatures: Dict[Tuple[str, str, int, bool, int], ItemSignature] = {}
+    seen: Dict[Tuple[str, str, int, bool], int] = {}
 
     items = index_data.get("items", [])
     for item in items:
@@ -420,6 +421,11 @@ def extract_item_signatures(
             continued=item.get("continued", False),
             final_bbox=item.get("final_bbox"),
         )
+        # 同 (type,id,page,continued) 可能出现多条（如同页多次续表）；
+        # 不编号会让后出现的那条静默覆盖前一条，数量变化检测不出来。
+        base = (sig.type, sig.id, sig.page, sig.continued)
+        sig.occurrence = seen.get(base, 0)
+        seen[base] = sig.occurrence + 1
         if from_golden:
             # golden 基准在 --update-golden 时记录的尺寸/哈希
             sig.file_size = item.get("golden_file_size_bytes")

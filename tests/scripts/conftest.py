@@ -17,6 +17,9 @@ ALLOW_GOLDEN_SKIP_ENV = "PDF_SKILL_ALLOW_GOLDEN_SKIP"
 # collection 阶段被排除的 golden 用例（由 pytest_deselected 回调填充）
 _deselected_golden_items = []
 
+# 运行期被 pytest.skip() 跳过的 golden 用例（由 pytest_runtest_logreport 填充）
+_skipped_golden_nodeids = []
+
 
 def pytest_configure(config):
     config.addinivalue_line(
@@ -33,20 +36,33 @@ def pytest_deselected(items):
             _deselected_golden_items.append(item)
 
 
+def pytest_runtest_logreport(report):
+    """记录运行期被 pytest.skip() 跳过的 golden 用例。
+
+    pytest_deselected 只覆盖 collection 阶段的 -m / -k 排除，
+    用例体内或 fixture 里调用 skip 不会经过它。
+    """
+    if report.skipped and "golden" in getattr(report, "keywords", {}):
+        if report.nodeid not in _skipped_golden_nodeids:
+            _skipped_golden_nodeids.append(report.nodeid)
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_sessionfinish(session, exitstatus):
-    """golden 用例被排除时强制会话变红（AGENTS §8：被跳过一律判失败）。
+    """golden 用例被排除或跳过时强制会话变红（AGENTS §8：被跳过一律判失败）。
 
     - 未设豁免环境变量：打印失败原因并将退出码置为非 0；
     - 设了 PDF_SKILL_ALLOW_GOLDEN_SKIP=1：允许排除，但打印醒目 warning。
     """
-    if not _deselected_golden_items:
+    skipped_ids = [item.nodeid for item in _deselected_golden_items]
+    skipped_ids += [n for n in _skipped_golden_nodeids if n not in skipped_ids]
+    if not skipped_ids:
         return
-    count = len(_deselected_golden_items)
+    count = len(skipped_ids)
     if os.environ.get(ALLOW_GOLDEN_SKIP_ENV) == "1":
         print(
             f"\n{'!' * 70}\n"
-            f"WARNING: {count} 个 golden 用例被排除"
+            f"WARNING: {count} 个 golden 用例被排除或跳过"
             f"（{ALLOW_GOLDEN_SKIP_ENV}=1 已允许），本次运行不算全绿\n"
             f"{'!' * 70}",
             file=sys.stderr,
@@ -54,13 +70,13 @@ def pytest_sessionfinish(session, exitstatus):
         return
     print(
         f"\n{'=' * 70}\n"
-        f"FAIL: {count} 个 golden 用例被排除，本次运行不算全绿：",
+        f"FAIL: {count} 个 golden 用例被排除或跳过，本次运行不算全绿：",
         file=sys.stderr,
     )
-    for item in _deselected_golden_items:
-        print(f"  - {item.nodeid}", file=sys.stderr)
+    for nodeid in skipped_ids:
+        print(f"  - {nodeid}", file=sys.stderr)
     print(
-        f"golden 被排除不算全绿；如确需排除，设环境变量 {ALLOW_GOLDEN_SKIP_ENV}=1\n"
+        f"golden 被排除或跳过不算全绿；如确需排除，设环境变量 {ALLOW_GOLDEN_SKIP_ENV}=1\n"
         f"{'=' * 70}",
         file=sys.stderr,
     )

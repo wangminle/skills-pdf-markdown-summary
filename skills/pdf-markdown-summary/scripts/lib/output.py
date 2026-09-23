@@ -36,9 +36,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# CSV 清单输出
-# ============================================================================
+def _relative_output_path(out_path: str, base_dir: str) -> str:
+    if not out_path:
+        return ""
+    return os.path.relpath(os.path.abspath(out_path), base_dir).replace('\\', '/')
 
 def write_manifest(
     records: List["AttachmentRecord"],
@@ -66,7 +67,7 @@ def write_manifest(
         # 统一为 (type, id, page, caption, file, continued)
         w.writerow(["type", "id", "page", "caption", "file", "continued"])
         for r in records:
-            rel = os.path.relpath(os.path.abspath(r.out_path), base_dir).replace('\\', '/')
+            rel = _relative_output_path(r.out_path, base_dir)
             w.writerow([r.kind, r.ident, r.page, r.caption, rel, int(r.continued)])
 
     logger.info(f"Wrote manifest: {manifest_path} (items={len(records)})")
@@ -109,9 +110,28 @@ def load_index_json_items(index_json_path: str) -> List[Dict[str, Any]]:
         return []
 
 
-def prune_unindexed_images(*, out_dir: str, index_json_path: str) -> int:
+def snapshot_prunable_images(out_dir: str) -> Dict[str, Tuple[int, int, int, int]]:
+    """记录运行前图片身份；不清理本轮新增或已被改写的文件。"""
+    result = {}
+    if not os.path.isdir(out_dir):
+        return result
+    for name in os.listdir(out_dir):
+        if not name.endswith(".png") or not name.startswith(("Figure_", "Table_")):
+            continue
+        path = os.path.abspath(os.path.join(out_dir, name))
+        try:
+            st = os.stat(path, follow_symlinks=False)
+            result[path] = (st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+        except OSError:
+            continue
+    return result
+
+
+def prune_unindexed_images(*, out_dir: str, index_json_path: str,
+                           preexisting: Optional[Dict[str, Tuple[int, int, int, int]]] = None) -> int:
     """
-    删除 out_dir 中未被 index.json 引用的 Figure_*/Table_* PNG 文件。
+    只删除运行前已存在、身份未变且未被 index.json 引用的 Figure_*/Table_* PNG。
+    无运行前快照时不执行删除；无效索引也不触发清理。
 
     Args:
         out_dir: 图片输出目录
@@ -120,7 +140,13 @@ def prune_unindexed_images(*, out_dir: str, index_json_path: str) -> int:
     Returns:
         删除的文件数量
     """
+    if not preexisting:
+        return 0
     try:
+        with open(index_json_path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+            return 0
         base_dir = os.path.dirname(os.path.abspath(index_json_path))
         items = load_index_json_items(index_json_path)
         referenced_abs: set[str] = set()
@@ -138,9 +164,12 @@ def prune_unindexed_images(*, out_dir: str, index_json_path: str) -> int:
             if not (name.startswith("Figure_") or name.startswith("Table_")):
                 continue
             abs_path = os.path.abspath(os.path.join(out_dir, name))
-            if abs_path in referenced_abs:
+            if abs_path in referenced_abs or abs_path not in preexisting:
                 continue
             try:
+                st = os.stat(abs_path, follow_symlinks=False)
+                if (st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns) != preexisting[abs_path]:
+                    continue
                 os.remove(abs_path)
                 removed += 1
             except Exception as e:
@@ -195,10 +224,10 @@ _RUN_ID: Optional[str] = None
 
 
 def get_run_id() -> str:
-    """获取当前运行的唯一 ID"""
+    """获取当前运行的唯一 ID（带毫秒，避免同一秒内两次运行互相覆盖产物）"""
     global _RUN_ID
     if _RUN_ID is None:
-        _RUN_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
+        _RUN_ID = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
     return _RUN_ID
 
 
@@ -221,7 +250,8 @@ def write_index_json(
     layout_model: Optional["DocumentLayoutModel"] = None,
     validation: Optional["PDFValidationResult"] = None,
     qc_issues: Optional[List["QualityIssue"]] = None,
-    extractor_version: str = "2.0.0"
+    extractor_version: str = "2.0.0",
+    inventory: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     """
     写入扩展版 index.json，包含元数据便于复现和诊断。
@@ -277,7 +307,7 @@ def write_index_json(
     tables_list: List[Dict[str, Any]] = []
 
     for r in records:
-        rel = os.path.relpath(os.path.abspath(r.out_path), base_dir).replace('\\', '/')
+        rel = _relative_output_path(r.out_path, base_dir)
         entry = {
             "type": r.kind,
             "id": r.ident,
@@ -361,6 +391,8 @@ def write_index_json(
     # 兼容性：保留 items 字段（旧版格式）
     all_items = figures_list + tables_list
     output["items"] = all_items
+    if inventory:
+        output["inventory"] = inventory
 
     with open(index_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)

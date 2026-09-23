@@ -116,6 +116,8 @@ from .caption_detection import (
     get_paragraph_length,
     is_bold_text,
     is_caption_reference,
+    is_explicit_caption_format,
+    is_caption_anchor_candidate,
     is_likely_caption_context,
     is_likely_reference_context,
     merge_caption_lines,
@@ -180,6 +182,13 @@ from .extract_figures import (
 from .extract_tables import (
     TABLE_LINE_RE as EXTRACT_TABLE_LINE_RE,
     extract_tables,
+)
+
+from .assess import (
+    markdown_insertable,
+    assess_extraction,
+    expected_captions_from_index,
+    finalize_caption_inventory,
 )
 
 __all__ = [
@@ -254,6 +263,8 @@ __all__ = [
     "get_paragraph_length",
     "is_bold_text",
     "is_caption_reference",
+    "is_explicit_caption_format",
+    "is_caption_anchor_candidate",
     "is_likely_caption_context",
     "is_likely_reference_context",
     "merge_caption_lines",
@@ -285,4 +296,9 @@ __all__ = [
     "PDFPage",
     "open_pdf",
     "try_extract_tables_with_pdfplumber",
+    # assess
+    "markdown_insertable",
+    "assess_extraction",
+    "expected_captions_from_index",
+    "finalize_caption_inventory",
 ]

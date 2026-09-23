@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.2**.
+Current package version: **0.6.3**.
 
 ## Core Workflow
 
@@ -71,6 +71,7 @@ The asset extractor includes:
 - Baseline limiting by neighboring captions and layout text blocks.
 - Figure refinement for text trimming, object alignment, column-aware X clipping, layout adjustment, autocrop, and figure-title recovery.
 - Table refinement for multiline header recovery, rendered horizontal-rule compensation, table-band detection, width restoration, text-bbox padding, wrapped-tail preservation, and far-side section-heading trimming.
+- Captionless table continuation recovery on adjacent pages when continuation markers, repeated headers, and horizontal rules agree. This runs automatically; `--allow-continued` controls repeated-caption items. Recovered fragments receive boundary checks and may require review.
 - Optional semantic-layout evidence, full-page one-to-one pairing, multi-frame grouping, conservative refinement, and four-state quality reporting.
 - Debug overlays showing `baseline`, `phase_a`, `phase_b`, `phase_d` (post-autocrop), and `final` regions.
 

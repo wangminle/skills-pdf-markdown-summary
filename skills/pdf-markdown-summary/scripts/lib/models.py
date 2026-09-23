@@ -112,13 +112,14 @@ class AttachmentRecord:
         caption_bbox: caption 行边界框 [x0, y0, x1, y1]（PDF 点，None 表示未记录；供 Layout 配对使用）
         content_bboxes: 资产内容框列表（多矩形，当前主链为 [final_bbox] 单元素或空列表）
         source_signals: 证据来源列表（当前主链唯一证据源为 caption，默认 ["caption"]）
-        pairing_confidence: 配对置信度（当前主链无配对置信度概念，占位 None）
-        boundary_confidence: 边界置信度（当前主链无边界置信度概念，占位 None）
-        warnings: 告警信息列表（当前默认为空）
-        review_required: 是否需要人工复核（当前主链默认 False）
-        status: 验收状态，四态之一：
+        pairing_confidence: 配对置信度
+        boundary_confidence: 边界置信度
+        warnings: 告警信息列表
+        review_required: 是否需要人工复核
+        status: 验收状态：
             'accepted' | 'accepted_with_margin' | 'review_required' | 'rejected'
-            （当前主链只导出 accepted；被拒绝/未导出的资产不产生 record）
+            主链会写入真实状态；留白偏多仍为 accepted，标题/正文入框为 rejected。
+            Markdown 只插入 accepted / accepted_with_margin。
     """
     kind: str              # 'figure' | 'table'
     ident: str             # 标识：图/表号（保留原样，如 '1'/'S1'/'III'）
@@ -138,7 +139,7 @@ class AttachmentRecord:
     boundary_confidence: Optional[float] = None                   # 边界置信度（占位，主链暂无此概念）
     warnings: List[str] = field(default_factory=list)             # 告警信息（当前默认为空）
     review_required: bool = False                                 # 是否需人工复核（当前默认 False）
-    status: str = "accepted"                                      # 四态验收状态（当前主链只导出 accepted）
+    status: str = "accepted"                                      # 验收状态；主链按评估结果写入
 
     def num_key(self) -> float:
         """用于排序的数值键：尽量将可解析的数字排在前面。"""
@@ -222,11 +223,20 @@ class CaptionIndex:
         number: str,
         page_num: int,
         min_score: float = 25.0,
+        *,
+        allow_cross_page: bool = False,
     ) -> Optional[CaptionCandidate]:
-        """获取指定编号在指定页面的最佳候选项"""
+        """获取指定编号在指定页面的最佳候选项。
+
+        allow_cross_page 为 True 时，本页无候选才回退到全文最高分候选。
+        默认关闭：跨页候选的 rect 属于别的页面，调用方基于坐标的距离门
+        会失去意义，版面重复时可能把正文引用行误锚为题注。
+        """
         candidates = self.get_candidates(kind, number)
         on_page = [c for c in candidates if c.page == page_num]
         if not on_page:
+            if not allow_cross_page:
+                return None
             all_sorted = sorted(candidates, key=lambda c: c.score, reverse=True)
             best = all_sorted[0] if all_sorted else None
             if best is None or best.score < min_score:

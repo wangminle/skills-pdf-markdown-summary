@@ -84,8 +84,12 @@ def classify_text_types(
             text_stripped = unit.text.strip()
 
             # 规则1: Caption检测
-            if caption_pattern.match(text_stripped):
-                if 'fig' in text_stripped.lower() or '图' in text_stripped:
+            caption_match = caption_pattern.match(text_stripped)
+            if caption_match:
+                # 只看行首的 label token；用子串判断会让含 "config"、
+                # "significant" 的 Table 题注被错分成 figure
+                label = caption_match.group(1).lower()
+                if label.startswith('fig') or label == '图':
                     unit.text_type = 'caption_figure'
                 else:
                     unit.text_type = 'caption_table'

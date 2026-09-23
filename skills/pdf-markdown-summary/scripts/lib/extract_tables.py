@@ -32,7 +32,15 @@ from .models import AttachmentRecord, CaptionBlock, CaptionIndex, DocumentLayout
 from .idents import TABLE_LINE_RE, build_output_basename, extract_table_ident, stable_debug_number
 from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
-    merge_caption_lines, is_caption_reference,
+    merge_caption_lines, is_caption_reference, is_likely_reference_context,
+)
+from .assess import (
+    AssessmentInput,
+    apply_assessment,
+    assess_extraction,
+    objects_truncated_on_far_side,
+    select_index_candidate,
+    text_crosses_clip_boundary,
 )
 from .acceptance import (
     adaptive_acceptance_thresholds,
@@ -50,14 +58,20 @@ from .clip_limit import (
 )
 from .far_side import detect_far_side_text_evidence, trim_far_side_text_iterative
 from .object_refine import merge_rects, refine_clip_by_objects
-from .pixel_detect import build_text_masks_px, detect_content_bbox_pixels, estimate_ink_ratio
+from .pixel_detect import (
+    build_text_masks_px,
+    detect_content_bbox_pixels,
+    make_ink_probe,
+)
 from .table_refine import (
     expand_clip_to_nearby_table_header,
+    table_remainder_is_open,
     expand_clip_to_rendered_horizontal_rule,
     expand_table_clip_to_text_bounds,
     refine_clip_to_table_band,
     restore_table_clip_width,
     restore_table_tail_after_layout_trim,
+    trim_table_clip_far_side_body,
     trim_table_far_side_section_heading,
 )
 from .text_trim import trim_clip_head_by_text_v2
@@ -241,6 +255,7 @@ def extract_tables(
 
         # 收集该页的文本行和绘图项（用于 Phase A/B）
         text_lines = collect_text_lines(dict_data)
+        page_ink_probe = make_ink_probe(page, text_lines)
         draw_items = collect_draw_items(page)
 
         # 收集图像和矢量对象的边界框（用于 Phase B）
@@ -287,17 +302,22 @@ def extract_tables(
                 # ============================================================
                 # 修复1: 使用 CaptionIndex 过滤正文引用
                 # ============================================================
+                weak_anchor = False
+                caption_score = 100.0
                 if caption_index is not None:
-                    best_on_page = caption_index.get_best_for_page('table', ident, pno, min_score=25.0)
+                    best_on_page, weak_anchor = select_index_candidate(
+                        caption_index, 'table', ident, pno
+                    )
                     if best_on_page is None:
                         if debug_captions:
-                            logger.debug(f"Table {ident} p{pno+1}: skipping low-score caption candidate")
+                            logger.debug(f"Table {ident} p{pno+1}: skipping non-anchor caption candidate")
                         continue
+                    caption_score = float(best_on_page.score)
 
                     line_y0 = ln.get("bbox", [0, 0, 0, 0])[1]
                     line_bbox_x0 = ln.get("bbox", [0, 0, 0, 0])[0]
                     y_dist = abs(line_y0 - best_on_page.rect.y0)
-                    x_dist = abs(line_bbox_x0 - best_on_page.rect.x0) if line_bbox_x0 and best_on_page.rect.x0 else 0
+                    x_dist = abs(line_bbox_x0 - best_on_page.rect.x0)
                     if y_dist > 30 or x_dist > 50:
                         if debug_captions:
                             logger.debug(f"Table {ident} p{pno+1}: skipping non-best caption candidate (dist={y_dist:.0f}pt)")
@@ -339,6 +359,21 @@ def extract_tables(
                 # ============================================================
                 # 修复3: 方向判定 - 局部优先，全局锚点 tie-break
                 # ============================================================
+                neighbor_caption_rects = []
+                if caption_index is not None:
+                    for key, cands in caption_index.candidates.items():
+                        if not key.startswith("table_"):
+                            continue
+                        for cand in cands:
+                            if cand.page != pno or cand.score < 25.0:
+                                continue
+                            if (
+                                abs(cand.rect.y0 - caption_bbox.y0) < 2.0
+                                and abs(cand.rect.x0 - caption_bbox.x0) < 2.0
+                            ):
+                                continue
+                            neighbor_caption_rects.append(cand.rect)
+
                 local_evidence = score_local_direction(
                     caption_bbox, page_rect,
                     image_rects, vector_rects,
@@ -347,6 +382,7 @@ def extract_tables(
                     caption_gap=table_caption_gap,
                     is_table=True,
                     text_lines=text_lines,
+                    neighbor_caption_rects=neighbor_caption_rects,
                 )
 
                 direction = determine_direction(
@@ -370,25 +406,17 @@ def extract_tables(
                 if direction == 'below':
                     y_top = caption_bbox.y1 + table_caption_gap
                     y_bottom = min(page_rect.y1, y_top + table_clip_height)
+                    search_bottom = page_rect.y1
+                    search_top = y_top
                 else:
                     y_bottom = caption_bbox.y0 - table_caption_gap
                     y_top = max(page_rect.y0, y_bottom - table_clip_height)
+                    search_top = page_rect.y0
+                    search_bottom = y_bottom
 
                 base_clip = create_rect(x_left, y_top, x_right, y_bottom)
-                if caption_index is not None:
-                    neighbor_caption_rects = []
-                    for key, cands in caption_index.candidates.items():
-                        if not key.startswith("table_"):
-                            continue
-                        for cand in cands:
-                            if cand.page != pno or cand.score < 25.0:
-                                continue
-                            if (
-                                abs(cand.rect.y0 - caption_bbox.y0) < 2.0
-                                and abs(cand.rect.x0 - caption_bbox.x0) < 2.0
-                            ):
-                                continue
-                            neighbor_caption_rects.append(cand.rect)
+                table_search_clip = create_rect(x_left, search_top, x_right, search_bottom)
+                if neighbor_caption_rects:
                     base_clip = limit_clip_by_neighbor_captions(
                         base_clip,
                         caption_bbox,
@@ -396,12 +424,20 @@ def extract_tables(
                         neighbor_caption_rects,
                         gap=table_caption_gap,
                     )
+                    table_search_clip = limit_clip_by_neighbor_captions(
+                        table_search_clip,
+                        caption_bbox,
+                        direction,
+                        neighbor_caption_rects,
+                        gap=table_caption_gap,
+                    )
 
+                table_assessment_clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
                 table_text_reference_clip = create_rect(
-                    base_clip.x0,
-                    base_clip.y0,
-                    base_clip.x1,
-                    base_clip.y1,
+                    table_search_clip.x0,
+                    table_search_clip.y0,
+                    table_search_clip.x1,
+                    table_search_clip.y1,
                 )
                 refine_enabled = ident not in no_refine_set
 
@@ -440,6 +476,8 @@ def extract_tables(
                         direction,
                     )
 
+                polluted = False
+                table_band_open = False
                 if not refine_enabled:
                     final_clip = create_rect(
                         base_clip.x0,
@@ -554,7 +592,7 @@ def extract_tables(
 
                     table_band_changed = False
                     table_band_clip, table_band_changed = refine_clip_to_table_band(
-                        base_clip,
+                        table_search_clip,
                         caption_bbox,
                         text_lines,
                         direction,
@@ -665,6 +703,24 @@ def extract_tables(
                         direction,
                         layout_text_blocks=layout_model.text_blocks.get(pno, []) if layout_model is not None else None,
                     )
+                    final_clip = trim_table_clip_far_side_body(
+                        final_clip,
+                        caption_bbox,
+                        text_lines,
+                        direction,
+                    )
+                    final_clip = expand_clip_to_nearby_table_header(
+                        create_rect(
+                            final_clip.x0,
+                            min(final_clip.y0, caption_bbox.y0),
+                            final_clip.x1,
+                            final_clip.y1,
+                        ),
+                        final_clip,
+                        text_lines,
+                        caption_bbox,
+                        direction,
+                    )
 
                     if layout_model is not None:
                         final_clip = trim_table_far_side_section_heading(
@@ -749,7 +805,7 @@ def extract_tables(
 
                     if accepted:
                         if polluted and not table_like_refined:
-                            logger.info(f"Table {ident}: rejected polluted clip ({pollution_reason})")
+                            logger.info(f"Table {ident}: polluted clip kept for review ({pollution_reason})")
                             log_event(
                                 "refine_rejected",
                                 pdf=pdf_name,
@@ -761,7 +817,6 @@ def extract_tables(
                                 reason=pollution_reason,
                             )
                             save_current_debug(rejected_reason=pollution_reason)
-                            continue
 
                     if not accepted:
                         if table_like_refined and not hard_reject:
@@ -829,7 +884,7 @@ def extract_tables(
 
                             polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
                             if polluted and not looks_like_table_text(final_clip, text_lines):
-                                logger.info(f"Table {ident}: rejected fallback clip ({pollution_reason})")
+                                logger.info(f"Table {ident}: polluted fallback clip kept for review ({pollution_reason})")
                                 log_event(
                                     "refine_rejected",
                                     pdf=pdf_name,
@@ -841,7 +896,6 @@ def extract_tables(
                                     reason=pollution_reason,
                                 )
                                 save_current_debug(rejected_reason=pollution_reason)
-                                continue
 
                 # ================================================================
                 # Debug 可视化（如果启用）
@@ -868,23 +922,72 @@ def extract_tables(
                         float(caption_bbox.x1),
                         float(caption_bbox.y1),
                     ]
-                    records.append(AttachmentRecord(
-                        kind='table',
-                        ident=ident,
-                        page=pno + 1,
-                        caption=full_caption_text,
-                        out_path=out_path,
-                        continued=is_continued,
-                        debug_artifacts=debug_artifacts,
-                        final_bbox=final_bbox,
-                        caption_bbox=caption_bbox_list,
-                        content_bboxes=[list(final_bbox)],
+                    table_band_open = table_remainder_is_open(
+                        final_clip, table_assessment_clip, text_lines, direction
+                    )
+
+                    # 自评信号：最终框是否仍留着远侧正文段落 / 是否把表头切在框外。
+                    # 两个探测只读不改几何，复用与精修同一套判据。
+                    far_side_body = trim_table_clip_far_side_body(
+                        final_clip, caption_bbox, text_lines, direction
+                    ) != final_clip
+                    header_clipped = expand_clip_to_nearby_table_header(
+                        table_search_clip, final_clip, text_lines, caption_bbox, direction
+                    ).y0 < final_clip.y0 - 0.5
+
+                    records.append(apply_assessment(
+                        AttachmentRecord(
+                            kind='table',
+                            ident=ident,
+                            page=pno + 1,
+                            caption=full_caption_text,
+                            out_path=out_path,
+                            continued=is_continued,
+                            debug_artifacts=debug_artifacts,
+                            final_bbox=final_bbox,
+                            caption_bbox=caption_bbox_list,
+                            content_bboxes=[list(final_bbox)],
+                        ),
+                        assess_extraction(
+                            AssessmentInput(
+                                kind="table",
+                                ident=ident,
+                                caption=full_caption_text,
+                                caption_score=caption_score,
+                                is_body_citation=is_likely_reference_context(full_caption_text),
+                                text_pollution=polluted and not looks_like_table_text(final_clip, text_lines),
+                                table_band_open=table_band_open,
+                                object_truncation=objects_truncated_on_far_side(
+                                    final_bbox,
+                                    [table_search_clip.x0, table_search_clip.y0, table_search_clip.x1, table_search_clip.y1],
+                                    [
+                                        [rect.x0, rect.y0, rect.x1, rect.y1]
+                                        for rect in (image_rects + vector_rects)
+                                    ],
+                                    direction,
+                                    ink_probe=page_ink_probe,
+                                ) or text_crosses_clip_boundary(
+                                    final_bbox,
+                                    [list(rect) for rect, _fs, text in text_lines if text.strip()],
+                                    min_inside_height_ratio=0.5,
+                                ),
+                                header_clipped=header_clipped,
+                                far_side_body=far_side_body,
+                                weak_anchor=weak_anchor,
+                            )
+                        ),
                     ))
 
                     logger.info(f"Extracted Table {ident} from page {pno + 1}: {out_path}")
                 except Exception as e:
+                    # 渲染失败时回退计数，否则该编号会被后续页面当成已处理而永久跳过
+                    seen_counts[ident] -= 1
+                    if seen_counts[ident] == 0:
+                        del seen_counts[ident]
                     logger.warning(f"Failed to extract Table {ident}: {e}")
 
+    from .table_continuation import recover_table_continuations
+    recover_table_continuations(doc, records, out_dir, dpi=dpi, debug_visual=debug_visual)
     logger.info(f"Extracted {len(records)} tables from {pdf_name}")
     return records
 

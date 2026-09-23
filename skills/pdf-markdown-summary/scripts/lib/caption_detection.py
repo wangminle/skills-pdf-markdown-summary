@@ -176,6 +176,55 @@ def min_distance_to_rects(rect: Any, rect_list: List[Any]) -> float:
     return min_dist
 
 
+_EXPLICIT_CAPTION_PREFIX_RE = re.compile(
+    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*",
+    re.IGNORECASE,
+)
+_BODY_DISCOURSE_RE = re.compile(
+    r"^(?:also|we|this|the|in|as)\b",
+    re.IGNORECASE,
+)
+_PERIOD_BODY_CITATION_RE = re.compile(
+    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*\.\s*(?:also|we|this|the|in)\b",
+    re.IGNORECASE,
+)
+
+
+def is_explicit_caption_format(text: str) -> bool:
+    """True when the line uses a real caption marker such as ``Table 3 |`` or ``Figure 1:``.
+
+    ``Table 6. Also, we evaluate...`` is a body citation, not a caption, even though it
+    starts with a number and a period.
+    """
+    stripped = (text or "").strip()
+    match = _EXPLICIT_CAPTION_PREFIX_RE.match(stripped)
+    if not match:
+        return False
+    rest = stripped[match.end():]
+    if rest.startswith((":", "：", "|")):
+        return True
+    if rest.startswith("."):
+        after = rest[1:].lstrip()
+        if not after or _BODY_DISCOURSE_RE.match(after):
+            return False
+        return True
+    return False
+
+
+def is_bare_caption_label(text: str) -> bool:
+    """True for standalone labels such as ``Figure 22`` or ``Table 3`` with no following marker."""
+    stripped = (text or "").strip()
+    match = _EXPLICIT_CAPTION_PREFIX_RE.match(stripped)
+    if not match:
+        return False
+    return not stripped[match.end():].strip()
+
+
+def is_caption_anchor_candidate(text: str) -> bool:
+    """True for explicit captions and bare numbered labels that should stay in inventory."""
+    return is_explicit_caption_format(text) or is_bare_caption_label(text)
+
+
 def is_likely_reference_context(text: str) -> bool:
     """
     判断文本是否像正文引用（而非图注描述）。
@@ -186,6 +235,9 @@ def is_likely_reference_context(text: str) -> bool:
     Returns:
         是否像正文引用
     """
+    if is_explicit_caption_format(text):
+        return False
+
     text_lower = text.lower()
 
     reference_patterns = [
@@ -193,8 +245,10 @@ def is_likely_reference_context(text: str) -> bool:
         r'shown in (figure|table)', r'listed in (table)',
         r'^table\s+[A-Z]?\d+\s+appendix\b',
         r'^table\s+[A-Z]?\d+\s*,\s*(?:we|this|the)\b',
+        r'^(?:table|figure|fig\.?)\s+[A-Z]?\d+\s*\.\s*(?:also|we|this|the|in)\b',
         r'如.*所示', r'见.*图', r'参见', r'如.*表.*所示',
-        r'according to', r'based on', r'from (figure|table)',
+        r'according to (figure|table)', r'based on (figure|table)',
+        r'from (figure|table)',
     ]
 
     for pat in reference_patterns:
@@ -214,10 +268,12 @@ def is_likely_caption_context(text: str) -> bool:
     Returns:
         是否像图注描述
     """
+    if is_explicit_caption_format(text):
+        return True
+
     text_lower = text.lower()
 
     caption_patterns = [
-        r'^(figure|table|fig\.|图|表)\s+\d+[:：.]',
         r'shows?', r'illustrates?', r'depicts?', r'displays?',
         r'compares?', r'presents?', r'demonstrates?',
         r'显示', r'展示', r'说明', r'比较', r'给出', r'呈现',
@@ -388,6 +444,9 @@ def score_caption_candidate(
     if ':' in text_prefix or '：' in text_prefix:
         format_score += 5.0
         details['punctuation'] = 'colon'
+    elif '|' in text_prefix:
+        format_score += 5.0
+        details['punctuation'] = 'pipe'
     elif '.' in text_prefix and not text_prefix.endswith('et al.'):
         format_score += 3.0
         details['punctuation'] = 'period'
@@ -438,7 +497,7 @@ def score_caption_candidate(
     # === 4. 上下文特征（10分）===
     context_score = 0.0
 
-    if is_likely_caption_context(candidate.text):
+    if is_explicit_caption_format(candidate.text) or is_likely_caption_context(candidate.text):
         context_score += 10.0
         details['context'] = 'caption'
     elif is_likely_reference_context(candidate.text):
@@ -744,10 +803,12 @@ def is_caption_reference(
         if text_lower.startswith(prefix):
             return True
 
-    # 明确的冒号 caption 可能与前一段正文被 PDF 编码在同一个大文本块中；
+    # 明确的冒号/竖线 caption 可能与前一段正文被 PDF 编码在同一个大文本块中；
     # 其语法本身比块行数更可靠，不能因长块上下文被误判成正文引用。
-    if re.match(r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*(?:[:：]|\|)", text, re.IGNORECASE):
+    if is_explicit_caption_format(text):
         return False
+    if _PERIOD_BODY_CITATION_RE.match(text.strip()):
+        return True
 
     num_lines = len(block.get("lines", []))
     total_text_len = sum(

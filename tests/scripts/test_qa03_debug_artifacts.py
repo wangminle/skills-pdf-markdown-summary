@@ -117,7 +117,10 @@ def test_rejected_table_still_creates_debug_visuals() -> None:
             debug_visual=True,
         )
 
-        assert records == [], "正文污染候选不应被导出"
+        assert len(records) == 1, f"污染候选应落盘为 rejected，实际 {len(records)}"
+        assert records[0].status == "rejected"
+        assert "text_pollution" in records[0].warnings
+        assert records[0].out_path and Path(records[0].out_path).is_file()
         rejected_pngs = list((out_dir / "debug").glob("*rejected*.png"))
         rejected_legends = list((out_dir / "debug").glob("*rejected*.txt"))
         assert len(rejected_pngs) == 1, rejected_pngs

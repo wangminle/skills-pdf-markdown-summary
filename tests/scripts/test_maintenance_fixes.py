@@ -509,7 +509,7 @@ def test_figure_fallback_skips_short_phase_a_and_writes_structured_event() -> No
             if evt["event"] == "refine_fallback_selected"
         ]
         assert len(selected_events) == 1
-        assert selected_events[0]["stage"] == "baseline"
+        assert selected_events[0]["stage"] == "phase_a"
 
         legend_path = out_dir / "debug" / "Figure_1_p1_stages_legend.txt"
         legend = legend_path.read_text(encoding="utf-8")

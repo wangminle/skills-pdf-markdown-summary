@@ -68,7 +68,7 @@
 - 修改 Skill 脚本后，至少验证四个入口脚本的 `--help`：`extract_pdf_assets.py`、`pdf_to_markdown.py`、`process_pdf.py`、`summarize_pdf.py`。
 - 修改 Python 脚本后，至少运行一次 `compileall` 或同等语法检查。
 - 测试数据、测试输出放入 `tests/`，不要写入 `docs/2-ref/`。
-- 完成开发后如需进行实际 PDF 文档测试，优先使用 `tests/basic-benchmark/`（Basic Benchmark）中的 8 份 PDF（扁平存放于 `tests/basic-benchmark/*.pdf`）：1706.03762v7、Qwen3-Omni、k3_tech_report、FunAudio-ASR、gemini_v2_5、gpt-5-system-card、KearnsNevmyvakaHFTRiskBooks、DeepSeek_V4。
+- 完成开发后如需进行实际 PDF 文档测试，优先使用 `tests/basic-benchmark/`（Basic Benchmark）中的 8 份 PDF（扁平存放于 `tests/basic-benchmark/*.pdf`）：1706.03762v7、Qwen3-Omni、2607.24653v2-Kimi-K3、FunAudio-ASR、gemini_v2_5、gpt-5-system-card、KearnsNevmyvakaHFTRiskBooks、DeepSeek_V41_Tech_Report。
 - **`tests/basic-benchmark/` 是只读目录**：只从中读取 PDF，**不要往里面写入任何测试结果、临时文件或调试产物**。测试输出统一写入 `tests/results/<yyyymmdd-xxx>/`。
 - 实际测试输出统一写入 `tests/results/<yyyymmdd-xxx>/`，格式为日期加序号，如 `20260605-001`、`20260605-002`。
 - `tests/results/<yyyymmdd-xxx>/` 下按每个 PDF 名称建立独立结果目录，例如 `tests/results/20260605-001/<pdf-name>/`。

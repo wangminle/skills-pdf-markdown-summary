@@ -39,7 +39,8 @@ from lib.extract_tables import extract_tables
 from lib.figure_contexts import build_figure_contexts
 from lib.layout_model import should_enable_layout_driven
 from lib.models import AttachmentRecord, DocumentLayoutModel, GatheredText
-from lib.output import prune_unindexed_images, write_index_json, write_manifest
+from lib.output import snapshot_prunable_images, prune_unindexed_images, write_index_json, write_manifest
+from lib.assess import finalize_caption_inventory
 from lib.text_extract import gather_structured_text, pre_validate_pdf, try_extract_text
 
 # 日志系统
@@ -132,7 +133,7 @@ Examples:
     # === 方向覆盖（Figure） ===
     p.add_argument("--below", default="", help="Figure ids to crop BELOW captions (e.g. 2,3,S1)")
     p.add_argument("--above", default="", help="Figure ids to crop ABOVE captions (e.g. 1,4)")
-    p.add_argument("--allow-continued", action="store_true", default=False, help="Allow exporting continued items")
+    p.add_argument("--allow-continued", action="store_true", default=False, help="Allow repeated-caption continuation items; structurally matched captionless table pages are recovered automatically")
 
     # === Phase A: text-trim ===
     p.add_argument("--text-trim", action="store_true", default=False, help="Enable text trim")
@@ -276,6 +277,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     run_id = configure_logging(level=args.log_level, log_file=args.log_file, log_jsonl=args.log_jsonl)
 
     os.makedirs(out_dir, exist_ok=True)
+    preexisting_images = snapshot_prunable_images(out_dir)
     os.makedirs(text_dir, exist_ok=True)
 
     validation = pre_validate_pdf(pdf_path)
@@ -536,6 +538,17 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
             except Exception as e:
                 logger.warning("A3 refinement failed: %s", e)
 
+    inventory = {}
+    try:
+        inventory = finalize_caption_inventory(
+            records,
+            pdf_path,
+            out_dir,
+            dpi=args.dpi,
+        )
+    except Exception as e:
+        logger.warning("Caption inventory finalize failed: %s", e)
+
     write_manifest(records, manifest_path)
     write_index_json(
         records,
@@ -546,10 +559,11 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
         log_jsonl=args.log_jsonl,
         layout_model=layout_model,
         validation=validation,
+        inventory=inventory,
     )
 
     if args.prune_images:
-        pruned = prune_unindexed_images(out_dir=out_dir, index_json_path=index_json)
+        pruned = prune_unindexed_images(out_dir=out_dir, index_json_path=index_json, preexisting=preexisting_images)
         if pruned:
             logger.info(f"Pruned {pruned} unindexed images")
 

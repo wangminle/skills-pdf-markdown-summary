@@ -87,6 +87,12 @@
 | BUG-074 | 修复 | Important: `--images off --tables screenshot` 仍导出并插入 Figure | 2026-08-30 12:59 | 2026-08-30 13:06 | 已修复 | 编排层仅支持 `--no-tables`，提取器无禁用 Figure 旗标且不过滤 figure items。修复：提取层新增 `--include-figures`/`--no-figures`；编排层 images=off 时传 `--no-figures` 并按 mode 过滤 items。新增 `test_extract_parser_accepts_no_figures`、`test_images_off_tables_on_does_not_insert_figures`；提取层新增 --include-figures/--no-figures，高层编排传递 --no-figures 并二次过滤 items；混合模式回归已通过。 |
 | BUG-075 | 修复 | Important: 资产提取失败时报告顶层 `status` 仍为 ready | 2026-08-30 12:59 | 2026-08-30 13:06 | 已修复 | CLI 已传播非零退出码且 `assets.exit_code` 可用，但顶层 status 无条件写 ready。修复：提取启用且 exit_code 非 0 时 `status=failed`；`test_asset_extraction_failure_propagates_exit_code` 补断言；报告顶层 status 现根据 assets.exit_code 写 ready/failed，非零退出码仍向上游传播；回归已通过。 |
 | BUG-076 | 修复 | Important: `run_all.py` 将测试文件缺失或 pytest 零收集当作 skip 并可返回 0 | 2026-08-30 12:59 | 2026-08-30 13:06 | 已修复 | 清单内套件路径错误或零收集时统一入口可假绿。修复：除用户显式授权的排除模式外，缺失/零收集一律失败；新增 `test_run_all.py` 并纳入套件清单（9→10）；清单内脚本缺失与 pytest exit 5 现均判失败；新增 test_run_all.py 4 项防假绿回归并纳入统一入口。 |
+| BUG-077 | 修复 | visual-review：题注筛选误收正文引用、误拒真实长题注 | 2026-09-07 16:17 | 2026-09-07 17:30 | 已修复 | DeepSeek `Table 6. Also, we evaluate…` 被当题注；Gemini Figure 9 因 `based on` 被 -20 参考扣分（19<25）未导出。新增 `is_explicit_caption_format()`：`Table N \|` / `Figure N:` 为真题注；`based on` 收窄为 `based on (figure\|table)`；句号后 Also/We/This 视为正文引用。真实 PDF：Gemini Figure 9 评分 68≥25，DeepSeek p37 引用被拒、p38 真表 64 分。 |
+| BUG-078 | 修复 | visual-review：堆叠表把题注上方前一张表当成当前表 | 2026-09-07 16:17 | 2026-09-07 17:30 | 已修复 | DeepSeek Table 3/10/11 题注在真实表上方，局部方向却判 above。`score_local_direction()` 识别「上一题注向下附着」后，两题注之间的内容全部归上一张表；章节标题不再干扰附着；一侧无结构化行时不再落入 object-ratio。真实页：p29 Table 3、p55 Table 10/11 均判 below。 |
+| BUG-079 | 修复 | visual-review：精裁因 height_ratio 回退 baseline，题注上方残留摘要/小节/列表 | 2026-09-07 16:17 | 2026-09-07 17:45 | 已修复 | FunAudio Figure 1 phase_d 因 0.364<0.450 被拒回含摘要的 baseline。Figure 路径恢复 `allow_low_ratio_keep`，fallback 高度门槛改为 `max(80, base*min(0.20, height_ratio))`。新增 `_trim_lingering_body_before_objects()`：在绘图对象带之外继续裁掉摘要尾句、拆分的 `4.1` 小节标题和项目列表；Phase D 对象扩边后再次调用，避免摘要小矢量把 y0 扩回去。004：FunAudio F1 `y0=436.5`，F3 `y0=191.5`，gpt-5 F22/F29 `y0=139.7/343.5`，K3 F1 `y0=405.5`。 |
+| BUG-080 | 修复 | visual-review：左右独立图合并、多子图文本裁切丢掉上排 | 2026-09-07 16:17 | 2026-09-07 17:30 | 已修复 | DeepSeek Figure 11/12 同页左右独立编号却导出同一全宽框。`limit_clip_by_neighbor_captions()` 对 y 重叠的左右 caption 在中点拆 X。K3 Figure 13 的 phase_a 把上边界从 260 收到 447，丢掉上排绘图区；`trim_clip_head_by_text_v2` 增加 `object_rects` 保护远侧绘图带。004：Fig11 `[67.2,240.5,292.5,381.7]`，Fig12 `[302.9,240.5,528.9,382.5]`；K3 F13 `y0=318.8`。 |
+| BUG-081 | 修复 | visual-review：长表搜索窗不足、表头被脚注重叠裁切 | 2026-09-07 16:17 | 2026-09-07 17:45 | 已修复 | K3 Table 2 / DeepSeek Table 12 初始窗口过短导致行带截断。Table 路径在方向判定前收集邻接 caption，并用 caption 到页边（再按邻接限制）的 `table_search_clip` 做行带搜索。K3 Table 3 合并题注 y1=120 与 Proprietary 表头 y0=118.2 重叠，窗口从 126 起切字；`expand_clip_to_nearby_table_header()` 在 below 方向即使 original 未被收紧也对 clip 上方短表头做 peek，允许轻擦题注的短标签，并在 final 再恢复一次。004：K3 T2 `y1=689.2`，T3 `y0=114.2`（含 Proprietary/Open Weight）；DeepSeek T12 `y1=753.4`。 |
+| BUG-082 | 修复 | visual-review：Figure 摘要小矢量回扩、Table 远端调查正文被扩边吞入 | 2026-09-07 16:17 | 2026-09-07 17:40 | 已修复 | DeepSeek Figure 1 的 phase_d 已到 466，但 `expand_clip_to_nearby_figure_objects` 把摘要文字小矢量当绘图对象把 y0 扩回 433。过滤过小矢量（w<20 或 h<14 或面积<120）并在对象扩边后再裁残留正文。DeepSeek Table 8 被 `expand_table_clip_to_text_bounds` 吃进表后调查段落；新增 `trim_table_clip_far_side_body()`。004：Figure 1 `y0=466.0`，Table 8 `y1=304.8`。 |
 
 ## 调整事项
 
@@ -178,6 +184,8 @@
 | TST-042 | 检查 | 全项目深度审查（4 并行审查 agent）+ BUG-070~072 修复验证 | 2026-08-29 00:00 | 2026-08-29 00:00 | 已完成 | 审查 agent 报告 ~60 条发现，逐条对抗性验证：确认 4 条真实缺陷（BUG-070/071/072 + 过期 docstring），推翻 13+ 条高危误报（含 off-by-one、prune 误删、双写覆盖、指纹位置/覆盖、方向反转、monkeypatch 错位等，均有代码/执行证据）；修复后验证：compileall OK、`pytest tests/ -q` → 147 passed 0 skipped（144 基线 + 3 新回归；skills/ 改动触发指纹变化，golden 按设计自动重提取新批次并与 20260810-001 基准比对通过，确认提取行为零变化）；四入口 `--help` 全过；`--no-*` 六旗标端到端复验全部尊重显式值且无显式传参时 preset 正常生效 |
 | TST-043 | 检查 | 验证 BUG-073~076 与 Golden 顶层说明修复 | 2026-08-30 13:20 | 2026-08-30 13:20 | 已完成 | TDD 先红后绿：针对性 10 通过；`pytest tests/ -q` → 155 passed 0 skipped（147 基线 + 8 新回归）；compileall 通过；四入口 `--help` 通过；`git diff --check` 通过；skills 改动触发 golden 指纹变化并自动重提取，比对通过 |
 | TST-044 | 检查 | 0.6.2 版本与文档审计全量验证 | 2026-08-30 13:00 | 2026-08-30 13:06 | 已完成 | pytest tests/ -q 为 155 passed、0 skipped（含 8 PDF Golden 重提取比较）；run_all.py 为 10 常规套件 + Golden 全 OK，155 通过、0 失败、0 跳过；compileall、四入口 --help、eval selfcheck、23 项针对性回归、CLI 87 旗标文档对照、10 份当前 Markdown 本地链接检查与 git diff --check 均通过。 |
+| TST-045 | 检查 | 验证 visual-review 17+1 项修复（BUG-077~082） | 2026-09-07 16:17 | 2026-09-07 17:45 | 已完成 | 新增 `tests/scripts/test_visual_review_20260907.py`；`pytest tests/scripts/test_visual_review_20260907.py tests/scripts/test_caption_anchor_quality.py` 95 passed；`pytest tests/scripts/ -k "not golden"` 161 passed（golden 排除按规则不算全绿）；compileall 与四入口 `--help` 通过。问题 PDF 重提至 `tests/results/20260907-004/`（benchmark 只读）。002 `run_benchmark.sh` 统计改为 `type` 回退 `kind`。未跑 `--update-golden`。 |
+| TST-046 | 检查 | 验证主链三态验收与题注对账（DEV-016） | 2026-09-07 22:47 | 2026-09-07 23:10 | 已完成 | `test_extraction_status_inventory.py` 13 passed；`compileall` 与四入口 `--help` 通过；`PDF_SKILL_ALLOW_GOLDEN_SKIP=1 pytest tests/scripts -k "not golden"` 175 passed、9 deselected（不算全绿）；Attention/Gemini 冒烟写入 `tests/results/20260907-005/`：Attention 9/9 accepted、inventory expected=exported=9；Gemini Figure 9 p31 accepted，Table 12 `review_required`（object_truncation），inventory 28/28。未更新 Golden。 |
 
 ## 文档维护
 
@@ -261,6 +269,7 @@
 | DEV-013 | 开发 | A4-1：holdout 集搭建 | 2026-08-06 23:30 | - | 进行中 | `tests/holdout/` 目录结构已创建 + README.md（holdout 要求：cross-publisher、扫描件/旋转/跨页/同页多图/无边框表、≥5 份 PDF ≥50 标注、退出条件 alignment≥90%/truncation≤5%/pairing≥85%/excess≤10%）；需人工提供 holdout PDF 并完成 GT 标注后方可执行 A4-3 正式评估 |
 | DEV-014 | 开发 | A4-3：holdout 正式 KPI 评估 | - | - | 待开发 | 依赖 A4-1 holdout 集就绪；在独立 holdout 上按 §2 口径运行 run_eval.py 并与退出条件对比，达标后方可对外宣称数字 |
 | DEV-015 | 调整 | golden 基准目录迁移：8 份 golden_index.json 从 tests/basic-benchmark/<stem>/images/ 移至 tests/results/20260810-001/<stem>/images/（与提取产物同批次）；basic-benchmark 恢复为纯 PDF 只读输入 | 2026-08-10 16:16 | 2026-08-10 16:30 | 已完成 | test_extraction_golden 新增 _find_golden_index（从 results 各批次找最新 golden，不校验指纹）；_resolve_golden_paths 去掉 basic-benchmark golden 逻辑和 benchmark_group 兼容；--update-golden 改写当前批次；.gitignore 加 tests/results/**/golden_index.json 例外；AGENTS.md §3/§8 同步 |
+| DEV-016 | 开发 | 主链三态验收 + 题注对账：留白不降级，污染/漏检落盘 | 2026-09-07 22:47 | 2026-09-07 23:10 | 已完成 | `lib/assess.py` 按布尔信号定级：标题/正文入框或正文引用 → rejected；截断/表带未收束/弱锚点/重复 PNG/对账补裁 → review_required；额外留白仍 accepted。四态字段保留，`accepted_with_margin` 仅 Layout 链使用。显式题注与裸 `Figure N`/`Table N` 纳入 expected；漏检补裁 PNG 进 index，Markdown 只插入 accepted / accepted_with_margin。污染候选不再静默跳过。 |
 
 ## 配置运维
 
@@ -275,9 +284,421 @@
 | --- | --- | --- | --- | --- |
 | 代码 Bug | 76 | 76 | 0 | 100% |
 | 调整事项 | 13 | 12 | 1 | 92.3% |
-| 检查事项 | 19 | 19 | 0 | 100% |
+| 检查事项 | 20 | 20 | 0 | 100% |
 | 测试数据 | 44 | 44 | 0 | 100% |
 | 文档维护 | 58 | 58 | 0 | 100% |
-| 功能开发 | 15 | 13 | 2 | 86.7% |
+| 功能开发 | 16 | 14 | 2 | 87.5% |
 | 配置运维 | 2 | 2 | 0 | 100% |
-| **总计** | 227 | 224 | 3 | 98.7% |
+| **总计** | 229 | 226 | 3 | 98.7% |
+
+## 项目阅读与诊断记录（2026-09-07）
+
+本节为用户要求的项目熟悉、评估与诊断记录，未修复下述问题。上方统计保留原历史口径，不表示本轮发现的问题已解决。正式 Skill 源码未修改；新增隔离复现脚本、合成 PDF、日志和真实论文提取结果均位于 `tests/results/20260907-001/`，未更新 Golden 基准，未修改 benchmark、只读参考目录或历史归档。
+
+### 阅读与检查范围
+
+- 使用 `git status --short`、`git log -5 --oneline`、`rg --files`、`rg -n`、`cat`、`sed`、`wc -l` 阅读仓库规则、README、正式 SKILL/references、四个入口及 core、正文提取、Figure/Table 裁剪、Layout adapter/pairing/refiners/pipeline、质量与输出模型、pytest/Golden、版本化评测器、两份现行架构文档和历史策略冲突记录。
+- 检查实际 Python 依赖：Python 3.13.13、pytest 9.0.3、PyMuPDF 1.28.0、pymupdf4llm 1.28.0、numpy 2.4.4、scipy 1.17.1。AST 统计正式脚本为 52 个 Python 文件、17,759 行；`extract_tables`、`extract_figures` 函数分别为 803、726 行（含注释与空行）。
+- 检查数据现状：benchmark 8 份 PDF；本地 Golden 8 份；holdout 仅 README；8 份 annotations 均声明为自动 bootstrap/provisional GT，尚非正式人工真值，且仍含 DeepSeek_V3_2、未含当前 benchmark 的 k3_tech_report。
+
+### 验证命令与结果
+
+| 命令或操作 | 结果与边界 |
+| --- | --- |
+| `python3 -m pytest tests/scripts/ -q -p no:cacheprovider --basetemp=tests/results/20260907-001/pytest-temp` | 首次由于本轮指定的临时目录父目录未创建，151 passed、4 个 tmp_path setup errors；属于本轮调用准备问题。执行 `mkdir -p tests/results/20260907-001` 后重跑：155 passed、0 skipped、5 条 SWIG 弃用警告，退出码 0。Golden 实际执行比较，但复用了当前代码指纹匹配的既有产物，并非八份 PDF 全部重新提取。 |
+| `python3 tests/results/20260907-001/diagnose.py` | 退出码 0；脚本内通过 subprocess 运行四入口 `--help`，均返回 0；以 `ast.parse` 检查正式脚本、测试与评测器共 72 个 Python 文件，全部通过；运行 `python3 tests/eval/selfcheck.py`，33 项自检通过。全部明细见本批次日志与 `diagnosis.json`。 |
+| `diagnose.py` 的合成 PDF 复现 | 跨栏标题顺序错误、纯图片 OCR force 空输出仍 ready、同目录两 PDF 默认提取删除前一份图片均复现。删除仅发生在本轮专门生成的 Alpha/Beta 合成样本目录内，未涉及既有用户产物。 |
+| `normalize_prediction` + `evaluate_document` 隔离复现 | 候选框完整、实际 final_bbox 仅半幅且图片路径不存在时，仍报告 exported=1、alignment=1、coverage=1、truncation=0；证明实际渲染框与候选证据被混用，且文件存在性未验证。 |
+| `detect_truncation` / `assess_quality` / `detect_text_pollution` 隔离探针（随后补入 diagnose.py） | 100×100pt 候选/对象被裁掉 5pt，返回未截断且 accepted、confidence=0.9；两行宽长正文返回无污染。说明在线检测阈值不等同于方案的元素完整包含、正文超过一行即失败。补入脚本后 `ast.parse` 通过。 |
+| `PDF_SUMMARY_LAYOUT_CACHE_DIR=tests/results/20260907-001/layout-cache python3 skills/pdf-markdown-summary/scripts/extract_pdf_assets.py --pdf tests/basic-benchmark/1706.03762v7-attention_is_all_you_need.pdf --out-dir tests/results/20260907-001/attention-off/images --out-text tests/results/20260907-001/attention-off/txt/attention.txt --preset robust --layout-backend off` | 全新提取，退出码 0；5 Figure + 4 Table，9 张 PNG 均存在，全部默认 accepted，pairing_confidence 均为空。stdout/stderr 写入 `attention-off.log`。 |
+| 同上命令将 `attention-off` 替换为 `attention-pymupdf4llm`、`--layout-backend off` 替换为 `--layout-backend pymupdf4llm` | 全新提取与独立缓存，退出码 0；5 Figure + 4 Table；Layout 提取 15 页/167 区域，9 配对、2 孤立内容框；A3 匹配 7、应用 6、保留旧框 1；输出状态 accepted=6、accepted_with_margin=2、review_required=1。9 张 PNG 均存在。日志为 `attention-pymupdf4llm.log`。 |
+| 两种路径 Figure 1 图片目视核对 | Transformer 主体和可见标签均保留；该项仅为局部目视抽查，不代表九张图表或整个 benchmark 正确率验收。 |
+
+### 诊断发现（均未修复）
+
+| 优先级 | 发现 | 证据与影响 |
+| --- | --- | --- |
+| P1 | 同目录默认输出缺少文档隔离 | `core/extract_pdf_assets.py` 默认共享 images/index.json，`lib/output.py:112` 清理全部未被当前索引引用的 Figure_/Table_ PNG。Beta 提取后 Alpha 图片消失，已有 Markdown 链接可能失效。 |
+| P1 | 正式评测混用候选框和截图框，未验证图片文件 | `tests/eval/keys.py:152` 优先 content_bboxes；多 panel 模式中该字段保存原候选，而实际 PNG 由 final_bbox 渲染。has_bbox 仅检查列表非空，不能代表图片已导出。 |
+| P1 | 四态输出尚未成为全流程统一验收 | `AttachmentRecord.status` 默认 accepted；Layout 默认 off；无匹配和异常路径仍保留默认状态，未导出资产不生成失败记录。Layout 候选补全与过滤主要停留在报告，精修仍以旧 records 为集合。 |
+| P1 | 文档退出结论与指标及检测能力不一致 | 实施方案 A3 表列截断率 7.19%、过量混正文率 10.71%，随后却勾选两项为 0。在线截断/污染阈值并非 §2 的人工元素级判据；检测未报错不能作为真实零缺陷证据。 |
+| P2 | 双栏正文排序破坏跨栏标题顺序 | `text_extract.py:343` 先按栏再按 y 排序，全篇共享双栏判断及首页宽度。最小样本输出左栏四段后才出现页顶跨栏标题。 |
+| P2 | OCR 未实现时顶层仍可能成功 | `core/pdf_to_markdown.py:212` 只按资产提取退出码决定 ready；纯图片 PDF + `--ocr force` 返回 0、ready，正文 Markdown 只有文件名标题，OCR 子状态虽明确 not_implemented，但顶层契约易误导下游。 |
+| P2 | 可复现性与独立验证仍有缺口 | Golden 缓存指纹仅覆盖正式 Python 代码，不覆盖输入 PDF、依赖版本或有效参数；核心依赖无版本约束；人工 GT/holdout 未就绪，暂不能对外据此宣称准确率。 |
+
+建议处理顺序：先修输出隔离与评测对象契约，再补齐统一验收/复核和文档事实对齐，然后用独立人工 GT 约束 Layout 融合；Markdown 阅读顺序和能力声明应独立验收。保留现有 caption、图表精修、debug 和回归积累，避免在未建立可信评测之前扩大调参或全面重写范围。
+
+## Basic Benchmark 全量提取（--debug-visual，2026-09-07）
+
+应用户要求，使用正式 Skill（v0.6.2）最新能力对 Basic Benchmark 8 份 PDF 全量运行资产提取，并启用 visual 诊断标记（`--debug-visual --debug-captions`），结果单独保存于 `tests/results/20260907-002/`。运行脚本为该批次目录内 `run_benchmark.sh`，逐份调用四入口之一 `extract_pdf_assets.py`；`--layout-backend` 保持默认 `off`。
+
+### 命令模板（每份 PDF）
+
+```bash
+python3 skills/pdf-markdown-summary/scripts/extract_pdf_assets.py \
+  --pdf "tests/basic-benchmark/<stem>.pdf" --preset robust \
+  --debug-visual --debug-captions \
+  --out-dir "tests/results/20260907-002/<stem>/images" \
+  --out-text "tests/results/20260907-002/<stem>/txt/<stem>.txt" \
+  --manifest "tests/results/20260907-002/<stem>/assets/manifest.csv" \
+  --index-json "tests/results/20260907-002/<stem>/images/index.json" \
+  --log-file "tests/results/20260907-002/<stem>/assets/extract.log"
+```
+
+### 结果汇总（明细见 `tests/results/20260907-002/run-status.tsv`）
+
+| PDF | 退出码 | Figure | Table | 正式 PNG | Debug 叠加图 | 文本 (字节) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1706.03762v7-attention_is_all_you_need | 0 | 5 | 4 | 9 | 9 | 39,681 |
+| 2509.17765v1-Qwen3-Omni Technical Report | 0 | 3 | 18 | 21 | 21 | 92,561 |
+| DeepSeek_V4 | 0 | 15 | 14 | 29 | 29 | 177,602 |
+| FunAudio-ASR | 0 | 4 | 8 | 12 | 12 | 49,538 |
+| KearnsNevmyvakaHFTRiskBooks | 0 | 8 | 1 | 9 | 9 | 69,017 |
+| gemini_v2_5_report | 0 | 15 | 12 | 27 | 27 | 219,693 |
+| gpt-5-system-card | 0 | 31 | 26 | 57 | 57 | 132,374 |
+| k3_tech_report | 0 | 16 | 5 | 21 | 21 | 190,165 |
+| 合计 | 全部 0 | 97 | 88 | 185 | 185 | 约 1.07 MB |
+
+### 验证与边界
+
+- 8 份 PDF 全部退出码 0；每个资产各生成一张 debug 叠加图（`<stem>/images/debug/`，含 baseline/phase_a/phase_b/phase_d/final 多阶段边界框），批次总量约 89 MB。
+- 图表检出数量与 `tests/results/20260830-001/` 批次完全一致（5/4、3/18、15/14、4/8、8/1、15/12、31/26、16/5），无回归。
+- stderr 逐一检查：无错误与堆栈；gpt-5-system-card、FunAudio-ASR 中 "error" 命中仅为资产文件名本身（Health_error_rates、Word_Error_Rate）。
+- 抽查 `gemini_v2_5_report/images/debug/Figure_6_p22_debug_stages.png`：多阶段多色裁剪框与图注高亮清晰可用。
+- `tests/basic-benchmark/` 保持只读，未写入任何结果或临时文件；批次目录按 `<stem>/{images,txt,assets}` 分层。
+- 本轮未运行 `--update-golden`，Golden 基准未变更；`--debug-captions` 的评分明细在各自 `assets/` 日志中。
+
+## Basic Benchmark visual 产物独立复核（2026-09-07）
+
+用户要求检查 `tests/results/20260907-002/` 的 debug-visual 结果是否正确。本轮只做产物与代码路径复核，未修改正式 Skill、原始 PDF、002 批次和 Golden；独立复核产物放在 `tests/results/20260907-003/`。既有 `task-list.md` 内容与未跟踪 `tests/tests/` 保留。
+
+### 操作、验证命令与结果
+
+| 操作或命令 | 结果与边界 |
+| --- | --- |
+| 读取项目规则、PDF 视觉核对技能、002 的 run-status.tsv/run_benchmark.sh、8 份 index.json、重点日志与 debug legend | 确认本批次默认 layout-backend=off；185 项全部标记 accepted。读操作未改动参考目录。 |
+| `python3 tests/results/20260907-003/audit.py` | 生成 185 项 inventory.json、8 份 integrity.json 记录及 24 张联系表；正式 PNG 全部可解码，索引 PDF 哈希前缀全部匹配，300 DPI 图片尺寸与 final_bbox 误差均不超过 2 像素。 |
+| 查看全部 24 张联系表，按疑点放大 PNG、对照原页、查看重点 debug 图及 legend | 185 张导出完成缩略图初筛；重点原页复核确认 17 张导出有实质问题，另外 Gemini Figure 9 未导出。不是全页人工 GT 验收，未逐一目视全部 debug 图。 |
+| `python3 tests/results/20260907-003/render_pages.py` | 使用 `pdftoppm -f <页> -l <页> -scale-to 1250 -singlefile -png` 独立渲染 21 张候选 PDF 原页至 003/pages，退出码 0。benchmark 保持只读。 |
+| 内联 Python：Pillow 对全部 debug PNG 执行 verify；比较 DeepSeek Figure 11/12 SHA-256 | 185 张 debug PNG 均可解码；Figure 11 与 12 导出文件字节完全相同，原页实际是两个独立编号图。 |
+| `rg` 读取 caption_detection.py、extract_figures.py、debug_visual.py 和相关运行日志 | 确认 Figure 候选筛选使用 25 分门槛；Gemini Figure 9 日志为 19 分、reference 扣 20 分。FunAudio Figure 1 日志明确高度比例过小后回退；K3 Figure 13 的 legend 显示 phase_a 已丢上排子图。首次尝试读取 caption_scoring.py/captions.py 时文件不存在，随后通过 rg --files 找到真实模块 caption_detection.py；未据错误路径形成结论。 |
+| `python3 tests/results/20260907-003/write_review.py` | 生成 visual-review-20260907.md、findings.json、reviewed-inventory.json；问题导出按文档计数：DeepSeek 9、FunAudio 2、GPT-5 2、K3 4。 |
+| 内联 Python：对 003 中 3 个脚本 ast.parse、JSON 解码、报告链接存在性、清单计数检查 | 3 个复核脚本语法通过；JSON 可解析；83 个报告链接均存在；17 条确认缺陷与 185 项清单一致。通过 fitz 核实 8 份 PDF 共 311 页。未运行正式 pytest 或全量重提取，因为本轮没有修改正式脚本。 |
+
+### 结论及未修复问题
+
+- 文件生成与 debug 叠加正常，但截图内容不能判为全对。确认 17 张问题导出：6 张题注错配/正文误识别/相邻图合并，4 张内容截断，7 张混入多行正文；另确认 Gemini Figure 9 这一编号未导出。该数是当前发现下限，不是完整错误率。
+- DeepSeek Table 3/10/11 选中上方相邻表；Table 6 把第 37 页正文当表，真实表在第 38 页；Figure 11/12 重复合并；Table 12 长表截断。
+- K3 Figure 13 丢失上排两幅绘图区，Table 2 缺少后续 Agentic 行和全部 Vision 分组，Table 3 顶部切过表头字形。
+- FunAudio Figure 1 的较好精修框被拒绝并回退，重新包含整段摘要；同文 Figure 3、GPT-5 Figure 22/29 等也混入多行正文。
+- Qwen Table 6/17、DeepSeek Table 14 放大后排除了疑似左缘截断；不计入缺陷。单行页眉及少量邻图题注残留另列为清理项。
+- 附带发现：002/run_benchmark.sh 第 31–32 行按 kind 统计，实际索引字段为 type；直接重跑该脚本会写出 Figure/Table 为 0 的计数。独立统计现有产物仍确认为 97/88。本轮未修改原批次脚本。
+- 报告及逐项证据：`tests/results/20260907-003/visual-review-20260907.md`。检查的是实际产物；后续应先建立这些失败样例的人工验收，再分别修题注配对、内容完整性和回退策略。
+- 收尾执行 `git diff --check` 通过；`git status --short` 仍只显示原有 `task-list.md` 修改和未跟踪 `tests/tests/`，复核结果位于已忽略的 tests/results/。
+
+## visual 缺陷成因与修复保证范围讨论（2026-09-07）
+
+- 用户询问问题属于架构还是参数，以及修复后是否能保证全部正确。本轮只分析，不实施修复。
+- 使用 `sed`/`rg` 核查正式 `extract_figures.py` 的题注过滤与回退链、`extract_tables.py` 的题注过滤、`caption_detection.py` 评分、`text_trim.py` 文本裁切和 `models.py` 默认状态；确认存在参数与决策机制交互，不能归因于单个阈值。
+- 判定边界：当前默认路径的局部启发式决策、以原窗口比例代理完整性、导出默认 accepted 等机制需要加强；不据此否定现有模块划分或断言必须整体重写。17 个已知缺陷修复后仍须验证同批次其他资产、补查漏检并使用独立样本，不能预先保证全部正确。
+- 本轮未修改正式代码、测试数据或结果；未运行测试，代码和日志读取用于解释现有证据。
+
+## visual-review 报告逐项修复（2026-09-07）
+
+按 `tests/results/20260907-003/visual-review-20260907.md` 的 17 张问题图 + Gemini Figure 9 漏检修复正式 Skill，验证产物写入 `tests/results/20260907-004/`。
+
+### 操作、验证命令与结果
+
+| 操作或命令 | 结果与边界 |
+| --- | --- |
+| 修改 `caption_detection.py`、`direction.py`、`clip_limit.py`、`extract_figures.py`、`extract_tables.py`、`text_trim.py`、`table_refine.py`、`figure_post.py` | 对应 BUG-077~082：题注筛选、堆叠表方向、精裁回退、左右拆 X / 多子图保护、长表窗口、表头 peek、远端调查正文、摘要小矢量。 |
+| `python3 -m pytest tests/scripts/test_visual_review_20260907.py tests/scripts/test_caption_anchor_quality.py -q` | 95 passed。 |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts`；四入口 `--help` | 语法检查通过；`extract_pdf_assets.py`、`pdf_to_markdown.py`、`process_pdf.py`、`summarize_pdf.py` 均 exit 0。 |
+| `python3 -m pytest tests/scripts/ -q -k "not golden"` | 161 passed、9 deselected；因未设 `PDF_SKILL_ALLOW_GOLDEN_SKIP` 退出码 1，按规则不算全绿。 |
+| 5 份问题 PDF 提取到 `tests/results/20260907-004/`（`--preset robust --debug-visual --debug-captions`） | 全部 exit 0。Gemini Figure 9 已导出 p31；DeepSeek Table 6 改为 p38 真表；Fig 11/12 左右分离且 bbox 不同；Table 3/10/11 方向 below。 |
+| 核对 004 索引 bbox 与 K3 Table 3 PNG | DeepSeek F1 `y0=466.0`、T8 `y1=304.8`、T12 `y1=753.4`；FunAudio F1 `y0=436.5`；K3 T2 `y1=689.2`、T3 `y0=114.2`（Proprietary/Open Weight 完整）、F13 `y0=318.8`。 |
+
+### 结论
+
+报告中 17 张实质错误与 Gemini Figure 9 漏检均已对因修复，并在 004 批次问题 PDF 上复核 bbox。单行页眉、邻图题注残留等报告未计入 17 项的清理项本轮未改。未更新 Golden。
+
+## 主链三态验收与题注对账（2026-09-07）
+
+按用户口径：截图留白略多可接受，框进标题或正文段落不可接受。schema 仍保留四态字段，主链实际使用三态。
+
+### 操作、验证命令与结果
+
+| 操作或命令 | 结果与边界 |
+| --- | --- |
+| 新增 `lib/assess.py`，接入 `extract_figures` / `extract_tables` / `extract_pdf_assets` / `pdf_to_markdown` | 评估只读几何布尔信号；污染与弱锚点落盘；提取后 `finalize_caption_inventory` 写入 `index.json.inventory`；Markdown 过滤非 insertable 状态。 |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts`；四入口 `--help` | 语法检查通过，四个入口均 exit 0。 |
+| `python3 -m pytest tests/scripts/test_extraction_status_inventory.py tests/scripts/test_pdf_to_markdown_cli.py -q` | 通过（含留白仍 accepted、裸 Figure 22 进 expected、正文引用 unexpected 才 reject、Markdown 只插 accepted / accepted_with_margin）。 |
+| `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/ -q -k "not golden"` | 175 passed、9 deselected；golden 排除不算全绿。 |
+| Attention / Gemini 提取到 `tests/results/20260907-005/` | Attention 9 项全部 accepted，inventory 9/9。Gemini 28 项：Figure 9 p31 accepted；Table 12 `review_required`（object_truncation）；inventory expected=exported=28、missing=0。未更新 Golden。 |
+
+### 结论
+
+主链不再用 `height_ratio` 把留白判失败。能确定身份且框内无标题/正文的资产为 accepted；完整性不确定进 review_required 并仍出 PNG；正文引用或框内段落为 rejected 并仍出 PNG。Markdown 只插入前两态中的 accepted / accepted_with_margin。未跑 8 份 Golden 更新。
+
+## 当前 Basic Benchmark 结构定位审查（2026-09-22）
+
+用户要求仔细检查当前代码是否已通过 PDF 结构定位良好处理 basic 测试集全部 PDF。本轮仅审查与验证，保留所有既有未提交修改，未修改正式 Skill、版本化测试脚本、benchmark PDF、只读参考目录或 Golden。
+
+### 操作、验证命令与结果
+
+| 操作或命令 | 结果与边界 |
+| --- | --- |
+| `git status --short`；读取 AGENTS.md、正式 SKILL.md、task-list.md、提取/验收/Golden/评测器代码及 annotations 来源 | 确认工作区已有修改；当前 benchmark 8份共304页。现有GT为自动bootstrap，未当作人工真值使用。 |
+| 内联Python通过 `git show HEAD:tests/basic-benchmark/<旧文件>` 与当前文件比较 SHA-256/页数/首页文本 | Kimi同为47页但字节不同；DeepSeek从58页V4换成51页V4.1；旧Golden清单未同步新文件名。只读，不恢复/改名输入。 |
+| `python3 tests/results/20260922-001/run_audit.py` | 当前8份PDF全量以 `--preset robust --debug-visual --debug-captions` 重提取，8/8 exit0。输出全部放001批次各PDF的 images/txt/assets/markdown 分层。实际命令及哈希见run-status.json。 |
+| `python3 -m pytest tests/scripts/ -q > tests/results/20260922-001/pytest.log 2>&1` | exit1：175 passed、9 failed、0 skipped。6项旧Golden差异、2项旧PDF路径不存在、1项新输入未纳入覆盖。不是全绿。pytest自动提取产物位于20260922-002，未更新Golden。 |
+| `python3 tests/results/20260922-001/inspect_outputs.py`（分阶段及最终汇总） | 174项：167 accepted、7 review_required；生成summary.json与17张联系表；全部174项完成缩略图初筛。 |
+| 内联Python使用fitz渲染疑点PDF原页，在内存页副本绘制最终bbox后仅保存PNG至001/assets；查看原页与截图 | 至少确认5项实质内容缺陷：Kimi F1右侧图截断、F12图内标题遗漏、F14轴标题/图例截断；Kearns F7图内标题/倍率遗漏；Gemini T11跨p60–63只输出p63。全部仍accepted。非304页全页人工GT验收。 |
+| 独立只读代码审查；`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=skills/pdf-markdown-summary/scripts python3` 调用assess纯函数 | `objects_truncated_on_far_side([0,0,100,60],[0,0,100,100],[[0,0,100,100]],'below')` 返回False；默认AssessmentInput返回accepted/0.85；同key的rejected空路径记录仍使inventory missing为空。明确自评盲点，未修改代码。 |
+| 内联Python校验输入哈希、代码指纹、PNG解码与300DPI/bbox尺寸 | 8份PDF哈希和正式脚本指纹前后不变；174项PNG均可解码、尺寸误差≤3像素；保存integrity.json。仅证明文件一致性，不证明内容正确。 |
+| 生成 `tests/results/20260922-001/structure-review-20260922.md`；追加本台账 | 完整报告包含8份结果、5项原页证据、代码行号、Golden失败分类、验收范围与修复优先级。所有新Markdown带日期后缀。 |
+| 收尾：审查报告本地链接、审查临时Python的AST语法、`git diff --check`、`git status --short` | 结果见本轮收尾验证输出。正式代码未改，未重复执行四入口help/compileall。 |
+
+### 结论
+
+默认 `layout-driven=on` 的文本/几何版式辅助确实存在，独立语义版面后端默认off。当前可确认8份都跑通，但不能判定所有图表准确完整；inventory与提取共用题注识别、续表需要本页题注、完整性自评忽略图内文字/横向截断等盲点均有证据。确认5项为发现下限，不是完整错误率；7项review_required也不等于7项错误。先修内容完整性和人工验收，再逐项审核Golden差异。
+
+## Basic 结构定位缺陷修复（2026-09-22）
+
+用户明确授权按审查问题立即逐项修复。本轮保留既有未提交修改，只对正式实现增量修正；未写入、改名或删除 benchmark 输入，未动 old-version 或 docs/2-ref。计划见 `docs/2-plans/basic结构定位修复计划-20260922.md`。
+
+### 实现与失败复现
+
+- 图形横向收缩纳入图中文字边界，排除页边竖排水印，恢复 Kimi F1 右侧柱图、F14 轴标题及图例。
+- 图内标题恢复允许部分相交文字，使用原始搜索范围，并在正文清理后恢复，修复 Kimi F12、Kearns F7。补上异栏、完整正文句、长正文和 Kimi F13 负例，避免恢复图前段落。
+- 新增 `table_continuation.py`，根据相邻页续页标记、重复表头及横线一致性恢复 Gemini T11 p60–63；支持无题注 debug 图。续表经过文字截断验收，默认保留全部结构匹配片段；四入口帮助与 Skill/CLI 文档说明 `--allow-continued` 仅控制重复题注续项。
+- 完整性验收识别大比例部分对象、横向文字截断；inventory 排除空路径、严格检查文件存在，先过滤正文引用再选择真实题注，单列推断续页及待复核计数。
+- Golden 输入清单同步当前 Kimi/DeepSeek V4.1 文件名、图表数量和 Gemini T11 新增三页；未修改输入 PDF。新增 `test_structure_review_20260922.py` 22 项用例，真实 PDF 断言来自原页人工确认的文字、边界和页码。
+
+### 验证命令与中间结果
+
+测试日志统一在 `tests/results/20260922-003/`；实际图片批次为 004–011，均写 tests/results。调试中显式放行 Golden 排除，不计为全绿。
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/test_structure_review_20260922.py -q`（逐阶段、先失败后修复） | 初始10项失败验证缺陷；随后水印、题注竞争、异栏标题、续页自评、正文恢复均先复现失败。最终22 passed，日志 final-structure.log。 |
+| `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/ -q -k 'not golden and not structure_review_20260922'` | 175 passed，31 deselected；final-unit.log，不算全绿。 |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts tests/scripts` | exit0，compileall.log。 |
+| 四入口 `python3 skills/pdf-markdown-summary/scripts/{extract_pdf_assets,pdf_to_markdown,process_pdf,summarize_pdf}.py --help`（逐个执行） | 4/4 exit0，help.log。 |
+| 独立只读复核 | 发现并修正异栏正文恢复、续页绕过自评；再次复核四个复现均通过，无新增阻断问题。 |
+| `python3 tests/results/20260922-011/run_audit.py` | 最终8份全量robust、debug-visual、debug-captions；具体每份命令/输入哈希/退出码见该批次run-status.json，汇总在最终结果段。 |
+| `python3 tests/results/20260922-003/compare_final.py` | 逐项比较本轮审查输出001与最终输出011、旧本地Golden；生成 assets/changes.json、golden-differences.json、changed-*.jpg，目视核对修改图片。 |
+
+## 全量代码 bug 审查与 benchmark 印证（2026-09-22，第二轮）
+
+用户要求仔细检查当前项目所有代码、以 basic-benchmark 印证是否还有 bug。本轮为只读审查：未修改正式 Skill、测试脚本、benchmark PDF、Golden；工作区另有并行会话正在修复今晨报告的 5 项缺陷，本轮结论以其修改中的工作树为准。
+
+### 操作、验证命令与结果
+
+| 操作或命令 | 结果与边界 |
+| --- | --- |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts` | 通过。 |
+| `Python 3.13 -m pytest tests/scripts/ -q`（系统 python3 无 pytest，须用 `/Library/Frameworks/Python.framework/Versions/3.13/bin/python3`） | exit1：13 failed / 182 passed。9 项 golden（含已删除的 k3_tech_report、DeepSeek_V4 旧规格）+ 4 项 structure-review 红测。注意运行期间工作树被并行会话改动，golden 收集用的是旧文件名规格。 |
+| 复跑 `pytest tests/scripts/test_structure_review_20260922.py -q` | 5 failed / 17 passed：原 4 项红测中 3 项已随并行修复转绿，新增 5 项红测指向未修缺陷（题注引用高分抢占、标题回收跨栏跟随、续表碎片带切字仍 accepted、标题回收吞正文、Kimi F13 正文残留）。 |
+| 6 个并行只读子代理分组精读 scripts/ 全部 40+ 文件、tests/scripts、tests/eval | 产出按严重度分级的 bug 清单；主代理对 P1/P2 逐条读原文核实，纠正了子代理两处错误归因（clip_limit `_is_supported_short_title` 符号方向、quality `detect_truncation` 判据 2 影响面）。 |
+| 读 `tests/results/20260922-009/gemini_v2_5_report/images/index.json` | Gemini Table 11 已导出 p60–p63 四页（p61/62 continued=True），今晨缺陷 1 已被并行修复，端到端印证通过。 |
+| 目视核对 010 批次 Kimi F1/F12/F14、Kearns F7 PNG | F1 右柱图、F12 图内标题、F14 轴标题与图例、Kearns F7 标题与 ×10^4 倍率均已补齐，今晨缺陷 2–5 修复生效；Kimi F14 仍夹带页眉（清理项，未修）。 |
+| 读 tests/annotations 各 gt.json 的 document_id | 均为下划线命名，run_eval 的 GT 键空格归一化缺陷在当前数据下不触发（潜伏）；annotations 仍含 DeepSeek_V3_2/V4、缺 Kimi-K3/DeepSeek_V41，GT 覆盖与 benchmark 改名不同步。 |
+
+### 结论
+
+今晨 5 项内容缺陷均已被并行会话修复并有 benchmark 产物印证；仍确认存在的新 bug 以 text_trim 近端距离公式写反（v1 与 v2 Phase B，Phase B 整段失效）、extract_tables 截断检查仍不含文字对象、markdown_insertable(None) 默认放行、layout_model 'fig' 子串误分类、get_best_for_page 跨页回退违约为代表，另有约 20 项 P3 级潜伏/死代码问题，明细见当轮会话报告。Golden 基准仍是改名前旧基准，6 项差异需人工逐条裁决后再决定是否 --update-golden。
+
+011批次最终目视发现 GPT F9/F13/F18/F22 的标题恢复误带无句号正文尾行，未更新Golden。新增四个真实PDF失败用例，修正为基于前行宽度、字体、行距和左对齐识别连续正文；26项回归与新批次重新验收。
+
+## Basic 结构定位缺陷修复收尾与 Golden 更新（2026-09-22）
+
+继续处理结构审查报告中的 5 项内容缺陷，并收口并行审查发现的正文残留与 Kimi Figure 14 运行页眉问题。benchmark 输入保持只读；测试产物与本地 Golden 均写入 `tests/results/`。
+
+### 最终修复
+
+- Gemini Table 11 已恢复 p60、p61、p62、p63 四个片段，续页均经过文字和对象截断验收。
+- Kimi Figure 1 右侧柱图与分数、Figure 12 图内标题、Figure 14 纵轴标题与右侧图例均已恢复。
+- Kearns Figure 7 图内标题及 `×10^4` 倍率标记已恢复。
+- Kimi Figure 14 的运行页眉文字和 Logo 已移除。根因是 Logo 在真实 PDF 中属于小型 `image_rect`，此前只过滤了微小矢量路径；现改为仅忽略紧邻运行页眉文字的小型图片，正常位图子图不受影响。
+- `tests/scripts/test_structure_review_20260922.py` 增加真实 PDF 的 Kimi Figure 14 页眉边界断言，并将纯函数样例改为真实的图片 Logo 类型。
+
+### Golden 差异审查
+
+先用最终代码重新提取并运行旧 Golden 对比，完整日志为 `tests/results/20260922-037/golden-review.log`；再目视检查 17 个自动标记为 `review_required` 的资产，汇总图为 `tests/results/20260922-037/visual-review-flagged.png`。这些项目的标题、坐标轴、图例、表头与末行均完整，告警来自线条或对象贴近裁框的保守判据。
+
+| PDF | 审查到的 Golden 差异 | 更新理由 |
+| --- | --- | --- |
+| Attention | 6 个 bbox/PNG 变化，身份集合不变 | 5 幅 Figure 去除整页留白、页眉或正文区域并收紧到图形；Table 2 顶边微调 2.1pt。 |
+| Qwen3-Omni | 10 个 bbox/PNG 变化，身份集合不变 | Figure 1/3 去除页边与正文；Table 1 恢复完整横向表宽；Table 4/5/6/8/10/13/17 为表带边界微调。 |
+| Kimi K3 | 新文件身份，旧基准不存在；当前 16 Figure + 5 Table | 输入由 `k3_tech_report.pdf` 更换为 `2607.24653v2-Kimi-K3.pdf`；新基准包含本轮 F1/F12/F14 完整性修复及 F14 页眉清理。 |
+| FunAudio-ASR | 3 个 bbox/PNG 变化，身份集合不变 | Figure 1/3/4 去除摘要、章节标题或页宽空白，保留实际绘图区。 |
+| Gemini 2.5 | 14 个 bbox/PNG 变化；新增 Figure 9；Table 11 改为 p60–63 四片段 | Figure 横向收紧、Table 顶边微调；补回 Figure 9；修复 Table 11 仅导出末页的问题，并正确标记 p61–63 为续页。 |
+| GPT-5 System Card | 10 个 bbox/PNG 变化，身份集合不变 | Figure 1/2/3/6/7/22/29 去除页眉或正文，Figure 9/18/28 为小于 1pt 的边界微调。 |
+| Kearns | 7 个 bbox/PNG 变化，身份集合不变 | 多幅 Figure 去除页边空白并收紧；Figure 7 同时恢复图内标题和倍率标记；Figure 5 为小幅横向补边。 |
+| DeepSeek V4.1 | 新文件身份，旧基准不存在；当前 12 Figure + 5 Table | 输入由 58 页 V4 更换为 51 页 `DeepSeek_V41_Tech_Report.pdf`，不能沿用旧 V4 Golden，按新文档独立建立基准。 |
+
+确认上述差异与修复目标一致后执行 `python3 tests/scripts/test_extraction_golden.py --update-golden -v`，8/8 更新成功；随后不带更新参数反向对比，8/8 通过。更新和复核日志分别为 `tests/results/20260922-037/golden-update.log`、`tests/results/20260922-037/golden-verify.log`。
+
+### 最终验证
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `python3 -m pytest tests/scripts/test_structure_review_20260922.py -q` | 28 passed；5 项原报告缺陷、Gemini 四页续表及 Kimi F14 页眉边界均通过真实 PDF 验收。 |
+| `python3 -m pytest tests/scripts/test_caption_anchor_quality.py -q` | 80 passed。 |
+| 目视查看最新 Kimi Figure 14 PNG | 页眉与 Logo 已移除；纵轴标题、横轴标题、曲线区域及右侧四项图例完整。 |
+| `python3 tests/scripts/test_extraction_golden.py -v` | 更新后 8/8 PDF 通过。 |
+| `python3 -m pytest tests/scripts/test_extraction_golden.py -q` | 9 passed，包含 8 份 PDF 对比及 1 项基准覆盖检查，Golden 未跳过。 |
+| `python3 -m pytest tests/scripts/ -q` | 233 passed、0 failed、0 skipped；5 条为 PyMuPDF SWIG 弃用警告。日志为 `tests/results/20260922-037/pytest-full-final.log`。 |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts tests/scripts` | exit 0。 |
+| 四入口 `python3 skills/pdf-markdown-summary/scripts/{extract_pdf_assets,pdf_to_markdown,process_pdf,summarize_pdf}.py --help`（逐个执行） | 4/4 exit 0。 |
+
+### 结论
+
+审查报告确认的 5 项内容缺陷、后续发现的标题恢复正文残留和 Kimi Figure 14 页眉残留均已修复。当前 Basic Benchmark 为 8 份 PDF、95 个 Figure、82 个 Table/续表片段，共 177 项；Golden 实际执行且完整测试全绿。Golden 仍是本地变更检测器，不替代独立人工 GT。
+
+## 只读审查 P1/P2/P3 缺陷修复（2026-09-22 晚）
+
+承接当轮只读审查报告，逐条修复报告中点名的 P1/P2/P3 问题。执行期间工作树仍被并行会话实时编辑（`figure_post.py` 于 20:04 被改动），本节结论以各步骤当时的工作树为准。
+
+### 代码修复
+
+| 级别 | 位置 | 修复内容 |
+| --- | --- | --- |
+| P1-1 | `lib/text_trim.py` v1 `trim_clip_head_by_text`、v2 Phase B | 近端距离公式两个方向写反已改正为 `near_is_top` 时取 `lb.y0 - caption_rect.y1`、否则取 `caption_rect.y0 - lb.y1`，与 Phase C 镜像一致。 |
+| P1-1 附带 | 同文件 v2 | 公式修正后 Phase B 会把表格行当远端正文裁掉。Phase B 的候选行改由 `skip_adjacent_sweep` 控制（表格路径直接跳过），docstring 同步说明该开关同时作用于 Phase B 与 Phase C。 |
+| P1-1 附带 | 同文件 v2 最小高度兜底 | 原兜底以「题注 ±600pt」重入递归，会返回整页横幅。改为回退到 Phase A 结果，Phase A 亦塌缩时回退原始 clip。 |
+| P1-2 | `lib/extract_tables.py` | 表侧 `object_truncation` 补入 `text_crosses_clip_boundary`，与图侧对齐；传 `min_inside_height_ratio=0.5`，避免仅擦到裁框上下边的邻行误报。 |
+| P1-2 配套 | `lib/assess.py` | `text_crosses_clip_boundary` 新增 `min_inside_height_ratio` 参数，默认 0.0 保持图侧行为不变。 |
+| P2-3 | `lib/assess.py`、`core/pdf_to_markdown.py` | `markdown_insertable` 在缺 status 时不再无条件放行，改为回退判断 `review_required` 与 `warnings`；调用方补传这两个字段。 |
+| P2-4 | `lib/models.py` | `get_best_for_page` 新增 `allow_cross_page`（默认 False），跨页回退改为显式选择加入，默认严格限本页。 |
+| P2-5 | `lib/layout_model.py` | 题注图/表分类改用正则捕获的行首 label token，不再用 `'fig' in text.lower()` 子串匹配。 |
+| P2-6 | `lib/extract_tables.py` | `header_clipped`、`far_side_body` 接入 `AssessmentInput`，分别复用 `expand_clip_to_nearby_table_header` 与 `trim_table_clip_far_side_body` 作为事后探测，不新增探测逻辑。 |
+| P2-7 | `lib/table_refine.py` | `expand_table_clip_to_text_bounds` 改用 `_is_caption_like`，同时排除 Figure 与 Table 题注。 |
+| P2-8 | `lib/pairing.py` | orphan 候选不再硬编码 `page=0`，改为传入真实页码。 |
+| P3 | `lib/direction.py` | 合并行为相同的 `>=0.6` / `>=0.5` 两分支为单一 `>=0.5`，docstring 同步。 |
+| P3 | `lib/clip_limit.py` | `limit_clip_by_neighbor_captions` 新增 `min_width`（默认 40，与原 `min_height` 默认一致），横向拆分验收不再误用高度下限。 |
+| P3 | `lib/acceptance.py` | 删除返回值中不存在的死值 `base_text` 及其三层调整，连同仅供其使用的 `desc`。 |
+| P3 | `lib/extract_figures.py`、`lib/extract_tables.py` | 去掉 `x_dist` 的 falsy 短路（`x0==0.0` 不再被当作缺失）；`seen_counts` 在渲染异常分支回滚，避免该编号被永久跳过。 |
+| P3 | `lib/debug_visual.py` | `draw_rects_on_pix` 改为直接写 `pix.samples_mv`。原实现调用 PyMuPDF 1.28 已移除的 `pix.set_samples`，配合 `dump_page_candidates` 的宽 except 一直在静默失败，同时修掉 alpha 位图只重绑定局部变量的问题。 |
+| P3 | `lib/output.py` | `get_run_id` 增加毫秒精度，避免同秒两跑覆盖 debug 目录。 |
+| P3 | `tests/eval/run_eval.py` | `find_gt_files` 的目录键套用 `_doc_key`，与预测侧归一化一致。 |
+| P3 | `tests/eval/keys.py` | GT 缺 `ident` 或 `caption_page` 时抛显式 `ValueError`，替代 `"None"` 键与 `int(None)` 崩溃。 |
+| P3 | `tests/eval/metrics.py` | `n_extra` 改用 `n_pred_exported`，无框预测不再同时计入漏检与多检。 |
+| P3 | `tests/scripts/test_extraction_golden.py` | `ItemSignature` 身份元组加入按文件序计算的 `occurrence`，重复 `(type,id,page,continued)` 不再静默覆盖；同时修正把 `index_path.parent.parent` 说成批次目录的注释（实为单 PDF 目录）。 |
+| P3 | `tests/scripts/conftest.py` | 新增 `pytest_runtest_logreport`，运行期 `pytest.skip()` 的 golden 用例与收集期排除同等对待，补上「0 跳过」规则的缺口。 |
+
+未修：`pipeline.py:375-388` 无 caption 时的 direction 回退、`pipeline.py:360` 只传 `orient=='O'` 矢量、`clip_limit.py:157-160` above/below 取样不镜像、`quality.py` 判据 2 文档与实现不一致、`output.py` rejected 记录写 `"file": ""`。这五条经复核属存疑或仅文档问题，改动会影响现有语义，保留待定。
+
+### 回归测试
+
+新增 `tests/scripts/test_review_fixes_20260922.py`，21 项用例覆盖上述每一条修复，含 Phase B 对 Figure 生效/对表格跳过的对照、最小高度兜底不返回整页、`min_inside_height_ratio` 的贴边行与真实侧切两种情形、`markdown_insertable` 的三种回退、`get_best_for_page` 跨页开关、题注 label token 分类、orphan 页码、`min_width`、eval 三项、golden 签名去重、alpha 位图画框。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts` | exit 0。 |
+| 四入口 `--help`（`extract_pdf_assets`/`pdf_to_markdown`/`process_pdf`/`summarize_pdf`） | 4/4 exit 0。 |
+| `pytest tests/scripts/test_review_fixes_20260922.py -q` | 21 passed。 |
+| 修复前基线 `tests/results/20260922-020` vs 修复后 `20260922-026`（8 份 benchmark 全量重跑） | bbox 变动 0、新增 0、删除 0、状态变动 0。全部修复对 benchmark 产物零影响。 |
+| P1-1 中途定位（`--debug-visual` 追 Gemini Table 12 分阶段 clip） | 仅修公式会让 Phase A 输出整页横幅 `(x,141.4)~(x,1341.4)`，命中「题注 ±600pt」兜底；据此补上 Phase B 表格保护与兜底重写，之后差异归零。 |
+| `pytest tests/scripts/ -q`（含 golden，当前工作树） | 233 passed、0 failed、0 skipped，golden 实际执行。 |
+
+### 期间发现，未处理
+
+- **工作树被并行会话实时编辑**：`figure_post.py` 于 20:04 改动，修复了 Kimi 运行页眉残留。以该改动为界重跑 benchmark（`20260922-026` vs `20260922-040`）：Kimi 11 幅 Figure 的 `y0` 上移 2.4~44.0pt，其余 7 份 PDF 零差异，状态无变化。本节此前所有「零差异」结论均在该改动之前取得，不受其影响（两侧基线同源）。
+- **`object_truncation` 存在系统性误报**：当前 177 项资产中 17 项（9.6%）被判 `review_required`，告警全部为 `object_truncation`。目视核对 FunAudio F1、Attention F2、GPT-5 F1 三例，裁剪框完整无缺。根因是 `objects_truncated_on_far_side` 用 `get_drawings()` / 图像块的**路径外框**判断，而该外框包含被 clip path 裁掉的部分与位图白边，系统性大于可见墨迹范围；`lost_fraction > 0.02` 且外溢 `> 2.0pt` 的判据过紧。实测触发对象：Attention F2 是位图白边外溢 18.3pt，FunAudio F1 是位图白边外溢 38.8pt，GPT-5 F1 是 10 个被 clip path 裁过的柱形路径。后果是这 17 项按四态契约不进 Markdown。修复方向是在判定前把对象框收敛到可见墨迹范围（`pixel_detect` 已有 `estimate_ink_ratio` / `detect_content_bbox_pixels` 可复用），属并行会话 `assess.py` 截断判定重写的范围，本轮未改。
+
+## 清理冗余备份分支（2026-09-22）
+
+| 操作或命令 | 结果与边界 |
+| --- | --- |
+| `git merge-base --is-ancestor`、`git log main..<branch>`、`git diff` 检查两备份分支 | `codex-main-before-rebase-20260605` 与 `codex-main-before-v021-squash-20260605` 内容完全一致；两者tip与 main 的 `e608fee`（V0.5.1-Build0243-20260605）内容逐字节相同，仅保留 rebase 前的旧提交图谱。 |
+| `git branch -D codex-main-before-rebase-20260605 codex-main-before-v021-squash-20260605` | 已删除。现仅剩本地 `main` 与远端 `origin/main`。内容零丢失；仅 rebase 前旧哈希不可达，将由 git GC 最终回收。 |
+
+## 第二轮复查：修复验证与新代码审查（2026-09-22）
+
+并行会话完成墨迹探测修复与诊断代码撤除后，用户要求再查 bug。本轮只读：compileall 通过；两个只读子代理分别复审墨迹探测新代码（pixel_detect/assess/两 extract/refiners/入口）与上一轮 17 项修复点+评测器改动。
+
+### 操作、验证命令与结果
+
+| 操作或命令 | 结果与边界 |
+| --- | --- |
+| `/Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m pytest tests/scripts/ -q` | **237 passed、0 failed、0 skipped**（196.8s，含 golden），本轮全绿。 |
+| 复查上一轮 P1/P2 修复（grep+子代理精读） | 17 项修复点全部落实：text_trim 距离公式两方向已纠正、表侧截断检查已并入 text_crosses_clip_boundary、markdown_insertable 改 review_required/warnings 兜底、get_best_for_page 加 allow_cross_page=False、layout_model 改行首 token 判断、direction 死阈值删除、table_refine 题注排除正则补齐、clip_limit 新增 min_width、pairing orphan 页码修正、acceptance 死值移除、debug_visual alpha 原地写、output 空路径/run_id 毫秒、eval 三件套（GT 键归一化/int(None)/双重计数）修复且 selfcheck 33 项 PASS、conftest 补运行期 skip 拦截、golden 新文件名+同键 occurrence 编号。 |
+| 子代理合成输入边界验证（空/单元素/NaN/双向 direction/框内外）+ benchmark 实测 ink probe 坐标 | 坐标换算（dpi scale、pix.irect 原点归一）正确，未发现崩溃级问题。 |
+
+### 结论
+
+上一轮确认 bug 已全部修复，测试全绿。新改动仍有 3 项 P2 级遗留：table_continuation.py:117 续表截断判定缺主链同款保护参数（易系统性误报 review_required）；extract_tables.py:405-415+923-932 的 table_search_clip 扩到整页放大 table_band_open 触发面；assess.py:371-379 的 lost_fraction 分支无视 direction 与远侧设计不一致。另有 table_refine.py:961-976 的 max_expand 绕过上轮未修，及 seen_counts 回退残留、estimate_ink_ratio 未用导入、per-record 重建 ink probe 等 P3 项。杂散目录 tests/tests/results/ 与 test_extraction_golden.py:17 陈旧注释待清理。
+
+## 剩余审查问题修复（2026-09-23）
+
+用户授权修复剩余P2/P3及inventory_gap根除保护。保留工作区全部既有修改，未修改benchmark输入、old-version或只读参考目录。
+
+### 修改与取舍
+
+- 续表 `text_crosses_clip_boundary` 对齐主表 `min_inside_height_ratio=0.5`，保留真实横向截断告警，排除擦边邻行误报。
+- 表格恢复仍可搜索整页，`table_band_open` 独立限定为原始高度且受邻题注约束的baseline，避免将整页剩余短行当未闭合表格。
+- `objects_truncated_on_far_side` 保留相交对象任意侧截断告警，明确其与完全分离题注侧对象豁免的区别；文档说明400平方点小对象检测盲区，补正反测试。
+- 文本安全补边钳回max_expand探测范围，整条文字bbox不再绕过上限。
+- 两提取器渲染失败后归零删除seen_counts键，保证同编号后页可重试。合成两页PDF注入首个PNG保存失败，验证Figure/Table均在第二页成功。
+- 标题支持在上下方向均搜索两侧近邻、采用非负几何间距，远侧紧跟正文时保留章节阻断，兼容现有数字表头保护测试。
+- 删除未用estimate_ink_ratio导入，墨迹探测闭包按页创建并复用缓存。
+- prune仅清理运行前已存在且inode/大小/mtime/ctime未变化、未被当前有效索引引用的文件；无快照或坏索引时不删除。本轮新增与运行中改写图片保留。入口在开始提取前采集快照。
+- run_id测试替换恒真断言为毫秒格式和同一运行稳定性检查，不虚称时间戳在同毫秒必定唯一；删除Golden陈旧版本示例注释。
+- 已确认杂散目录仅3个错误cwd运行日志，将 `tests/tests/results/20260907-002/` 归档至 `tests/results/20260923-001/archived-misplaced/20260907-002/`，仅移除空父目录。
+- 已确认 `tests/annotations/DeepSeek_V4/` 仅有旧V4 bootstrap标注，将其完整保留至 `tests/annotations/archive/DeepSeek_V4/gt.json`，避免默认单层GT发现误用。没有将旧坐标改名伪装V4.1标注；当前V4.1仍缺人工GT。全部4个移动文件前后SHA256相同，见archival-moves.json。
+
+### 验证过程
+
+日志统一在 `tests/results/20260923-001/`；pytest实际提取自动创建后续日期批次。
+
+| 命令/操作 | 结果 |
+| --- | --- |
+| `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/test_remaining_review_20260923.py -q` | 首轮5失败/1通过，分别复现prune、max_expand、镜像标题、续表擦边；修复后6通过。新增失败重试及余量判定后8通过/2缺新函数，完成后定向全套通过。 |
+| `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/ -q -k 'not golden and not structure_review_20260922'` | 最终209 passed，38 deselected；中间发现并修复Rect构造NameError及表头/章节标题兼容回归。此结果排除Golden，不算全绿。 |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts tests/scripts tests/eval` | exit0。 |
+| 四入口 `python3 skills/pdf-markdown-summary/scripts/{extract_pdf_assets,pdf_to_markdown,process_pdf,summarize_pdf}.py --help`（逐一执行） | 4/4 exit0，help.log。 |
+| `python3 tests/eval/run_eval.py --selfcheck` | 结果见eval.log。 |
+| `git diff --check`；检查归档文件清单与哈希 | 无空白错误；移动范围严格为上述4文件。 |
+
+### 全量结果与 Golden 差异验收
+
+- `python3 -m pytest tests/scripts/ -q --basetemp=tests/results/20260923-001/pytest-final`：246 passed、1 failed、0 skipped，唯一失败为 FunAudio-ASR Table 4 的预期Golden几何/PNG变化。实际重提取全部8份，当前产物位于20260923-003（中途被终止的调试批次002未用于最终结论）。
+- `python3 tests/results/20260923-001/review_diffs.py`：逐项比较最新代码指纹匹配产物与原Golden，8份中仅1个PNG变化。FunAudio-ASR Table 4 p10 bbox从 `[135.4,299.5,421.0,478.7]` 改为 `[180.7,299.5,421.0,478.7]`；原因是安全补边不再被整行bbox绕过max_expand。已目视比较新旧PNG，去除左侧空白，表头、Environment首列、11行环境及Average行均完整。其余PNG身份、bbox及哈希不变，因此准许更新本地Golden；这仅是变更检测，不宣称全量人工真值验收。
+- `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/test_remaining_review_20260923.py -q --basetemp=tests/results/20260923-001/remaining-tmp`：12 passed，新增坏索引和被引用旧文件保护检查也通过。最终完整套件将纳入新增的这2项。
+- 评测器selfcheck全部通过；AST验证73个Python文件通过，git diff --check通过。CLI文档已同步prune的新语义。
+
+### 最终完成验证
+
+- `python3 tests/scripts/test_extraction_golden.py --update-golden`：8通过、0失败；差异原因已逐项记录（仅FunAudio T4）。日志golden-update.log。
+- `python3 -m pytest tests/scripts/ -q --basetemp=tests/results/20260923-001/pytest-confirmed`：**249 passed、0 failed、0 skipped，含Golden**。最终确认复用刚刚全量重提取且代码指纹一致的8份产物；日志full-final.log。5条PyMuPDF/SWIG弃用警告不影响通过。
+- 内联Python校验：8份输入PDF的SHA256与20260922-001审查时一致，全部177个PNG可解码、inventory missing为0；仍有4项review_required，保留待复核状态，未以改Golden隐藏。详情integrity.json。
+- 本轮全部列出的P2/P3代码问题已处理；旧V4标注作为历史数据保留，当前V4.1人工GT缺失未伪造补齐。未提交或回滚用户的其他修改。
+
+## 版本升级 0.6.3 与文档同步（2026-09-23）
+
+将 2026-09-22/23 两轮审查修复（墨迹探测四态评估、续表恢复、prune 安全化等）以版本号 0.6.3 固化，并把对外文档刷新到当前代码状态。未改动任何脚本逻辑，仅版本字符串与文档内容。
+
+### 修改清单
+
+| 文件 | 修改内容 |
+| --- | --- |
+| `skills/pdf-markdown-summary/scripts/__init__.py` | `__version__` 0.6.2 → 0.6.3。 |
+| `skills/pdf-markdown-summary/SKILL.md` | Current package version 0.6.2 → 0.6.3（能力清单在上一轮已含续表恢复条目，本轮核对无需再改）。 |
+| `README.md` | 版本号 0.6.2 → 0.6.3；「当前状态/Status」新增四态质量评估（assess）、跨页续表自动恢复、题注对账、`--prune-images` 安全化四项能力；回归基线由「155 passed、0 skipped（2026-08-30 复验）」更新为「249 passed、0 failed、0 skipped（2026-09-23 复验）」，并注明 benchmark 输入集 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版，仍 8 份）。中英文两节同步。 |
+| `AGENTS.md` | 第 8 节 benchmark 清单同步实际目录：`k3_tech_report` → `2607.24653v2-Kimi-K3`，`DeepSeek_V4` → `DeepSeek_V41_Tech_Report`（与 `tests/basic-benchmark/` 现存 8 份 PDF 一致）。 |
+| `task-list.md` | 本节记录。 |
+
+references/ 三个文档核对结论：`cli-options.md` 与四入口 `--help` 逐项一致（`--prune-images`、`--allow-continued` 新语义上一轮已写入）；`pdf-to-markdown.md`、`pdf-summary.md` 工作流描述仍准确，无需改动。`docs/` 根目录两份 2026-07 历史分析文档与 `docs/1-archive/`、`docs/2-ref/` 均未触碰。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `python3 -m compileall -q skills/pdf-markdown-summary/scripts` | exit 0。 |
+| 四入口 `--help`（`extract_pdf_assets` / `pdf_to_markdown` / `process_pdf` / `summarize_pdf`） | 4/4 exit 0。 |
+| 版本一致性 grep（`__init__.py` / `SKILL.md` / `README.md`） | 三处均为 0.6.3。 |
+

@@ -32,7 +32,15 @@ from .models import AttachmentRecord, CaptionBlock, CaptionIndex, DocumentLayout
 from .idents import FIGURE_LINE_RE, build_output_basename, extract_figure_ident, stable_debug_number
 from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
-    merge_caption_lines, is_caption_reference,
+    merge_caption_lines, is_caption_reference, is_likely_reference_context,
+)
+from .assess import (
+    AssessmentInput,
+    apply_assessment,
+    assess_extraction,
+    objects_truncated_on_far_side,
+    text_crosses_clip_boundary,
+    select_index_candidate,
 )
 from .acceptance import (
     adaptive_acceptance_thresholds,
@@ -55,8 +63,12 @@ from .figure_post import (
     trim_far_side_noise_before_content,
 )
 from .object_refine import merge_rects, refine_clip_by_objects
-from .pixel_detect import build_text_masks_px, detect_content_bbox_pixels, estimate_ink_ratio
-from .text_trim import trim_clip_head_by_text_v2
+from .pixel_detect import (
+    build_text_masks_px,
+    detect_content_bbox_pixels,
+    make_ink_probe,
+)
+from .text_trim import _trim_lingering_body_before_objects, trim_clip_head_by_text_v2
 from .extract_helpers import (
     collect_draw_items,
     collect_text_lines,
@@ -237,6 +249,7 @@ def extract_figures(
 
         # 收集该页的文本行和绘图项（用于 Phase A/B）
         text_lines = collect_text_lines(dict_data)
+        page_ink_probe = make_ink_probe(page, text_lines)
         draw_items = collect_draw_items(page)
 
         # 收集图像和矢量对象的边界框（用于 Phase B）
@@ -288,17 +301,22 @@ def extract_figures(
                 # ============================================================
                 # 修复1: 使用 CaptionIndex 过滤正文引用
                 # ============================================================
+                weak_anchor = False
+                caption_score = 100.0
                 if caption_index is not None:
-                    best_on_page = caption_index.get_best_for_page('figure', ident, pno, min_score=25.0)
+                    best_on_page, weak_anchor = select_index_candidate(
+                        caption_index, 'figure', ident, pno
+                    )
                     if best_on_page is None:
                         if debug_captions:
-                            logger.debug(f"Figure {ident} p{pno+1}: skipping low-score caption candidate")
+                            logger.debug(f"Figure {ident} p{pno+1}: skipping non-anchor caption candidate")
                         continue
+                    caption_score = float(best_on_page.score)
 
                     line_y0 = ln.get("bbox", [0, 0, 0, 0])[1]
                     line_bbox_x0 = ln.get("bbox", [0, 0, 0, 0])[0]
                     y_dist = abs(line_y0 - best_on_page.rect.y0)
-                    x_dist = abs(line_bbox_x0 - best_on_page.rect.x0) if line_bbox_x0 and best_on_page.rect.x0 else 0
+                    x_dist = abs(line_bbox_x0 - best_on_page.rect.x0)
                     if y_dist > 30 or x_dist > 50:
                         if debug_captions:
                             logger.debug(f"Figure {ident} p{pno+1}: skipping non-best caption candidate (dist={y_dist:.0f}pt)")
@@ -469,6 +487,7 @@ def extract_figures(
                         far_side_para_min_ratio=far_side_para_min_ratio,
                         typical_line_h=typical_line_h,
                         skip_adjacent_sweep=False,
+                        object_rects=image_rects + vector_rects,
                         debug=debug_captions,
                     )
 
@@ -511,6 +530,7 @@ def extract_figures(
                         x_margin=margin_x,
                         min_width_ratio=0.30,
                         debug=debug_captions,
+                        text_lines=text_lines,
                     )
 
                 # ================================================================
@@ -624,21 +644,30 @@ def extract_figures(
                         gap=caption_gap,
                         max_expand=80.0,
                     )
-                    final_clip = expand_clip_to_nearby_figure_title(
-                        clip_after_B,
-                        final_clip,
-                        text_lines,
-                        direction,
-                    )
                     final_clip = pad_figure_clip_near_caption(
                         final_clip,
                         caption_bbox,
                         direction,
                     )
+                    final_clip = _trim_lingering_body_before_objects(
+                        final_clip,
+                        base_clip,
+                        caption_bbox,
+                        direction,
+                        text_lines,
+                        image_rects + vector_rects,
+                        gap=text_trim_gap,
+                    )
+                    # 使用精裁前的搜索区恢复图内标题；phase A/B 已可能丢掉它。
+                    # 放在正文裁切之后，防止小写图内标题再次被当成正文残片。
+                    final_clip = expand_clip_to_nearby_figure_title(
+                        base_clip, final_clip, text_lines, direction,
+                    )
 
                 # ================================================================
                 # 修复6: 增强验收检查
                 # ================================================================
+                polluted = False
                 if refine_safe and ident not in no_refine_set:
                     far_cov = estimate_far_side_text_coverage(
                         base_clip,
@@ -667,12 +696,12 @@ def extract_figures(
                         final_metrics=final_metrics,
                         base_metrics=base_metrics,
                         page_width=page_rect.width,
-                        allow_low_ratio_keep=False,
+                        allow_low_ratio_keep=True,
                     )
 
                     polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
                     if polluted:
-                        logger.info(f"Figure {ident}: rejected polluted clip ({pollution_reason})")
+                        logger.info(f"Figure {ident}: polluted clip kept for review ({pollution_reason})")
                         log_event(
                             "refine_rejected",
                             pdf=pdf_name,
@@ -683,7 +712,6 @@ def extract_figures(
                             message=pollution_reason,
                             reason=pollution_reason,
                         )
-                        continue
 
                     if not accepted:
                         logger.info(
@@ -713,7 +741,9 @@ def extract_figures(
                             candidate_polluted, _ = detect_text_pollution(candidate, text_lines)
                             if candidate_polluted:
                                 continue
-                            if stage_name == "baseline" or candidate.height >= base_clip.height * thresholds.height_ratio:
+                            if stage_name == "baseline" or candidate.height >= max(
+                                80.0, base_clip.height * min(0.20, thresholds.height_ratio)
+                            ):
                                 fallback_clip = candidate
                                 fallback_stage = stage_name
                                 break
@@ -736,7 +766,7 @@ def extract_figures(
 
                         polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
                         if polluted:
-                            logger.info(f"Figure {ident}: rejected fallback clip ({pollution_reason})")
+                            logger.info(f"Figure {ident}: polluted fallback clip kept for review ({pollution_reason})")
                             log_event(
                                 "refine_rejected",
                                 pdf=pdf_name,
@@ -747,7 +777,6 @@ def extract_figures(
                                 message=pollution_reason,
                                 reason=pollution_reason,
                             )
-                            continue
 
                 # ================================================================
                 # Debug 可视化（如果启用）
@@ -790,21 +819,50 @@ def extract_figures(
                         float(caption_bbox.x1),
                         float(caption_bbox.y1),
                     ]
-                    records.append(AttachmentRecord(
-                        kind='figure',
-                        ident=ident,
-                        page=pno + 1,
-                        caption=full_caption_text,
-                        out_path=out_path,
-                        continued=is_continued,
-                        debug_artifacts=debug_artifacts,
-                        final_bbox=final_bbox,
-                        caption_bbox=caption_bbox_list,
-                        content_bboxes=[list(final_bbox)],
+                    records.append(apply_assessment(
+                        AttachmentRecord(
+                            kind='figure',
+                            ident=ident,
+                            page=pno + 1,
+                            caption=full_caption_text,
+                            out_path=out_path,
+                            continued=is_continued,
+                            debug_artifacts=debug_artifacts,
+                            final_bbox=final_bbox,
+                            caption_bbox=caption_bbox_list,
+                            content_bboxes=[list(final_bbox)],
+                        ),
+                        assess_extraction(
+                            AssessmentInput(
+                                kind="figure",
+                                ident=ident,
+                                caption=full_caption_text,
+                                caption_score=caption_score,
+                                is_body_citation=is_likely_reference_context(full_caption_text),
+                                text_pollution=polluted,
+                                object_truncation=objects_truncated_on_far_side(
+                                    final_bbox,
+                                    [base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1],
+                                    [
+                                        [rect.x0, rect.y0, rect.x1, rect.y1]
+                                        for rect in (image_rects + vector_rects)
+                                    ],
+                                    direction,
+                                    ink_probe=page_ink_probe,
+                                ) or text_crosses_clip_boundary(
+                                    final_bbox, [list(rect) for rect, _fs, text in text_lines if text.strip()]
+                                ),
+                                weak_anchor=weak_anchor,
+                            )
+                        ),
                     ))
 
                     logger.info(f"Extracted Figure {ident} from page {pno + 1}: {out_path}")
                 except Exception as e:
+                    # 渲染失败时回退计数，否则该编号会被后续页面当成已处理而永久跳过
+                    seen_counts[ident] -= 1
+                    if seen_counts[ident] == 0:
+                        del seen_counts[ident]
                     logger.warning(f"Failed to extract Figure {ident}: {e}")
 
     logger.info(f"Extracted {len(records)} figures from {pdf_name}")

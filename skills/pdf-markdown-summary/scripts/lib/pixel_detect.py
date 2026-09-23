@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, List, Optional, Tuple
 
 try:
@@ -52,6 +53,132 @@ def estimate_ink_ratio(pix: "fitz.Pixmap", white_threshold: int = 250) -> float:
     if total == 0:
         return 0.0
     return nonwhite / float(total)
+
+
+def region_has_ink(
+    page: "fitz.Page",
+    rect: Any,
+    *,
+    mask_rects: Optional[List[Any]] = None,
+    dpi: int = 72,
+    white_threshold: int = 250,
+    min_ratio: float = 0.005,
+) -> bool:
+    """
+    判断页面某个区域内是否存在可见墨迹（可排除若干遮罩区域）。
+
+    用于区分「对象路径外框超出裁剪框」与「真的有内容被裁掉」：
+    PDF 的路径外框包含被 clip path 裁掉的部分，位图块外框包含白边，
+    两者都系统性大于实际可见范围，只能靠渲染判定。
+
+    Args:
+        page: PyMuPDF 页面对象
+        rect: 待检测区域（页面坐标）
+        mask_rects: 忽略的区域列表（页面坐标），通常为文本行
+        dpi: 渲染精度
+        white_threshold: 白色阈值（0-255）
+        min_ratio: 非白像素占比达到该值才算有墨迹
+
+    Returns:
+        区域内是否存在可见墨迹
+    """
+    if fitz is None:
+        return False
+
+    r = fitz.Rect(rect) & page.rect
+    if r.is_empty or r.width <= 0.5 or r.height <= 0.5:
+        return False
+
+    try:
+        pix = page.get_pixmap(clip=r, dpi=dpi, alpha=False)
+    except Exception:
+        return True  # 渲染失败时不敢放行，保持原有的保守判定
+
+    w, h = pix.width, pix.height
+    if w <= 0 or h <= 0:
+        return False
+    n = pix.n
+    samples = memoryview(pix.samples)
+    stride = pix.stride
+    scale = dpi / 72.0
+
+    # 位图边界对齐到整数像素，不能假定 r.x0 就是第 0 列，必须按 pix 原点换算；
+    # 再外扩若干像素吸收字形抗锯齿，否则遮罩边缘残留的一列会被当成墨迹。
+    pad_px = int(math.ceil(scale)) + 1
+    ox, oy = tuple(pix.irect)[:2]
+    masks_px: List[Tuple[int, int, int, int]] = []
+    for m in (mask_rects or []):
+        mr = fitz.Rect(m)
+        if (mr & r).is_empty:
+            continue
+        masks_px.append((
+            int(math.floor(mr.x0 * scale)) - ox - pad_px,
+            int(math.floor(mr.y0 * scale)) - oy - pad_px,
+            int(math.ceil(mr.x1 * scale)) - ox + pad_px,
+            int(math.ceil(mr.y1 * scale)) - oy + pad_px,
+        ))
+
+    def masked(x: int, y: int) -> bool:
+        for (lx, ty, rx, by) in masks_px:
+            if lx <= x < rx and ty <= y < by:
+                return True
+        return False
+
+    step_x = max(1, w // 400)
+    step_y = max(1, h // 400)
+    nonwhite = 0
+    total = 0
+    for y in range(0, h, step_y):
+        row = samples[y * stride:(y + 1) * stride]
+        for x in range(0, w, step_x):
+            if masked(x, y):
+                continue
+            total += 1
+            off = x * n
+            r_ = row[off + 0]
+            g_ = row[off + 1] if n > 1 else r_
+            b_ = row[off + 2] if n > 2 else r_
+            if r_ < white_threshold or g_ < white_threshold or b_ < white_threshold:
+                nonwhite += 1
+    if total == 0:
+        return False
+    return nonwhite / float(total) >= min_ratio
+
+
+def make_ink_probe(
+    page: "fitz.Page",
+    text_lines: List[Tuple[Any, float, str]],
+    *,
+    dpi: int = 72,
+    min_ratio: float = 0.005,
+):
+    """
+    构造按页缓存的墨迹探测器，供截断判定排除「路径外框大于可见范围」的误报。
+
+    文本行整体作为遮罩排除：对象截断判定只关心图形内容，正文与题注的墨迹
+    不应被算作被裁掉的图形。
+
+    Args:
+        page: PyMuPDF 页面对象
+        text_lines: 该页文本行 [(rect, font_size, text), ...]
+        dpi: 渲染精度
+        min_ratio: 非白像素占比阈值
+
+    Returns:
+        接受矩形、返回该区域是否有可见墨迹的函数
+    """
+    mask_rects = [lb for (lb, _fs, txt) in text_lines if str(txt).strip()]
+    cache: dict = {}
+
+    def probe(rect: Any) -> bool:
+        key = tuple(round(float(v), 1) for v in tuple(rect)[:4])
+        if key not in cache:
+            cache[key] = region_has_ink(
+                page, key, mask_rects=mask_rects, dpi=dpi, min_ratio=min_ratio
+            )
+        return cache[key]
+
+    return probe
 
 
 def detect_content_bbox_pixels(

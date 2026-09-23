@@ -96,10 +96,10 @@ def pair_page(
 
     if not captions or not contents:
         result.orphan_captions = [
-            _region_to_candidate(c, "caption", kind=kind) for c in captions
+            _region_to_candidate(c, "caption", kind=kind, page=page) for c in captions
         ]
         result.orphan_contents = [
-            _region_to_candidate(c, "content", kind=kind) for c in contents
+            _region_to_candidate(c, "content", kind=kind, page=page) for c in contents
         ]
         return result
 
@@ -156,12 +156,12 @@ def pair_page(
 
     # 未配对的孤儿
     result.orphan_captions = [
-        _region_to_candidate(captions[i], "caption", kind=kind)
+        _region_to_candidate(captions[i], "caption", kind=kind, page=page)
         for i in range(len(captions))
         if i not in used_caps
     ]
     result.orphan_contents = [
-        _region_to_candidate(contents[i], "content", kind=kind)
+        _region_to_candidate(contents[i], "content", kind=kind, page=page)
         for i in range(len(contents))
         if i not in used_contents
     ]
@@ -243,6 +243,7 @@ def _region_to_candidate(
     region: RegionBBox,
     role: str,
     kind: str = "figure",
+    page: int = 0,
 ) -> AssetCandidate:
     """将 RegionBBox 转为 AssetCandidate（用于孤儿列表）。"""
     asset_kind = getattr(region, "kind", None) or kind
@@ -250,7 +251,7 @@ def _region_to_candidate(
         asset_kind = kind
     cand = AssetCandidate(
         kind=asset_kind,
-        page=0,
+        page=page,
         sources={"layout"},
         confidence=0.0,
     )

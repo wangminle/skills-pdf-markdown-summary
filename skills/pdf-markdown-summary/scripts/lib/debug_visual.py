@@ -96,16 +96,13 @@ def draw_rects_on_pix(
         logger.warning("PyMuPDF not available, skipping rect drawing")
         return
 
-    # 确保无 alpha 通道
-    if pix.alpha:
-        tmp = fitz.Pixmap(fitz.csRGB, pix)
-        pix = tmp
-
+    # 按 pix.n / pix.stride 逐通道写入，带 alpha 的位图同样成立（只改前 3 个通道）。
+    # 这里不能转换成新的无 alpha 位图：那样只会重绑定局部变量，画框静默丢失。
     w, h = pix.width, pix.height
     n = pix.n
 
-    # 转换为可变的 bytearray 以便修改像素
-    samples = bytearray(pix.samples)
+    # samples_mv 是可写 memoryview，直接原地改；PyMuPDF 1.28 起已无 set_samples()
+    samples = pix.samples_mv
     stride = pix.stride
 
     def set_px(x: int, y: int, color: Tuple[int, int, int]):
@@ -133,9 +130,6 @@ def draw_rects_on_pix(
             for y in range(ty, by + 1):
                 set_px(lx + offset, y, col)
                 set_px(rx - offset, y, col)
-
-    # 将修改后的 samples 写回位图
-    pix.set_samples(bytes(samples))
 
 
 def dump_page_candidates(
@@ -284,7 +278,8 @@ def save_debug_visualization(
 
         # 绘制 caption（紫色）
         caption_color = (148/255.0, 0, 211/255.0)
-        shape.draw_rect(caption_rect)
+        if caption_rect is not None:
+            shape.draw_rect(caption_rect)
         shape.finish(color=caption_color, width=3)
 
         shape.commit()
@@ -353,8 +348,11 @@ def _write_legend_file(
     """
     with open(legend_path, 'w', encoding='utf-8') as f:
         f.write(f"=== {prefix} {fig_no} Debug Legend (Page {page_num}) ===\n\n")
-        f.write(f"Caption: {caption_rect.x0:.1f},{caption_rect.y0:.1f} -> {caption_rect.x1:.1f},{caption_rect.y1:.1f} "
-                f"({caption_rect.width:.1f}×{caption_rect.height:.1f}pt)\n\n")
+        if caption_rect is None:
+            f.write("Caption: none (captionless continuation page)\n\n")
+        else:
+            f.write(f"Caption: {caption_rect.x0:.1f},{caption_rect.y0:.1f} -> {caption_rect.x1:.1f},{caption_rect.y1:.1f} "
+                    f"({caption_rect.width:.1f}×{caption_rect.height:.1f}pt)\n\n")
 
         # 写入文本区块信息（如果有）
         if text_blocks_drawn:

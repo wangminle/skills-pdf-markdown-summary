@@ -34,7 +34,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--images", choices=["off", "figures"], default="off")
     parser.add_argument("--ocr", choices=["off", "auto", "force"], default="off")
     parser.add_argument("--preset", default="robust", choices=["robust"], help="Asset extraction preset")
-    parser.add_argument("--allow-continued", action="store_true", default=False)
+    parser.add_argument("--allow-continued", action="store_true", default=False, help="Allow repeated-caption continuation items; structurally matched captionless table pages are recovered automatically")
     return parser.parse_args(argv)
 
 
@@ -104,12 +104,20 @@ def _filter_assets_by_mode(
     args: argparse.Namespace,
 ) -> List[Dict[str, Any]]:
     """按 --images / --tables 过滤提取结果，关闭的类型不得进入 Markdown。"""
+    from lib.assess import markdown_insertable
+
     filtered: List[Dict[str, Any]] = []
     for item in items:
         kind = str(item.get("type") or "").lower()
         if kind == "figure" and args.images == "off":
             continue
         if kind == "table" and args.tables == "off":
+            continue
+        if not markdown_insertable(
+            item.get("status"),
+            review_required=item.get("review_required"),
+            warnings=item.get("warnings"),
+        ):
             continue
         filtered.append(item)
     return filtered

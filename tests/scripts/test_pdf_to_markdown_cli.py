@@ -20,7 +20,7 @@ if SCRIPTS_DIR not in sys.path:
 import fitz
 
 from core import extract_pdf_assets as extract_pdf_assets_module
-from core.pdf_to_markdown import _resolve_outputs, _run_asset_extraction, main
+from core.pdf_to_markdown import _filter_assets_by_mode, _resolve_outputs, _run_asset_extraction, main
 
 
 def _make_text_pdf(path: Path) -> None:
@@ -257,6 +257,19 @@ def test_assets_disabled_returns_zero() -> None:
         assert exit_code == 0
 
 
+def test_filter_skips_review_and_rejected_assets() -> None:
+    args = argparse.Namespace(images="figures", tables="screenshot")
+    items = [
+        {"type": "figure", "id": "1", "status": "accepted"},
+        {"type": "figure", "id": "2", "status": "accepted_with_margin"},
+        {"type": "figure", "id": "3", "status": "review_required"},
+        {"type": "table", "id": "4", "status": "rejected"},
+        {"type": "table", "id": "5"},
+    ]
+    filtered = _filter_assets_by_mode(items, args)
+    assert [item["id"] for item in filtered] == ["1", "2", "5"]
+
+
 def main_test() -> int:
     tests = [
         test_relative_asset_dir_resolves_next_to_markdown,
@@ -266,6 +279,7 @@ def main_test() -> int:
         test_extract_parser_accepts_no_figures,
         test_images_off_tables_on_does_not_insert_figures,
         test_assets_disabled_returns_zero,
+        test_filter_skips_review_and_rejected_assets,
     ]
     passed = 0
     failed = 0

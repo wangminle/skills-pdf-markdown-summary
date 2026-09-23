@@ -15,6 +15,17 @@ except ImportError:
 from .acceptance import looks_like_table_text
 
 
+def table_remainder_is_open(final_clip: Any, baseline: Any, text_lines: List, direction: str) -> bool:
+    """只在原始、邻题注约束后的窗口内检查余量，不使用整页恢复搜索区。"""
+    if direction == "below" and baseline.y1 > final_clip.y1 + 36.0:
+        remainder = fitz.Rect(final_clip.x0, final_clip.y1, final_clip.x1, baseline.y1)
+    elif direction == "above" and final_clip.y0 > baseline.y0 + 36.0:
+        remainder = fitz.Rect(final_clip.x0, baseline.y0, final_clip.x1, final_clip.y0)
+    else:
+        return False
+    return looks_like_table_text(remainder, text_lines, min_lines=3)
+
+
 def expand_clip_to_rendered_horizontal_rule(
     clip: Any,
     page: Any,
@@ -370,6 +381,28 @@ def restore_table_tail_after_layout_trim(
 
     return adjusted_clip
 
+def _is_short_table_header_label(text: str) -> bool:
+    txt = (text or "").strip()
+    if not txt:
+        return False
+    words = txt.split()
+    return (
+        len(txt) <= 40
+        and len(words) <= 4
+        and not txt.rstrip().endswith((".", "。", "!", "?", "；", ";"))
+    )
+
+
+def _caption_overlap_blocks_header(line_rect: Any, caption_rect: Any, text: str) -> bool:
+    """Skip caption-overlapping lines, but keep short header cells that only graze the caption."""
+    overlap = line_rect & caption_rect
+    if overlap.width <= 0 or overlap.height <= 0:
+        return False
+    if _is_short_table_header_label(text) and overlap.height < max(4.0, line_rect.height * 0.5):
+        return False
+    return True
+
+
 def expand_clip_to_nearby_table_header(
     original_clip: Any,
     limited_clip: Any,
@@ -390,80 +423,120 @@ def expand_clip_to_nearby_table_header(
     if limited_clip.width <= 1 or limited_clip.height <= 1:
         return limited_clip
 
+    def _collect_header_candidates(
+        clip: Any,
+        band: Any,
+        toward_caption: str,
+        search_clip: Any,
+    ) -> List[Any]:
+        found: List[Any] = []
+        for line_rect, _font_size, text in text_lines:
+            txt = (text or "").strip()
+            if not txt:
+                continue
+            if re.match(r"^\s*(?:Figure|Table)\s+\S+", txt, re.I):
+                continue
+            if _caption_overlap_blocks_header(line_rect, caption_rect, txt):
+                continue
+            if len(txt) > 140:
+                continue
+            if len(txt) > 80 and txt.rstrip().endswith((".", "。", "!", "?", "；", ";")):
+                continue
+
+            inter = line_rect & band
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if inter.width < max(24.0, search_clip.width * 0.04):
+                continue
+
+            if toward_caption in ("above", "below_near"):
+                if line_rect.y0 >= clip.y0:
+                    continue
+                if line_rect.y0 < clip.y0 - max_header_height:
+                    continue
+                found.append(line_rect)
+            elif toward_caption == "below_far" and line_rect.y1 > clip.y1:
+                found.append(line_rect)
+        return found
+
+    def _apply_near_header(clip: Any, band_y0: float, band_y1: float, y0_floor: float) -> Any:
+        probe = fitz.Rect(
+            clip.x0,
+            clip.y0,
+            clip.x1,
+            min(clip.y1, clip.y0 + table_probe_height),
+        )
+        if not looks_like_table_text(probe, text_lines, min_lines=3):
+            return clip
+        band = fitz.Rect(original_clip.x0, band_y0, original_clip.x1, band_y1)
+        candidates = _collect_header_candidates(clip, band, "below_near" if direction == "below" else "above", original_clip)
+        if len(candidates) < 2:
+            return clip
+        nearest_gap = clip.y0 - max(r.y1 for r in candidates)
+        if nearest_gap > max_gap:
+            return clip
+        new_y0 = max(y0_floor, min(r.y0 for r in candidates) - pad)
+        if new_y0 < clip.y0 and clip.y1 - new_y0 >= 40.0:
+            return fitz.Rect(clip.x0, new_y0, clip.x1, clip.y1)
+        return clip
+
     if direction == "above":
         if limited_clip.y0 <= original_clip.y0 + 0.5:
             return limited_clip
-        probe = fitz.Rect(
-            limited_clip.x0,
-            limited_clip.y0,
-            limited_clip.x1,
-            min(limited_clip.y1, limited_clip.y0 + table_probe_height),
+        return _apply_near_header(
+            limited_clip,
+            max(original_clip.y0, limited_clip.y0 - max_header_height),
+            limited_clip.y0 + max_gap,
+            original_clip.y0,
         )
-        if not looks_like_table_text(probe, text_lines, min_lines=3):
-            return limited_clip
-        band_y0 = max(original_clip.y0, limited_clip.y0 - max_header_height)
-        band_y1 = limited_clip.y0 + max_gap
-    elif direction == "below":
-        if limited_clip.y1 >= original_clip.y1 - 0.5:
-            return limited_clip
-        probe = fitz.Rect(
-            limited_clip.x0,
-            max(limited_clip.y0, limited_clip.y1 - table_probe_height),
-            limited_clip.x1,
-            limited_clip.y1,
-        )
-        if not looks_like_table_text(probe, text_lines, min_lines=3):
-            return limited_clip
-        band_y0 = limited_clip.y1 - max_gap
-        band_y1 = min(original_clip.y1, limited_clip.y1 + max_header_height)
-    else:
+
+    if direction != "below":
         return limited_clip
 
-    band = fitz.Rect(original_clip.x0, band_y0, original_clip.x1, band_y1)
-    candidates: List[Any] = []
-    for line_rect, _font_size, text in text_lines:
-        txt = (text or "").strip()
-        if not txt:
-            continue
-        if re.match(r"^\s*(?:Figure|Table)\s+\S+", txt, re.I):
-            continue
-        if (line_rect & caption_rect).width > 0 and (line_rect & caption_rect).height > 0:
-            continue
+    recovered = limited_clip
+    probe = fitz.Rect(
+        recovered.x0,
+        recovered.y0,
+        recovered.x1,
+        min(recovered.y1, recovered.y0 + table_probe_height),
+    )
+    if looks_like_table_text(probe, text_lines, min_lines=3):
+        title_floor = caption_rect.y0 + min(12.0, max(8.0, caption_rect.height * 0.15))
+        recovered = _apply_near_header(
+            recovered,
+            recovered.y0 - max_header_height,
+            recovered.y0 + max_gap,
+            title_floor,
+        )
 
-        inter = line_rect & band
-        if inter.width <= 0 or inter.height <= 0:
-            continue
-        if inter.width < max(24.0, original_clip.width * 0.04):
-            continue
-        if len(txt) > 140:
-            continue
-        if len(txt) > 80 and txt.rstrip().endswith((".", "。", "!", "?", "；", ";")):
-            continue
+    far_side_cut = limited_clip.y1 < original_clip.y1 - 0.5
+    if not far_side_cut:
+        return recovered
 
-        if direction == "above" and line_rect.y0 < limited_clip.y0:
-            candidates.append(line_rect & original_clip)
-        elif direction == "below" and line_rect.y1 > limited_clip.y1:
-            candidates.append(line_rect & original_clip)
-
+    far_probe = fitz.Rect(
+        recovered.x0,
+        max(recovered.y0, recovered.y1 - table_probe_height),
+        recovered.x1,
+        recovered.y1,
+    )
+    if not looks_like_table_text(far_probe, text_lines, min_lines=3):
+        return recovered
+    band = fitz.Rect(
+        original_clip.x0,
+        recovered.y1 - max_gap,
+        original_clip.x1,
+        min(original_clip.y1, recovered.y1 + max_header_height),
+    )
+    candidates = _collect_header_candidates(recovered, band, "below_far", original_clip)
     if len(candidates) < 2:
-        return limited_clip
-
-    if direction == "above":
-        nearest_gap = limited_clip.y0 - max(r.y1 for r in candidates)
-        if nearest_gap > max_gap:
-            return limited_clip
-        new_y0 = max(original_clip.y0, min(r.y0 for r in candidates) - pad)
-        if new_y0 < limited_clip.y0 and limited_clip.y1 - new_y0 >= 40.0:
-            return fitz.Rect(limited_clip.x0, new_y0, limited_clip.x1, limited_clip.y1)
-    else:
-        nearest_gap = min(r.y0 for r in candidates) - limited_clip.y1
-        if nearest_gap > max_gap:
-            return limited_clip
-        new_y1 = min(original_clip.y1, max(r.y1 for r in candidates) + pad)
-        if new_y1 > limited_clip.y1 and new_y1 - limited_clip.y0 >= 40.0:
-            return fitz.Rect(limited_clip.x0, limited_clip.y0, limited_clip.x1, new_y1)
-
-    return limited_clip
+        return recovered
+    nearest_gap = min(r.y0 for r in candidates) - recovered.y1
+    if nearest_gap > max_gap:
+        return recovered
+    new_y1 = min(original_clip.y1, max(r.y1 for r in candidates) + pad)
+    if new_y1 > recovered.y1 and new_y1 - recovered.y0 >= 40.0:
+        return fitz.Rect(recovered.x0, recovered.y0, recovered.x1, new_y1)
+    return recovered
 
 def expand_table_clip_to_text_bounds(
     clip: Any,
@@ -544,6 +617,14 @@ def expand_table_clip_to_text_bounds(
         if part_count >= 2:
             return False
         words = text.split()
+        stripped = text.strip()
+        sentence_like = (
+            len(stripped) > 80
+            or len(words) > 16
+            or (len(stripped) > 50 and stripped.rstrip().endswith((".", "。", "!", "?", "；", ";")))
+        )
+        if sentence_like and row_rect.width >= clip.width * 0.55:
+            return True
         if len(words) < 8:
             return False
         if row_rect.width < clip.width * 0.60:
@@ -883,7 +964,7 @@ def expand_table_clip_to_text_bounds(
         txt = (text or "").strip()
         if not txt:
             continue
-        if re.match(r"^\s*Table\s+\S+", txt, re.I):
+        if _is_caption_like(txt):
             continue
         caption_overlap = line_rect & caption_rect
         if caption_overlap.width > 0 and caption_overlap.height > 0:
@@ -900,15 +981,79 @@ def expand_table_clip_to_text_bounds(
     if text_rect is None:
         return clip
 
-    new_x0 = max(x0_bound, min(clip.x0, text_rect.x0 - pad))
-    new_y0 = max(y0_bound, min(clip.y0, text_rect.y0 - pad))
-    new_x1 = min(x1_bound, max(clip.x1, text_rect.x1 + pad))
-    new_y1 = min(y1_bound, max(clip.y1, text_rect.y1 + pad))
+    new_x0 = max(probe.x0, min(clip.x0, text_rect.x0 - pad))
+    new_y0 = max(probe.y0, min(clip.y0, text_rect.y0 - pad))
+    new_x1 = min(probe.x1, max(clip.x1, text_rect.x1 + pad))
+    new_y1 = min(probe.y1, max(clip.y1, text_rect.y1 + pad))
 
     if new_x1 - new_x0 < 1 or new_y1 - new_y0 < 1:
         return clip
     expanded_clip = fitz.Rect(new_x0, new_y0, new_x1, new_y1)
     return _trim_far_side_to_first_structured_row(expanded_clip)
+
+def trim_table_clip_far_side_body(
+    clip: Any,
+    caption_rect: Any,
+    text_lines: List[Tuple[Any, float, str]],
+    direction: str,
+    *,
+    pad: float = 4.0,
+    min_keep: float = 40.0,
+) -> Any:
+    """Drop a full-width body paragraph that follows a table on the far side."""
+    if fitz is None or clip.width <= 1 or clip.height <= 1:
+        return clip
+
+    def _is_body(text: str, rect: Any) -> bool:
+        txt = (text or "").strip()
+        if not txt or re.match(r"^\s*(?:Table|Figure|Tab\.?|Fig\.?)\s+\S+", txt, re.I):
+            return False
+        words = txt.split()
+        wide = rect.width >= clip.width * 0.55
+        sentence_like = (
+            len(txt) > 80
+            or len(words) > 16
+            or (len(txt) > 50 and txt.rstrip().endswith((".", "。", "!", "?", "；", ";")))
+        )
+        return wide and sentence_like
+
+    if direction == "below":
+        first_body = None
+        for line_rect, _fs, text in sorted(text_lines, key=lambda item: item[0].y0):
+            inter = line_rect & clip
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if line_rect.y0 <= caption_rect.y1 + 2.0:
+                continue
+            if _is_body(text, inter):
+                first_body = line_rect
+                break
+        if first_body is None:
+            return clip
+        new_y1 = first_body.y0 - pad
+        if new_y1 >= caption_rect.y1 + min_keep and new_y1 < clip.y1 - 0.5:
+            return fitz.Rect(clip.x0, clip.y0, clip.x1, new_y1)
+        return clip
+
+    if direction == "above":
+        last_body = None
+        for line_rect, _fs, text in sorted(text_lines, key=lambda item: item[0].y0, reverse=True):
+            inter = line_rect & clip
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if line_rect.y1 >= caption_rect.y0 - 2.0:
+                continue
+            if _is_body(text, inter):
+                last_body = line_rect
+                break
+        if last_body is None:
+            return clip
+        new_y0 = last_body.y1 + pad
+        if new_y0 <= caption_rect.y0 - min_keep and new_y0 > clip.y0 + 0.5:
+            return fitz.Rect(clip.x0, new_y0, clip.x1, clip.y1)
+        return clip
+
+    return clip
 
 def trim_table_far_side_section_heading(
     clip: Any,

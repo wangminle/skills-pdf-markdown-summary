@@ -147,7 +147,9 @@ def evaluate_document(
     # 「有条目但无框」的预测按 §2.2 计入漏检风险（它们不可能被一对一配对，
     # 因为无框不可配对，其对应 GT 落入 unmatched）。
     n_missing = n_gt - n_matched
-    n_extra = n_pred - n_matched  # 多检：未配对到任何 GT 的预测
+    # 多检：未配对到任何 GT 的「有框」预测。无框预测已计入漏检，
+    # 再算一次多检会让同一条记录同时污染两个指标。
+    n_extra = n_pred_exported - n_matched
 
     judged_trunc = [r for r in matched_rows if r["truncated"] is not None]
     n_truncated = sum(1 for r in judged_trunc if r["truncated"])

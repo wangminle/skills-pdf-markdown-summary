@@ -256,6 +256,7 @@ def score_local_direction(
     caption_gap: float = 3.0,
     is_table: bool = False,
     text_lines: Optional[List[Tuple["fitz.Rect", float, str]]] = None,
+    neighbor_caption_rects: Optional[List["fitz.Rect"]] = None,
 ) -> Tuple[str, float]:
     """
     基于局部对象密度评估单个 caption 的方向。
@@ -272,6 +273,7 @@ def score_local_direction(
         margin_x: 水平边距
         caption_gap: Caption 与图像间隙
         is_table: 是否为表格
+        neighbor_caption_rects: 同页其他 caption，用于避免把前一张表当成当前题注的内容
 
     Returns:
         (direction, confidence) 元组
@@ -284,9 +286,84 @@ def score_local_direction(
     if _fitz is None:
         return ('below' if is_table else 'above', 0.5)
 
+    collapse_above_objects = False
     if is_table and text_lines:
         search_height = min(300.0, max(160.0, clip_height * 0.5))
         page_width = max(1.0, page_rect.width)
+        neighbors = [rect for rect in (neighbor_caption_rects or []) if rect is not None]
+
+        def _looks_table_line(rect: "fitz.Rect", text: str) -> bool:
+            stripped = text.strip()
+            if not stripped:
+                return False
+            if re.match(r"^\s*(?:table|tab\.?|figure|fig\.?)\s*[A-Z]?\d+\b", stripped, re.I):
+                return False
+            if re.match(r"^[A-H]\.\s+\S", stripped):
+                return False
+            if re.match(r"^\d+(?:\.\d+)+\s+\S", stripped):
+                return False
+            digit_hits = len(re.findall(r"\d+(?:\.\d+)?%?", stripped))
+            short_cell = len(stripped) <= 40 or rect.width < page_width * 0.55
+            return digit_hits >= 2 or (short_cell and len(stripped) <= 24)
+
+        def _structured_side(nbr: "fitz.Rect", side: str) -> Tuple[int, Optional[float]]:
+            band_lines = []
+            for line in text_lines:
+                rect, _fs, text = line
+                if not _looks_table_line(rect, text):
+                    continue
+                if side == "above":
+                    if not (rect.y1 <= nbr.y0 - 2.0 and nbr.y0 - rect.y1 <= 50.0):
+                        continue
+                    gap = nbr.y0 - rect.y1
+                else:
+                    if not (rect.y0 >= nbr.y1 + 2.0 and rect.y0 - nbr.y1 <= 50.0):
+                        continue
+                    gap = rect.y0 - nbr.y1
+                band_lines.append((rect, text, gap))
+            if not band_lines:
+                return 0, None
+            rows: List[List[Tuple["fitz.Rect", str, float]]] = []
+            centers: List[float] = []
+            for item in sorted(band_lines, key=lambda entry: (entry[0].y0, entry[0].x0)):
+                center = (item[0].y0 + item[0].y1) / 2.0
+                if rows and abs(center - centers[-1]) <= 3.0:
+                    rows[-1].append(item)
+                    centers[-1] = sum(
+                        (entry[0].y0 + entry[0].y1) / 2.0 for entry in rows[-1]
+                    ) / len(rows[-1])
+                else:
+                    rows.append([item])
+                    centers.append(center)
+            structured = [row for row in rows if len(row) >= 2]
+            if not structured:
+                return 0, None
+            return len(structured), min(item[2] for row in structured for item in row)
+
+        def _neighbor_attaches_below(nbr: "fitz.Rect") -> bool:
+            """True when the neighbor caption sits above its own table."""
+            above_rows, above_gap = _structured_side(nbr, "above")
+            below_rows, below_gap = _structured_side(nbr, "below")
+            if below_rows == 0 or below_gap is None:
+                return False
+            if above_rows == 0:
+                return True
+            return below_gap + 8.0 < above_gap
+
+        downward_neighbors = [nbr for nbr in neighbors if _neighbor_attaches_below(nbr)]
+        collapse_above_objects = any(nbr.y1 < caption_bbox.y0 for nbr in downward_neighbors)
+
+        def _owned_by_neighbor(line_rect: "fitz.Rect") -> bool:
+            for nbr in downward_neighbors:
+                if nbr.y1 <= line_rect.y0 and line_rect.y1 <= caption_bbox.y0:
+                    return True
+            for nbr in neighbors:
+                if caption_bbox.y1 <= line_rect.y0 and line_rect.y1 <= nbr.y0:
+                    dist_curr = line_rect.y0 - caption_bbox.y1
+                    dist_nbr = nbr.y0 - line_rect.y1
+                    if dist_nbr + 8.0 < dist_curr:
+                        return True
+            return False
 
         def table_text_features(side: str) -> Tuple[float, Optional[float], int, Optional[float]]:
             if side == 'above':
@@ -320,6 +397,7 @@ def score_local_direction(
                     line[2].strip(),
                     re.IGNORECASE,
                 )
+                and not _owned_by_neighbor(line[0])
                 and not (
                     line[0].width < page_width * 0.08
                     and len(line[2].strip()) <= 8
@@ -404,6 +482,10 @@ def score_local_direction(
             and below_text_score - above_text_score <= 0.12
         ):
             return 'above', 0.62
+        if above_structured_count == 0 and below_structured_count > 0:
+            return 'below', 0.88
+        if below_structured_count == 0 and above_structured_count > 0:
+            return 'above', 0.88
         if score_diff >= 0.03:
             direction = 'above' if above_text_score > below_text_score else 'below'
             confidence = min(0.95, 0.60 + score_diff * 2.0)
@@ -429,6 +511,27 @@ def score_local_direction(
 
     clip_above = create_rect(x_left, max(page_rect.y0, caption_bbox.y0 - clip_height - caption_gap), x_right, caption_bbox.y0 - caption_gap)
     clip_below = create_rect(x_left, caption_bbox.y1 + caption_gap, x_right, min(page_rect.y1, caption_bbox.y1 + clip_height + caption_gap))
+
+    if collapse_above_objects:
+        clip_above = create_rect(clip_above.x0, clip_above.y1, clip_above.x1, clip_above.y1)
+    elif is_table and neighbor_caption_rects:
+        for nbr in neighbor_caption_rects:
+            if nbr is None:
+                continue
+            if nbr.y1 < caption_bbox.y0:
+                clip_above = create_rect(
+                    clip_above.x0,
+                    max(clip_above.y0, nbr.y1 + caption_gap),
+                    clip_above.x1,
+                    clip_above.y1,
+                )
+            if nbr.y0 > caption_bbox.y1:
+                clip_below = create_rect(
+                    clip_below.x0,
+                    clip_below.y0,
+                    clip_below.x1,
+                    min(clip_below.y1, nbr.y0 - caption_gap),
+                )
 
     obj_above = compute_object_ratio(clip_above, image_rects, vector_rects)
     obj_below = compute_object_ratio(clip_below, image_rects, vector_rects)
@@ -552,7 +655,7 @@ def determine_direction(
 
     优先级（局部优先策略）：
     1. 用户显式指定（forced_below/forced_above）
-    2. 局部方向证据（local_evidence）高置信度（>=0.6）直接采用
+    2. 局部方向证据（local_evidence）置信度 >=0.5 直接采用
     3. 全局锚点 tie-break：局部证据弱或缺失时，优先于页面位置启发式
     4. 页面位置启发式（作为无 global_anchor 时的回退）
     5. 默认值（Figure: above, Table: below）
@@ -585,11 +688,9 @@ def determine_direction(
     if ident in forced_above:
         return 'above'
 
-    # 2. 局部方向证据
+    # 2. 局部方向证据（实际生效阈值为 0.5，见 docstring 第 2 条）
     if local_evidence is not None:
         local_dir, local_conf = local_evidence
-        if local_conf >= 0.6:
-            return local_dir
         if local_conf >= 0.5:
             return local_dir
 

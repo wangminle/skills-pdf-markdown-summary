@@ -33,6 +33,182 @@ def _looks_like_short_figure_label(text: str) -> bool:
 
     return True
 
+
+_LINGERING_SECTION_RE = re.compile(
+    r"^(?:\d+(?:\.\d+)*|[A-H]\.)\s+\S",
+)
+_LINGERING_SECTION_NUMBER_RE = re.compile(r"^\d+(?:\.\d+)*$")
+_LINGERING_LIST_RE = re.compile(r"^(?:[•●▪◦]|[-–—])\s+\S")
+
+
+def _looks_like_lingering_body(text: str) -> bool:
+    """True for leftover abstract, list, or section-title lines above/below a figure."""
+    txt = (text or "").strip()
+    if not txt:
+        return False
+    if re.match(r"^(?:figure|fig\.?|table|tab\.?)\s+[A-Z]?\d+\b", txt, re.I):
+        return False
+    if txt.startswith("(") and len(txt) <= 48:
+        return False
+    if _LINGERING_SECTION_NUMBER_RE.match(txt):
+        return True
+    if len(txt) < 8:
+        return False
+    if _LINGERING_SECTION_RE.match(txt) or _LINGERING_LIST_RE.match(txt):
+        return True
+    if txt[:1].islower():
+        return True
+    if len(txt) >= 40 and txt.rstrip().endswith((".", "。", ",", "，", ":", "：")):
+        return True
+    if txt.startswith(("Additionally", "The ", "This ", "We ", "In this", "Our ")):
+        return True
+    return False
+
+
+def _trim_lingering_body_before_objects(
+    clip: Any,
+    original_clip: Any,
+    caption_rect: Any,
+    direction: str,
+    text_lines: List[Tuple[Any, float, str]],
+    object_rects: List[Any],
+    *,
+    gap: float = 4.0,
+    min_width_ratio: float = 0.18,
+    min_object_height: float = 40.0,
+) -> Any:
+    """Cut body/section lines that remain on the far side of substantial drawing objects.
+
+    Ratio-capped far-side trim often stops in the last abstract paragraph. If the
+    remaining lines sit entirely outside the object band, drop them without eating
+    multi-panel plots that overlap the same y range as in-figure labels.
+    """
+    if fitz is None or not object_rects or clip.width <= 1:
+        return clip
+
+    substantial = []
+    for rect in object_rects:
+        inter = rect & original_clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        if inter.width < original_clip.width * min_width_ratio:
+            continue
+        if inter.height < min_object_height:
+            continue
+        substantial.append(inter)
+    if not substantial:
+        return clip
+
+    far_is_top = direction == "above"
+    min_keep = 40.0
+    if far_is_top:
+        object_start = min(item.y0 for item in substantial)
+        cutoff = object_start - 2.0
+        body_lines = []
+        for line_rect, _fs, text in text_lines:
+            inter = line_rect & clip
+            if inter.width <= 0 or inter.height <= 0:
+                continue
+            if line_rect.y1 >= cutoff:
+                continue
+            stripped = text.strip()
+            wide_enough = (
+                inter.width >= clip.width * 0.35
+                or _LINGERING_SECTION_RE.match(stripped)
+                or _LINGERING_SECTION_NUMBER_RE.match(stripped)
+                or _LINGERING_LIST_RE.match(stripped)
+                or stripped[:1].islower()
+            )
+            if _looks_like_lingering_body(text) and wide_enough:
+                body_lines.append(line_rect)
+        if body_lines:
+            companions = []
+            for line_rect, _fs, text in text_lines:
+                inter = line_rect & clip
+                if inter.width <= 0 or inter.height <= 0 or line_rect.y1 >= cutoff:
+                    continue
+                if any(abs(((line_rect.y0 + line_rect.y1) / 2.0) - ((body.y0 + body.y1) / 2.0)) <= 3.0 for body in body_lines):
+                    companions.append(line_rect)
+            body_lines.extend(companions)
+        if not body_lines:
+            return clip
+        body_bottom = max(item.y1 for item in body_lines)
+        new_y0 = min(cutoff, body_bottom + gap)
+        if new_y0 > clip.y0 + 0.5 and caption_rect.y0 - new_y0 >= min_keep:
+            return fitz.Rect(clip.x0, new_y0, clip.x1, clip.y1)
+        return clip
+
+    object_end = max(item.y1 for item in substantial)
+    cutoff = object_end + 2.0
+    body_top = None
+    for line_rect, _fs, text in text_lines:
+        if not _looks_like_lingering_body(text):
+            continue
+        inter = line_rect & clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        if line_rect.y0 <= cutoff:
+            continue
+        stripped = text.strip()
+        wide_enough = (
+            inter.width >= clip.width * 0.35
+            or _LINGERING_SECTION_RE.match(stripped)
+            or _LINGERING_LIST_RE.match(stripped)
+            or stripped[:1].islower()
+        )
+        if not wide_enough:
+            continue
+        body_top = line_rect.y0 if body_top is None else min(body_top, line_rect.y0)
+    if body_top is None:
+        return clip
+    new_y1 = max(cutoff, body_top - gap)
+    if new_y1 < clip.y1 - 0.5 and new_y1 - caption_rect.y1 >= min_keep:
+        return fitz.Rect(clip.x0, clip.y0, clip.x1, new_y1)
+    return clip
+
+
+def _protect_object_band_from_text_trim(
+    original_clip: Any,
+    clip: Any,
+    object_rects: List[Any],
+    direction: str,
+    *,
+    min_width_ratio: float = 0.18,
+    min_height: float = 40.0,
+    pad: float = 2.0,
+) -> Any:
+    """Keep far-side drawing/image bands that text trim would otherwise discard."""
+    if fitz is None or not object_rects or original_clip.width <= 1:
+        return clip
+
+    far_is_top = direction == "above"
+    protected: List[Any] = []
+    for rect in object_rects:
+        inter = rect & original_clip
+        if inter.width <= 0 or inter.height <= 0:
+            continue
+        if inter.width < original_clip.width * min_width_ratio:
+            continue
+        if inter.height < min_height:
+            continue
+        if far_is_top:
+            if inter.y0 < clip.y0 - 0.5:
+                protected.append(inter)
+        else:
+            if inter.y1 > clip.y1 + 0.5:
+                protected.append(inter)
+
+    if not protected:
+        return clip
+
+    if far_is_top:
+        new_y0 = min(clip.y0, min(item.y0 for item in protected) - pad)
+        return fitz.Rect(clip.x0, max(original_clip.y0, new_y0), clip.x1, clip.y1)
+
+    new_y1 = max(clip.y1, max(item.y1 for item in protected) + pad)
+    return fitz.Rect(clip.x0, clip.y0, clip.x1, min(original_clip.y1, new_y1))
+
+
 def is_caption_text(
     lines: List[Any],
     caption_rect: Any,
@@ -218,15 +394,12 @@ def trim_clip_head_by_text(
             if lb.y0 < bot_thresh:
                 continue
         # 邻接图注判定：靠近图注的文本很可能是正文
-        near_caption = False
+        # near_is_top 时图注在 clip 上方，行在图注下方；反之图注在 clip 下方
         if near_is_top:
-            dist = caption_rect.y0 - lb.y1
-            if 0 <= dist <= adjacent_th:
-                near_caption = True
-        else:
             dist = lb.y0 - caption_rect.y1
-            if 0 <= dist <= adjacent_th:
-                near_caption = True
+        else:
+            dist = caption_rect.y0 - lb.y1
+        near_caption = 0 <= dist <= adjacent_th
         if not near_caption:
             # 即使不相邻，如果行紧贴页边距，也考虑裁切
             if abs(lb.x0 - page_rect.x0) < 6.5 or abs(page_rect.x1 - lb.x1) < 6.5:
@@ -277,6 +450,8 @@ def trim_clip_head_by_text_v2(
     typical_line_h: Optional[float] = None,
     # 表格保护 - 跳过 adjacent sweep
     skip_adjacent_sweep: bool = False,
+    # 多子图保护：远侧绘图对象不应被正文裁切丢掉
+    object_rects: Optional[List[Any]] = None,
     # Debug
     debug: bool = False,
 ) -> Any:
@@ -303,7 +478,7 @@ def trim_clip_head_by_text_v2(
         far_side_min_dist: 远端段落最小距离
         far_side_para_min_ratio: 远端段落最小覆盖率
         typical_line_h: 典型行高（用于自适应检测）
-        skip_adjacent_sweep: 跳过相邻扫描（表格保护）
+        skip_adjacent_sweep: 跳过 Phase B 与 Phase C 相邻扫描（表格保护）
         debug: 调试输出
 
     Returns:
@@ -324,6 +499,7 @@ def trim_clip_head_by_text_v2(
         width_ratio=width_ratio, font_min=font_min, font_max=font_max,
         gap=gap, adjacent_th=adjacent_th
     )
+    clip_after_phase_a = fitz.Rect(clip)
 
     # === Phase A+: 增强"精确两行"检测 ===
     if typical_line_h is not None and typical_line_h > 0:
@@ -370,9 +546,11 @@ def trim_clip_head_by_text_v2(
     # === Phase B: 检测并裁切远距离文本 ===
     near_is_top = (direction == 'below')
 
-    # 收集远距离段落行（使用原始 clip）
+    # 收集远距离段落行（使用原始 clip）。
+    # 表格保护：近端整行数据行与正文段落难以区分，跳过 Phase B 以免裁掉表体。
     far_para_lines: List[Tuple[Any, float, str]] = []
-    for (lb, size_est, text) in text_lines:
+    phase_b_lines: List[Tuple[Any, float, str]] = [] if skip_adjacent_sweep else text_lines
+    for (lb, size_est, text) in phase_b_lines:
         if not text.strip():
             continue
         inter = lb & original_clip
@@ -385,9 +563,9 @@ def trim_clip_head_by_text_v2(
 
         # 到图注的距离（远距离范围：adjacent_th ~ far_text_th）
         if near_is_top:
-            dist = caption_rect.y0 - lb.y1
-        else:
             dist = lb.y0 - caption_rect.y1
+        else:
+            dist = caption_rect.y0 - lb.y1
 
         if adjacent_th < dist <= far_text_th:
             if near_is_top:
@@ -647,15 +825,31 @@ def trim_clip_head_by_text_v2(
         direction,
         pad=max(6.0, gap),
     )
+    if object_rects:
+        clip = _trim_lingering_body_before_objects(
+            clip,
+            original_clip,
+            caption_rect,
+            direction,
+            text_lines,
+            object_rects,
+            gap=gap,
+        )
+        clip = _protect_object_band_from_text_trim(
+            original_clip,
+            clip,
+            object_rects,
+            direction,
+        )
 
-    # 强制最小高度
+    # 强制最小高度：Phase B/C 叠加过度时退回更保守的中间结果，
+    # 不能改用 caption ± 600pt 的整页带，那会把整页正文带进裁剪框。
     min_h = 40.0
     if clip.height < min_h:
-        return trim_clip_head_by_text(
-            fitz.Rect(page_rect.x0, caption_rect.y0 - 600, page_rect.x1, caption_rect.y1 + 600) & page_rect,
-            page_rect, caption_rect, direction, text_lines,
-            width_ratio=width_ratio, font_min=font_min, font_max=font_max,
-            gap=gap, adjacent_th=adjacent_th
+        clip = (
+            clip_after_phase_a
+            if clip_after_phase_a.height >= min_h
+            else original_clip
         )
 
     # 限制在页面范围内

@@ -36,19 +36,19 @@ from keys import BBox, normalize_gt_asset, normalize_prediction  # noqa: E402
 from metrics import aggregate, evaluate_document  # noqa: E402
 
 
+def _doc_key(dirname: str) -> str:
+    """目录名 → document_id（空格转下划线，与 GT/pdf_stem 约定一致）。"""
+    return dirname.replace(" ", "_")
+
+
 def find_gt_files(gt_dir: Path) -> Dict[str, Path]:
-    """{document_id: gt.json 路径}。"""
+    """{document_id: gt.json 路径}。键与预测侧一样做空格归一化。"""
     out = {}
     if not gt_dir.exists():
         return out
     for p in sorted(gt_dir.glob("*/gt.json")):
-        out[p.parent.name] = p
+        out[_doc_key(p.parent.name)] = p
     return out
-
-
-def _doc_key(dirname: str) -> str:
-    """目录名 → document_id（空格转下划线，与 GT/pdf_stem 约定一致）。"""
-    return dirname.replace(" ", "_")
 
 
 def find_pred_files(pred_root: Path) -> Dict[str, Path]:

@@ -38,18 +38,17 @@ def adaptive_acceptance_thresholds(
     from .models import AcceptanceThresholds as AT
 
     # 基础阈值（根据尺寸分层）
+    # 旧版还有一个 relax_text 文本行阈值，AcceptanceThresholds 已不含该字段，
+    # 对应的 base_text 计算一并移除，避免留下无人消费的死值。
     if base_height > 400:
         base_h, base_a = (0.50, 0.45) if is_table else (0.55, 0.50)
-        base_ink, base_cov, base_text = 0.85, 0.80, 0.70
-        desc = "large"
+        base_ink, base_cov = 0.85, 0.80
     elif base_height > 200:
         base_h, base_a = (0.50, 0.45) if is_table else (0.60, 0.55)
-        base_ink, base_cov, base_text = 0.90, 0.85, 0.75
-        desc = "medium"
+        base_ink, base_cov = 0.90, 0.85
     else:
         base_h, base_a = (0.65, 0.60) if is_table else (0.70, 0.65)
-        base_ink, base_cov, base_text = 0.92, 0.88, 0.80
-        desc = "small"
+        base_ink, base_cov = 0.92, 0.88
 
     # 根据远侧覆盖率进一步调整
     if far_cov >= 0.60:
@@ -57,22 +56,16 @@ def adaptive_acceptance_thresholds(
         base_a = min(base_a, 0.25)
         base_ink = min(base_ink, 0.70)
         base_cov = min(base_cov, 0.70)
-        base_text = min(base_text, 0.55)
-        desc += "+high_far_cov"
     elif far_cov >= 0.30:
         base_h = min(base_h, 0.45)
         base_a = min(base_a, 0.35)
         base_ink = min(base_ink, 0.75)
         base_cov = min(base_cov, 0.75)
-        base_text = min(base_text, 0.60)
-        desc += "+med_far_cov"
     elif far_cov >= 0.18:
         base_h = min(base_h, 0.50)
         base_a = min(base_a, 0.40)
         base_ink = min(base_ink, 0.80)
         base_cov = min(base_cov, 0.80)
-        base_text = min(base_text, 0.65)
-        desc += "+low_far_cov"
 
     return AT(
         height_ratio=base_h,

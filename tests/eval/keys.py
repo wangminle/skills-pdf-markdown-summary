@@ -118,8 +118,15 @@ def asset_key(
 def normalize_gt_asset(document_id: str, raw: Dict[str, Any]) -> Dict[str, Any]:
     """把 tests/annotations/<doc>/gt.json 的单条记录规范化。"""
     kind = raw.get("kind") or raw.get("type")
-    ident = str(raw.get("ident"))
-    page = int(raw.get("caption_page") or raw.get("page"))
+    raw_ident = raw.get("ident")
+    raw_page = raw.get("caption_page") or raw.get("page")
+    if raw_ident is None or raw_page is None:
+        # 缺字段时旧代码会得到 "None" 键或 int(None) 崩溃，都比不上直接点名哪条记录有问题
+        raise ValueError(
+            f"{document_id}: GT 记录缺少 ident/caption_page: {raw!r}"
+        )
+    ident = str(raw_ident)
+    page = int(raw_page)
     occurrence = int(raw.get("occurrence") or 1)
     group_id = str(raw.get("group_id") or "")
     content = [BBox.from_any(b) for b in (raw.get("content_bboxes") or [])]

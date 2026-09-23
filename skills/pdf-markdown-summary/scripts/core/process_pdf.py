@@ -23,7 +23,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--out", default=None, help="Output Markdown path")
     parser.add_argument("--asset-dir", default="images", help="Image asset directory")
     parser.add_argument("--preset", default="robust", choices=["robust"])
-    parser.add_argument("--allow-continued", action="store_true", default=False)
+    parser.add_argument("--allow-continued", action="store_true", default=False, help="Allow repeated-caption continuation items; structurally matched captionless table pages are recovered automatically")
     parser.add_argument("--ocr", choices=["off", "auto", "force"], default="off")
     return parser.parse_args(argv)
 

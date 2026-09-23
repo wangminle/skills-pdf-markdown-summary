@@ -28,7 +28,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--images` | enum | `off` | Image mode: `off` / `figures` |
 | `--ocr` | enum | `off` | OCR mode: `off` / `auto` / `force` — currently a pure no-op; it only records a `not_implemented` status in the conversion report |
 | `--preset` | enum | `robust` | Asset extraction preset (only `robust`) |
-| `--allow-continued` | flag | off | Allow exporting items that continue across pages |
+| `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
 
 ## summarize_pdf
 
@@ -36,7 +36,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | --- | --- | --- | --- |
 | `--pdf` | str | required | Source PDF path |
 | `--preset` | enum | `robust` | Parameter preset (only `robust`) |
-| `--allow-continued` | flag | off | Allow exporting items that continue across pages |
+| `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
 | `--out-dir` | str | `<pdf-dir>/images` | Image output directory |
 | `--text-path` | str | none | Prepared plain-text path (used by reuse mode) |
 | `--reuse-existing` | flag | off | Reuse an existing `index.json` + text file instead of extracting again (`process_pdf` sets this automatically) |
@@ -49,7 +49,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--out` | str | `<stem>.md` | Output Markdown path |
 | `--asset-dir` | str | `images` | Image asset directory |
 | `--preset` | enum | `robust` | Parameter preset |
-| `--allow-continued` | flag | off | Allow continued items |
+| `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
 | `--ocr` | enum | `off` | OCR mode (same as above: currently a pure no-op) |
 
 `process_pdf` computes asset/text paths that match `pdf_to_markdown`, then invokes `summarize_pdf` with `--reuse-existing` so the PDF is parsed only once.
@@ -76,7 +76,7 @@ Flags are grouped below to match their function in the source. Most flags are al
 | `--out-dir` | str | none | PNG output directory |
 | `--manifest` | str | none | CSV manifest output path |
 | `--index-json` | str | none | `index.json` output path |
-| `--prune-images` / `--no-prune-images` | flag | enabled | Remove unindexed `Figure_*/Table_*` PNGs |
+| `--prune-images` / `--no-prune-images` | flag | enabled | Remove unindexed `Figure_*/Table_*` PNGs only if present before this run and unchanged; preserve new or modified files |
 
 ### Rendering & Clipping (Figure)
 
@@ -105,7 +105,7 @@ Flags are grouped below to match their function in the source. Most flags are al
 | --- | --- | --- | --- |
 | `--below` | str | "" | Figure ids to crop BELOW captions (e.g. `2,3,S1`) |
 | `--above` | str | "" | Figure ids to crop ABOVE captions (e.g. `1,4`) |
-| `--allow-continued` | flag | off | Allow exporting continued items |
+| `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
 
 Use `--below`/`--above` to force a direction when automatic detection picks the wrong side. Identifiers support plain numbers, S-prefix (`S1`), and roman numerals.
 

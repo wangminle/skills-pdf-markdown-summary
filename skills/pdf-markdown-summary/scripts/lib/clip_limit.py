@@ -148,16 +148,15 @@ def limit_clip_by_text_blocks(
                 nearby_short_titles += 1
         if nearby_short_titles >= 2:
             return True
-        if direction == "below":
-            supporting_candidates = candidates[position + 1:position + 3]
-        else:
-            supporting_candidates = candidates[max(0, position - 2):position]
+        # 远侧紧跟正文的标题是章节边界，不能由近侧上一张表的数字支撑。
+        if position + 1 < len(candidates) and _looks_like_blocker(candidates[position + 1]):
+            return False
+        # 表头可能位于内容簇任一端；两种方向均检查邻近两侧，距离不得为负。
+        supporting_candidates = (candidates[max(0, position - 2):position]
+                                 + candidates[position + 1:position + 3])
         for future in supporting_candidates:
             future_rect = _rect(future)
-            if direction == "below":
-                distance = future_rect.y0 - current.y1
-            else:
-                distance = future_rect.y0 - current.y1
+            distance = max(0.0, future_rect.y0 - current.y1, current.y0 - future_rect.y1)
             if distance > min_near_distance:
                 continue
             if (
@@ -227,33 +226,53 @@ def limit_clip_by_neighbor_captions(
     *,
     gap: float = 6.0,
     min_height: float = 40.0,
+    min_width: float = 40.0,
 ) -> Any:
     """
-    使用同页相邻 caption 限制裁剪窗口的 y 范围。
+    使用同页相邻 caption 限制裁剪窗口。
 
     连续 Figure/Table 场景中，baseline 窗口可能越过上一条或下一条 caption，
-    把相邻图表也截入当前结果。这里只收紧远离当前 caption 的一侧，不改变 x 范围。
+    把相邻图表也截入当前结果。竖直方向只收紧远离当前 caption 的一侧；
+    左右并列的独立编号 caption 还会在中点处拆开 x 范围。
     """
     if fitz is None or not neighbor_caption_rects:
         return clip
 
+    limited = fitz.Rect(clip)
+
     if direction == "above":
         previous_caps = [r for r in neighbor_caption_rects if r.y1 <= caption_rect.y0]
-        if not previous_caps:
-            return clip
-        nearest_prev = max(previous_caps, key=lambda r: r.y1)
-        limited = fitz.Rect(clip.x0, max(clip.y0, nearest_prev.y1 + gap), clip.x1, clip.y1)
+        if previous_caps:
+            nearest_prev = max(previous_caps, key=lambda r: r.y1)
+            candidate = fitz.Rect(
+                limited.x0, max(limited.y0, nearest_prev.y1 + gap), limited.x1, limited.y1
+            )
+            if candidate.height >= min_height:
+                limited = candidate
     elif direction == "below":
         next_caps = [r for r in neighbor_caption_rects if r.y0 >= caption_rect.y1]
-        if not next_caps:
-            return clip
-        nearest_next = min(next_caps, key=lambda r: r.y0)
-        limited = fitz.Rect(clip.x0, clip.y0, clip.x1, min(clip.y1, nearest_next.y0 - gap))
-    else:
-        return clip
+        if next_caps:
+            nearest_next = min(next_caps, key=lambda r: r.y0)
+            candidate = fitz.Rect(
+                limited.x0, limited.y0, limited.x1, min(limited.y1, nearest_next.y0 - gap)
+            )
+            if candidate.height >= min_height:
+                limited = candidate
 
-    if limited.height < min_height:
-        return clip
+    x0, x1 = limited.x0, limited.x1
+    for neighbor in neighbor_caption_rects:
+        y_overlap = min(caption_rect.y1, neighbor.y1) - max(caption_rect.y0, neighbor.y0)
+        min_h = min(caption_rect.height, neighbor.height)
+        if min_h <= 0 or y_overlap < 0.45 * min_h:
+            continue
+        if neighbor.x0 >= caption_rect.x1 - 2.0:
+            x1 = min(x1, 0.5 * (caption_rect.x1 + neighbor.x0))
+        elif neighbor.x1 <= caption_rect.x0 + 2.0:
+            x0 = max(x0, 0.5 * (neighbor.x1 + caption_rect.x0))
+
+    if x1 - x0 >= min_width and x1 - x0 < limited.width - 1.0:
+        limited = fitz.Rect(x0, limited.y0, x1, limited.y1)
+
     return limited
 
 def refine_clip_x_range(
@@ -269,6 +288,7 @@ def refine_clip_x_range(
     x_margin: float = 15.0,
     min_width_ratio: float = 0.25,
     debug: bool = False,
+    text_lines: Optional[List] = None,
 ) -> Any:
     """
     根据图注所在列和对象边界框缩小裁剪区域的 x 方向范围。
@@ -362,6 +382,21 @@ def refine_clip_x_range(
             y_overlap = inter.height / max(1.0, r.height)
             if y_overlap > 0.3:
                 objects_in_y.append(r)
+
+    # 图像/矢量列表可能只包含图的一部分（细柱、文字轴标签均可能不在其中）。
+    # 水平收缩必须同时包含同一纵向区域的完整文字框，随后由像素裁剪去掉留白。
+    for rect, _size, text in text_lines or []:
+        if not text.strip():
+            continue
+        # 页外侧竖排出版水印不属于图；图内纵轴仍由其位于版心内区分。
+        if rect.height > 3 * max(1.0, rect.width) and (
+            rect.x1 < page_rect.x0 + 0.10 * page_width
+            or rect.x0 > page_rect.x1 - 0.10 * page_width
+        ):
+            continue
+        inter = rect & clip
+        if inter.width > 0 and inter.height >= 0.5 * rect.height:
+            objects_in_y.append(rect)
 
     if len(objects_in_y) >= 1:
         obj_x0 = min(r.x0 for r in objects_in_y)
