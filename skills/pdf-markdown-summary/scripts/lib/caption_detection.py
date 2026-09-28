@@ -177,7 +177,12 @@ def min_distance_to_rects(rect: Any, rect_list: List[Any]) -> float:
 
 
 _EXPLICIT_CAPTION_PREFIX_RE = re.compile(
-    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*",
+    # 子图尾巴（3a / 5-b / 6(c)）与 idents.py 的 FIGURE_LINE_RE 保持同一套
+    # 可选模式，否则 "Figure 3a:" 会被主正则匹配、却不算显式题注，
+    # 导致 inventory reconcile 系统性缺子图。
+    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+"
+    r"(?:\s*[-–]?\s*[A-Za-z]|\s*\([A-Za-z]\))?"
+    r"\s*",
     re.IGNORECASE,
 )
 _BODY_DISCOURSE_RE = re.compile(
@@ -246,6 +251,12 @@ def is_likely_reference_context(text: str) -> bool:
         r'^table\s+[A-Z]?\d+\s+appendix\b',
         r'^table\s+[A-Z]?\d+\s*,\s*(?:we|this|the)\b',
         r'^(?:table|figure|fig\.?)\s+[A-Z]?\d+\s*\.\s*(?:also|we|this|the|in)\b',
+        # 复数标签 + 编号并列（"Figures 3 and 4"）是正文引用的强信号，
+        # 真实 caption 极少以复数列举开头。
+        r'^(?:tables|tabs\.?|figures|figs\.?)\s+[a-z]?\d+\s+(?:and|,|;|–|-|to)\s+[a-z]?\d+\b',
+        # 「标签 + 编号 + 描述动词 + that/how 从句」是正文句；限定 that/how
+        # 是为了不误伤 "Figure 3 shows the architecture" 这类句式 caption。
+        r'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s*[a-z]?\d+\s+(?:shows?|demonstrates?|illustrates?|compares?|presents?|summarizes?|reports?)\s+(?:that|how)\b',
         r'如.*所示', r'见.*图', r'参见', r'如.*表.*所示',
         r'according to (figure|table)', r'based on (figure|table)',
         r'from (figure|table)',

@@ -23,7 +23,63 @@ def table_remainder_is_open(final_clip: Any, baseline: Any, text_lines: List, di
         remainder = fitz.Rect(final_clip.x0, baseline.y0, final_clip.x1, final_clip.y0)
     else:
         return False
+    # 余量窗口常与同页矢量图的散点标签重叠（Kimi K3 Table 5 下方 Figure 13
+    # 的轴刻度/图例全是 4-6pt 短行，短行占比判据把它们当表格行误报
+    # table_band_open）。以已收录表格行的字号中位数为基准过滤明显更小/更大
+    # 的行；表内无文本行（纯线表格）时不过滤，保持原行为。
+    inner_sizes = sorted(
+        size for rect, size, text in text_lines
+        if (text or "").strip()
+        and (rect & final_clip).width > 0 and (rect & final_clip).height > 0
+    )
+    if inner_sizes:
+        median_size = inner_sizes[len(inner_sizes) // 2]
+        text_lines = [
+            (rect, size, text) for rect, size, text in text_lines
+            if abs(size - median_size) <= 2.5
+        ]
     return looks_like_table_text(remainder, text_lines, min_lines=3)
+
+
+def _rendered_rule_rows(
+    page: Any,
+    render_clip: Any,
+    *,
+    scale: float = 4.0,
+    dark_threshold: int = 80,
+    min_dark_fraction: float = 0.35,
+) -> List[int]:
+    """返回 render_clip 内「横向长线」所在的渲染行号（空列表=无线）。
+
+    近题注边与远侧边共用同一判据：整行暗像素占比 >= min_dark_fraction。
+    """
+    try:
+        matrix = fitz.Matrix(scale, scale)
+        raw_page = getattr(page, "raw", page)
+        pix = raw_page.get_pixmap(matrix=matrix, clip=render_clip, alpha=False)
+    except Exception:
+        return []
+
+    if pix.width <= 0 or pix.height <= 0:
+        return []
+
+    samples = memoryview(pix.samples)
+    n = pix.n
+    stride = pix.stride
+    qualifying_rows: List[int] = []
+    for y in range(pix.height):
+        row = samples[y * stride:(y + 1) * stride]
+        dark = 0
+        for x in range(pix.width):
+            off = x * n
+            r = row[off]
+            g = row[off + 1] if n > 1 else r
+            b = row[off + 2] if n > 2 else r
+            if (r + g + b) / 3.0 <= dark_threshold:
+                dark += 1
+        if dark / max(1.0, float(pix.width)) >= min_dark_fraction:
+            qualifying_rows.append(y)
+    return qualifying_rows
 
 
 def expand_clip_to_rendered_horizontal_rule(
@@ -62,33 +118,10 @@ def expand_clip_to_rendered_horizontal_rule(
     if render_clip.width <= 1 or render_clip.height <= 0.5:
         return clip
 
-    try:
-        matrix = fitz.Matrix(scale, scale)
-        raw_page = getattr(page, "raw", page)
-        pix = raw_page.get_pixmap(matrix=matrix, clip=render_clip, alpha=False)
-    except Exception:
-        return clip
-
-    if pix.width <= 0 or pix.height <= 0:
-        return clip
-
-    samples = memoryview(pix.samples)
-    n = pix.n
-    stride = pix.stride
-    qualifying_rows: List[int] = []
-    for y in range(pix.height):
-        row = samples[y * stride:(y + 1) * stride]
-        dark = 0
-        for x in range(pix.width):
-            off = x * n
-            r = row[off]
-            g = row[off + 1] if n > 1 else r
-            b = row[off + 2] if n > 2 else r
-            if (r + g + b) / 3.0 <= dark_threshold:
-                dark += 1
-        if dark / max(1.0, float(pix.width)) >= min_dark_fraction:
-            qualifying_rows.append(y)
-
+    qualifying_rows = _rendered_rule_rows(
+        page, render_clip, scale=scale,
+        dark_threshold=dark_threshold, min_dark_fraction=min_dark_fraction,
+    )
     if not qualifying_rows:
         return clip
 
@@ -104,6 +137,7 @@ def expand_clip_to_rendered_horizontal_rule(
             return fitz.Rect(clip.x0, clip.y0, clip.x1, new_y1)
 
     return clip
+
 
 def refine_clip_to_table_band(
     clip: Any,
@@ -991,6 +1025,267 @@ def expand_table_clip_to_text_bounds(
     expanded_clip = fitz.Rect(new_x0, new_y0, new_x1, new_y1)
     return _trim_far_side_to_first_structured_row(expanded_clip)
 
+# 字母上标脚注起始（"a These 19 languages..."）：学术表格常见格式，
+# Qwen3-Omni Table 6/17 实测首行 size 5.5、紧贴表底。要求单个小写字母后
+# 跟标点或空白再接内容，避免 "a.k.a." 这类无空格缩写误匹配。
+_LETTER_NOTE_START_RE = re.compile(r"^[a-z][).]?\s+\S")
+
+
+def _table_note_rects(clip: Any, text_lines: List) -> List[Any]:
+    """仅关联贴近表底、同列的小字号显式尾注及紧邻续行。
+
+    字号容差 1.5、总高上限 64：DeepSeek Table 4 实测续行 max-span 字号
+    与首行差 0.72、总高 47.3pt。Qwen 的上标虽是 5.5pt，
+    collect_text_lines 返回整行最大字号 7.3pt，不能据上标放宽整行阈值。
+    """
+    ordered = sorted(text_lines, key=lambda item: (item[0].y0, item[0].x0))
+    notes = []
+    note_size = None
+    start_y = None
+    last_letter_marker = None
+    for rect, size, text in ordered:
+        text = (text or "").strip()
+        if not text or rect.x0 < clip.x0 - 8 or rect.x1 > clip.x1 + 8:
+            continue
+        if not notes:
+            if not (re.match(r"^(?:Notes?[.:]|注[：:])", text, re.I)
+                    or _LETTER_NOTE_START_RE.match(text)):
+                continue
+            # 首行窗口须覆盖「尾注块已整体在框内」的二次调用：trim/far_side
+            # 用扩边后的 clip 重新推导豁免时，首行距框底可达 尾注块高 64pt
+            # （Qwen T6 实测 54.3pt），51pt 窗口会把首行落在框外、豁免失效，
+            # 尾注被反过来当正文裁掉（final y1 停在 741.2 的成因）。
+            if not (clip.y1 - 84 <= rect.y0 <= clip.y1 + 12) or size > 10:
+                continue
+            notes.append(rect)
+            note_size, start_y = size, rect.y0
+            if _LETTER_NOTE_START_RE.match(text):
+                last_letter_marker = text[0].lower()
+        else:
+            # 轻微重叠通常是同行外来文字，不能跨过去继续桥接正文。
+            # 仅 a→b→c 等明确连续的字母脚注允许这种重叠；Qwen T6/T17
+            # 的 c 行与 b 行 bbox 实测重叠 1.8pt。
+            if rect.y0 < notes[-1].y1 - 1:
+                overlap = notes[-1].y1 - rect.y0
+                letter_marker = text[0].lower() if _LETTER_NOTE_START_RE.match(text) else None
+                sequential_marker = (
+                    letter_marker is not None
+                    and last_letter_marker is not None
+                    and ord(letter_marker) == ord(last_letter_marker) + 1
+                )
+                if not sequential_marker or overlap > 0.5 * min(rect.height, notes[-1].height):
+                    break
+            if (rect.y0 - notes[-1].y1 > 4 or abs(size - note_size) > 1.5
+                    or rect.y1 - start_y > 64 or text.startswith(("•", "Table ", "Figure "))):
+                break
+            notes.append(rect)
+            if _LETTER_NOTE_START_RE.match(text):
+                last_letter_marker = text[0].lower()
+    return notes
+
+
+def expand_clip_to_table_notes(
+    clip: Any,
+    text_lines: List,
+    caption_rect: Optional[Any] = None,
+    *,
+    pad: float = 3.0,
+) -> Any:
+    """恢复表格底线外的显式注释，不扩大到随后的正文列表。
+
+    caption_rect: 题注矩形。尾注是「表格自己的一部分」，题注在 Markdown 里
+    单独渲染，不允许被拖进截图。判据只看尾注行本身是否压到题注——不用
+    「回扩后整块 vs 题注」相交的粗判，因为 clip 本来就贴着题注边界，
+    那样会把本来正常的回扩一起否掉。
+    """
+    notes = _table_note_rects(clip, text_lines)
+    if not notes:
+        return clip
+    if caption_rect is not None and any(
+        (note & caption_rect).get_area() > 0 for note in notes
+    ):
+        return clip
+    grown = fitz.Rect(min(clip.x0, min(r.x0 for r in notes) - pad), clip.y0,
+                      max(clip.x1, max(r.x1 for r in notes) + pad),
+                      max(clip.y1, max(r.y1 for r in notes) + pad))
+    if grown.height <= 1 or grown.width <= 1:
+        return clip
+    return grown
+
+
+# 短脚注可以整行纳入以保住外框线；更高的正文块不跟着吞进来。
+_BORDER_TEXT_EXTEND_LIMIT = 24.0
+
+
+def _overlapping_text_lines(text_lines, x0, x1):
+    lines = []
+    for line_rect, _fs, _text in text_lines or []:
+        if line_rect is None:
+            continue
+        if min(line_rect.x1, x1) - max(line_rect.x0, x0) <= 0.5:
+            continue
+        lines.append(line_rect)
+    return lines
+
+
+def _edge_inside_line(edge, line_rect) -> bool:
+    return line_rect.y0 + 1e-3 < edge < line_rect.y1 - 1e-3
+
+
+def _edge_inside_any(edge, lines) -> bool:
+    return any(_edge_inside_line(edge, line) for line in lines)
+
+
+def _short_line_past_rule(line_rect, rule_edge, *, toward_bottom: bool) -> bool:
+    height = line_rect.y1 - line_rect.y0
+    extra = (line_rect.y1 - rule_edge) if toward_bottom else (rule_edge - line_rect.y0)
+    return height <= _BORDER_TEXT_EXTEND_LIMIT and extra <= _BORDER_TEXT_EXTEND_LIMIT
+
+
+def _extend_through_short_lines(edge, lines, rule_edge, *, toward_bottom: bool):
+    """边落在后续短行内部时，沿这些短行走到外侧，不穿过高正文。"""
+    for _ in range(8):
+        hosts = [
+            line for line in lines
+            if _edge_inside_line(edge, line)
+            and _short_line_past_rule(line, rule_edge, toward_bottom=toward_bottom)
+        ]
+        if not hosts:
+            return edge
+        nxt = max(line.y1 for line in hosts) if toward_bottom else min(line.y0 for line in hosts)
+        if abs(nxt - edge) <= 1e-3:
+            return edge
+        edge = nxt
+    return edge
+
+
+def _clear_bottom_edge(proposed, rule_y1, lines, clip_y1):
+    """底边落到文字行内部时，改到行界上；保不住横线又不该吞正文时放弃扩展。"""
+    if not _edge_inside_any(proposed, lines):
+        return proposed
+    stops = []
+    for line in lines:
+        if line.y0 >= rule_y1 - 0.05 and not _edge_inside_any(line.y0, lines):
+            stops.append(line.y0)
+        overlaps_rule = line.y0 < rule_y1 - 0.05
+        if overlaps_rule and _short_line_past_rule(line, rule_y1, toward_bottom=True):
+            far = _extend_through_short_lines(line.y1, lines, rule_y1, toward_bottom=True)
+            if not _edge_inside_any(far, lines):
+                stops.append(far)
+    valid = [edge for edge in stops if edge >= rule_y1 - 0.05]
+    if not valid:
+        return clip_y1
+    return min(valid)
+
+
+def _clear_top_edge(proposed, rule_y0, lines, clip_y0):
+    """顶边与底边对称。"""
+    if not _edge_inside_any(proposed, lines):
+        return proposed
+    stops = []
+    for line in lines:
+        if line.y1 <= rule_y0 + 0.05 and not _edge_inside_any(line.y1, lines):
+            stops.append(line.y1)
+        overlaps_rule = line.y1 > rule_y0 + 0.05
+        if overlaps_rule and _short_line_past_rule(line, rule_y0, toward_bottom=False):
+            far = _extend_through_short_lines(line.y0, lines, rule_y0, toward_bottom=False)
+            if not _edge_inside_any(far, lines):
+                stops.append(far)
+    valid = [edge for edge in stops if edge <= rule_y0 + 0.05]
+    if not valid:
+        return clip_y0
+    return max(valid)
+
+
+def _fit_border_edge_around_text(
+    clip,
+    new_y0,
+    new_y1,
+    top_rule_y0,
+    bottom_rule_y1,
+    text_lines,
+    x0,
+    x1,
+):
+    """调整补边，使外框线留在框内，且边不落在文字行内部。"""
+    lines = _overlapping_text_lines(text_lines, x0, x1)
+    if bottom_rule_y1 is not None and new_y1 > clip.y1:
+        new_y1 = _clear_bottom_edge(new_y1, bottom_rule_y1, lines, clip.y1)
+    if top_rule_y0 is not None and new_y0 < clip.y0:
+        new_y0 = _clear_top_edge(new_y0, top_rule_y0, lines, clip.y0)
+    return new_y0, new_y1
+
+
+def expand_table_clip_to_border_rules(
+    clip: Any,
+    page: Any,
+    text_lines: Optional[List[Tuple[Any, float, str]]] = None,
+    *,
+    max_gap: float = 4.0,
+    pad: float = 1.5,
+    min_rule_width: float = 0.55,
+) -> Any:
+    """把紧贴 clip 上/下边缘的表格横线（外框线）并入截图。
+
+    Qwen3-Omni Table 6/17（底线距 clip 底 3.6pt）、Kimi Table 5（顶线距
+    clip 顶 0.94pt）这类被文字收边排除掉的外框线会触发
+    object_truncation/table_band_open 评审告警，且截图缺一条边。
+    只并入水平方向与 clip 显著重叠、宽度达到 clip 55% 的横线；
+    距离超过 max_gap 的线（多半属于下一个元素）不并入。
+
+    硬约束：扩展不得切开文字行，也不得为此丢掉已经选中的外框线。
+    行首在横线外侧时，把该侧收到行首（Qwen T6/T17 脚注在底线下方 0.9pt）。
+    短行已经跨过原 clip 边，或字框压住横线时，收到行首会切字或丢线，
+    改为纳入整行。与横线重叠的高正文不整段吞入，这一侧放弃扩展。
+    """
+    if fitz is None or clip.width <= 1 or clip.height <= 1:
+        return clip
+    page_rect = getattr(page, "rect", None)
+    if page_rect is None:
+        return clip
+    x0 = min(clip.x0, page_rect.x1)
+    x1 = max(clip.x1, page_rect.x0)
+    min_w = (x1 - x0) * min_rule_width
+    new_y0, new_y1 = clip.y0, clip.y1
+    top_rule_y0 = None
+    bottom_rule_y1 = None
+    for d in page.get_drawings():
+        rect = fitz.Rect(d["rect"])
+        if rect.height > 2.5 or rect.width < min_w:
+            continue
+        horiz_overlap = min(rect.x1, x1) - max(rect.x0, x0)
+        if horiz_overlap < min_w:
+            continue
+        if 0 <= clip.y0 - rect.y1 <= max_gap:
+            new_y0 = min(new_y0, rect.y0 - pad)
+            top_rule_y0 = rect.y0 if top_rule_y0 is None else min(top_rule_y0, rect.y0)
+        if 0 <= rect.y0 - clip.y1 <= max_gap:
+            new_y1 = max(new_y1, rect.y1 + pad)
+            bottom_rule_y1 = rect.y1 if bottom_rule_y1 is None else max(bottom_rule_y1, rect.y1)
+
+    new_y0, new_y1 = _fit_border_edge_around_text(
+        clip,
+        new_y0,
+        new_y1,
+        top_rule_y0,
+        bottom_rule_y1,
+        text_lines,
+        x0,
+        x1,
+    )
+
+    if new_y0 >= clip.y0:
+        new_y0 = clip.y0
+    if new_y1 <= clip.y1:
+        new_y1 = clip.y1
+    if new_y0 == clip.y0 and new_y1 == clip.y1:
+        return clip
+    # PyMuPDF 的空交集 Rect（x0>=x1）布尔值仍为 True，`or clip` 兜底不生效，
+    # 必须显式判 is_empty；退化交集时回退原 clip 而非返回畸形框。
+    clamped = fitz.Rect(clip.x0, new_y0, clip.x1, new_y1) & page_rect
+    return clip if clamped.is_empty else clamped
+
+
 def trim_table_clip_far_side_body(
     clip: Any,
     caption_rect: Any,
@@ -1004,7 +1299,11 @@ def trim_table_clip_far_side_body(
     if fitz is None or clip.width <= 1 or clip.height <= 1:
         return clip
 
+    note_rects = _table_note_rects(clip, text_lines)
+
     def _is_body(text: str, rect: Any) -> bool:
+        if any((rect & note).get_area() >= 0.9 * rect.get_area() for note in note_rects):
+            return False
         txt = (text or "").strip()
         if not txt or re.match(r"^\s*(?:Table|Figure|Tab\.?|Fig\.?)\s+\S+", txt, re.I):
             return False
@@ -1150,24 +1449,6 @@ def trim_table_far_side_section_heading(
             elif title_rect.y0 - lh <= p.y0 <= title_rect.y1 + para_tol:
                 return True
         return False
-
-    def _table_cells_beyond(title_rect: Any) -> int:
-        count = 0
-        for line_rect, _font_size, text in text_lines or []:
-            if not (text or "").strip():
-                continue
-            inter = line_rect & clip
-            if inter.width <= 0 or inter.height <= 0:
-                continue
-            if inter.width >= 0.55 * clip.width:
-                continue  # 宽行视为正文段落，不计入表格单元格
-            if direction == "below":
-                if line_rect.y0 > title_rect.y1 + 0.3 * lh:
-                    count += 1
-            else:
-                if line_rect.y1 < title_rect.y0 - 0.3 * lh:
-                    count += 1
-        return count
 
     def _has_same_row_table_context(title_rect: Any) -> bool:
         """标题同一横向行带是否存在并排的表格单元格。

@@ -25,7 +25,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--report-json` | str | none | Conversion report JSON output path |
 | `--blocks-json` | str | none | Markdown blocks JSON output path |
 | `--tables` | enum | `off` | Table handling: `off` / `auto` / `screenshot` / `structure` — `auto`, `screenshot`, and `structure` currently behave identically (screenshot export); `structure` is a roadmap placeholder, not yet implemented |
-| `--images` | enum | `off` | Image mode: `off` / `figures` |
+| `--images` | enum | `figures` | Image mode: `off` / `figures` — 默认提取 Figure，仅显式传 `off` 才关闭 |
 | `--ocr` | enum | `off` | OCR mode: `off` / `auto` / `force` — currently a pure no-op; it only records a `not_implemented` status in the conversion report |
 | `--preset` | enum | `robust` | Asset extraction preset (only `robust`) |
 | `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
@@ -39,7 +39,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
 | `--out-dir` | str | `<pdf-dir>/images` | Image output directory |
 | `--text-path` | str | none | Prepared plain-text path (used by reuse mode) |
-| `--reuse-existing` | flag | off | Reuse an existing `index.json` + text file instead of extracting again (`process_pdf` sets this automatically) |
+| `--reuse-existing` | flag | off | Reuse an existing `index.json` + text file instead of extracting again (`process_pdf` sets this automatically). The index must belong to the current PDF: it records the source PDF name and a `sha256:` content hash, and reuse is refused with exit 1 when either mismatches (another PDF in the same default `images/` dir, or a same-named PDF whose content changed) |
 
 ## process_pdf
 

@@ -540,11 +540,24 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
 
     inventory = {}
     try:
+        # 对账范围与用户显式开关一致：--no-figures/--no-tables 禁用的类型、
+        # --min/--max-figure 收窄到范围外的编号都不算「缺失」，
+        # 否则会凭空产出 inventory_gap PNG 与 review_required 条目。
+        inventory_kinds = set()
+        if getattr(args, "include_figures", True):
+            inventory_kinds.add("figure")
+        if getattr(args, "include_tables", True):
+            inventory_kinds.add("table")
         inventory = finalize_caption_inventory(
             records,
             pdf_path,
             out_dir,
             dpi=args.dpi,
+            # 空集（全部类型都被禁用）是合法输入：传空集跳过全部补裁。
+            # 不能写成 `or None`，那会把空集坍缩成 None 反而放开过滤。
+            kinds=inventory_kinds,
+            min_figure=getattr(args, "min_figure", None),
+            max_figure=getattr(args, "max_figure", None),
         )
     except Exception as e:
         logger.warning("Caption inventory finalize failed: %s", e)

@@ -46,6 +46,7 @@ coverage.xml
 .cursorindexingignore
 .pypirc
 .claude/
+.agents/
 node_modules/
 **/.DS_Store
 
@@ -80,4 +81,4 @@ tests/annotations/
 tests/holdout/
 
 # 实验目录（含大量 PNG/debug/Layout 产物，本地保留，不上传 GitHub）
-docs/3-experiments/
+docs/4-experiments/

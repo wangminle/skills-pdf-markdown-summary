@@ -258,6 +258,19 @@ def collect_explicit_args(
             dest_like = name.replace("-", "_")
             explicit.add(dest_like)
             action = option_actions.get(flag)
+            if action is None and option_actions:
+                # argparse 默认 allow_abbrev=True，命令行可以写选项前缀。
+                # _option_string_actions 只登记完整串，前缀查不到 -> dest 缺失
+                # -> preset 认为「未显式传参」而覆盖用户的值（实测
+                # --text-trim-width 0.8 被 robust preset 改回 0.5）。
+                # 这里按 argparse 同样的前缀规则补齐 dest。
+                prefixed = [
+                    act for opt, act in option_actions.items()
+                    if opt.startswith(flag) and opt != flag
+                ]
+                # 唯一前缀才敢认；歧义时 argparse 自己也会报错
+                if len(prefixed) == 1:
+                    action = prefixed[0]
             action_dest = getattr(action, "dest", None) if action is not None else None
             if action_dest:
                 explicit.add(action_dest)

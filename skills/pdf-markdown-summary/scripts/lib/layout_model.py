@@ -197,11 +197,13 @@ def detect_columns(
 
     # 采样前5页的段落文本
     x0_values = []
+    width_values = []
     for pno in list(all_units.keys())[:5]:
         units = all_units.get(pno, [])
         for unit in units:
             if unit.text_type == 'paragraph':
                 x0_values.append(unit.bbox.x0)
+                width_values.append(unit.bbox.width)
 
     if not x0_values or len(x0_values) < 10:
         if debug:
@@ -229,7 +231,12 @@ def detect_columns(
             peak1_x = bins[top_peaks[0]]
             peak2_x = bins[top_peaks[1]]
 
-            candidate_gap = peak2_x - peak1_x - (page_width - peak2_x)
+            # 栏间距估计：两峰间距 ≈ 栏宽 + 栏间距，用段落行宽中位数估计栏宽后相减。
+            # 旧公式误减 (page_width - peak2_x)（= 栏宽 + 右页边距），对称布局下
+            # 恒等于 栏间距 - 页边距，标准边距 54pt > 栏间距 ~30pt 时必为负，
+            # 导致双栏检测恒失效。
+            med_line_width = float(np.median(width_values))
+            candidate_gap = peak2_x - peak1_x - med_line_width
             peak_sep = peak2_x - peak1_x
             valid_gap = 0 < candidate_gap <= 0.30 * page_width
             valid_sep = 0.18 * page_width <= peak_sep <= 0.60 * page_width

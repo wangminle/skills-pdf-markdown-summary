@@ -45,18 +45,13 @@ def trim_far_side_noise_before_content(
             continue
         relative_top = (line_rect.y0 - clip.y0) / max(1.0, clip.height)
         relative_bottom = (clip.y1 - line_rect.y1) / max(1.0, clip.height)
-        if (
-            direction == "above"
-            and relative_top <= 0.18
-            and (":" in txt or (len(txt) >= 8 and txt == txt.upper()))
-        ):
+        # 页眉/页脚的文本特征两侧必须一致：只有全大写（len>=8）才行会把
+        # "NeurIPS 2024: Foo et al." 这类带冒号、非全大写的页眉漏判，
+        # 使它在 below 方向仍被当作图内文字证据、把页脚框进截图。
+        looks_like_running_margin = (":" in txt) or (len(txt) >= 8 and txt == txt.upper())
+        if direction == "above" and relative_top <= 0.18 and looks_like_running_margin:
             running_margin_text.append(line_rect)
-        elif (
-            direction == "below"
-            and relative_bottom <= 0.18
-            and len(txt) >= 8
-            and txt == txt.upper()
-        ):
+        elif direction == "below" and relative_bottom <= 0.18 and looks_like_running_margin:
             running_margin_text.append(line_rect)
 
     for r in image_rects:
@@ -171,6 +166,7 @@ def expand_clip_to_nearby_figure_title(
     pad: float = 4.0,
     max_gap: float = 12.0,
     max_title_font_size: float = 11.0,
+    page_rect: Optional[Any] = None,
 ) -> Any:
     """恢复紧贴图主体的图内标题，避免被 layout 标题 blocker 排除。"""
     if fitz is None or original_clip.width <= 1 or original_clip.height <= 1:
@@ -179,6 +175,11 @@ def expand_clip_to_nearby_figure_title(
         return limited_clip
 
     def _is_page_header(line_rect: Any, text: str) -> bool:
+        # 页面顶部 5% 带内的行一律视为运行页眉/页眉区：Kimi K3 的居中页眉
+        # （"Kimi K3: Open Frontier Intelligence" 等）各元素只占窗口宽约 26%，
+        # 旧的「宽 >=70% 且含冒号」判据对它失效，曾被当 chart title 扩进图。
+        if page_rect is not None and line_rect.y0 <= page_rect.y0 + 0.05 * page_rect.height:
+            return True
         width_ratio = line_rect.width / max(1.0, original_clip.width)
         return width_ratio >= 0.70 and line_rect.y0 <= original_clip.y0 + 80.0 and ":" in text
 
@@ -330,9 +331,12 @@ def expand_clip_to_nearby_figure_objects(
 
     if direction == "above":
         boundary = page_rect.y0
+        # 邻题注只要与当前 clip 有任何重叠（含落在 clip 内部）都要当停止线：
+        # 只取「完全在 clip 之上」的题注，会在题注已被部分框进来时放任扩边，
+        # 把邻题注剩下的部分一起吞掉。
         previous_caps = [
             rect for rect in neighbor_caption_rects
-            if rect.y1 <= caption_rect.y0 and rect.y1 < limited_clip.y0 - 0.5
+            if rect.y1 <= caption_rect.y0 and rect.y0 < limited_clip.y0 - 0.5
         ]
         if previous_caps:
             boundary = max(boundary, max(rect.y1 for rect in previous_caps) + gap)
@@ -358,7 +362,7 @@ def expand_clip_to_nearby_figure_objects(
         boundary = page_rect.y1
         next_caps = [
             rect for rect in neighbor_caption_rects
-            if rect.y0 >= caption_rect.y1 and rect.y0 > limited_clip.y1 + 0.5
+            if rect.y0 >= caption_rect.y1 and rect.y1 > limited_clip.y1 + 0.5
         ]
         if next_caps:
             boundary = min(boundary, min(rect.y0 for rect in next_caps) - gap)

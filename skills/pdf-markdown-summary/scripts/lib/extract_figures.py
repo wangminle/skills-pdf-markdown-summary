@@ -452,6 +452,7 @@ def extract_figures(
                         base_clip,
                         text_lines,
                         direction,
+                        page_rect=page_rect,
                     )
                     base_clip = expand_clip_to_nearby_figure_objects(
                         base_clip,
@@ -662,6 +663,7 @@ def extract_figures(
                     # 放在正文裁切之后，防止小写图内标题再次被当成正文残片。
                     final_clip = expand_clip_to_nearby_figure_title(
                         base_clip, final_clip, text_lines, direction,
+                        page_rect=page_rect,
                     )
 
                 # ================================================================
@@ -689,6 +691,10 @@ def extract_figures(
                     final_metrics = compute_clip_quality_metrics(
                         page, final_clip, image_rects, vector_rects, dpi=72,
                     )
+                    # 门控与表路径（table_like_refined）同构：低比例保留只对
+                    # 「框内以图形为主、无大面积正文」的候选开 后门；正文污染
+                    # 框必须走验收回退。15f4e08 曾写死 True 架空全部比例判据。
+                    polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
                     accepted, hard_reject, fallback_reason = evaluate_refinement_acceptance(
                         final_clip,
                         base_clip,
@@ -696,10 +702,9 @@ def extract_figures(
                         final_metrics=final_metrics,
                         base_metrics=base_metrics,
                         page_width=page_rect.width,
-                        allow_low_ratio_keep=True,
+                        allow_low_ratio_keep=not polluted,
                     )
 
-                    polluted, pollution_reason = detect_text_pollution(final_clip, text_lines)
                     if polluted:
                         logger.info(f"Figure {ident}: polluted clip kept for review ({pollution_reason})")
                         log_event(
@@ -850,7 +855,12 @@ def extract_figures(
                                     direction,
                                     ink_probe=page_ink_probe,
                                 ) or text_crosses_clip_boundary(
-                                    final_bbox, [list(rect) for rect, _fs, text in text_lines if text.strip()]
+                                    final_bbox,
+                                    [list(rect) for rect, _fs, text in text_lines if text.strip()],
+                                    # 与表格路径（extract_tables.py / table_continuation.py）
+                                    # 同一阈值：只擦到边缘 <50% 高度的邻行不算跨界，
+                                    # 否则同页 figure 与 table 对同一几何给出相反结论。
+                                    min_inside_height_ratio=0.5,
                                 ),
                                 weak_anchor=weak_anchor,
                             )

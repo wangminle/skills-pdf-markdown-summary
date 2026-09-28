@@ -54,7 +54,7 @@ tests/results/ 中，仅作本地变更检测，不纳入版本控制。
   - 环境变量 PDF_GOLDEN_REEXTRACT=1 可强制不复用、全部重新提取。
   - golden 基准 golden_index.json 存放于 tests/results/ 各批次中（不纳入版本控制，
     tests/results/ 已整体 gitignore）；读取时从最新批次查找，--update-golden 写入
-    当前批次。clone 后需先运行 --update-golden 生成本地基准。basic-benchmark 仅
+    独立批次，避免与被比较产物同批自比。clone 后需先运行 --update-golden 生成本地基准。basic-benchmark 仅
     保留 PDF（纯只读输入）。
 """
 
@@ -671,8 +671,8 @@ def _resolve_golden_paths(spec: GoldenSpec) -> Tuple[Path, Path, Path, Path]:
       没有已提取产物时，路径指向本次运行的新批次目录（懒创建）。
     - golden_index.json 基准存放于 tests/results/ 各批次中（本地基准，不纳入
       版本控制——tests/results/ 已整体 gitignore）；读取时从最新批次查找
-      （_find_golden_index，不校验指纹），找不到时回退到当前批次路径
-      （供 --update-golden 写入；新 clone 需先运行 --update-golden 生成基准）。
+      （_find_golden_index，不校验指纹）。更新时由 run_golden_tests 创建单独批次，
+      与被比较的 index.json 分离；新 clone 需先运行 --update-golden 生成基准。
     """
     stem = Path(spec.pdf_file).stem
     pdf_path = TESTS_DIR / spec.pdf_file
@@ -684,6 +684,25 @@ def _resolve_golden_paths(spec: GoldenSpec) -> Tuple[Path, Path, Path, Path]:
         index_path = images_dir / "index.json"
     golden_path = _find_golden_index(stem) or (images_dir / "golden_index.json")
     return pdf_path, images_dir, index_path, golden_path
+
+
+def golden_is_self_comparison(index_path: Path, golden_path: Path) -> bool:
+    """判断基准是否就出自被比对象所在的那次运行（同批次）。
+
+    `_find_golden_index` 取「最新含基准的批次」，而 `_find_existing_index`
+    取「最新含 index.json 的批次」。`--update-golden` 会把基准写进它自己
+    刚提取出来的批次，于是两者落在同一批次目录——此时无论产物对不对，
+    比较都必然全绿（假绿）。
+
+    比父目录而非比文件：文件名本就不同（index.json / golden_index.json），
+    比文件永远为 False，判不到自比状态。
+
+    这类状态必须显式失败：真实防回归需要「另一次运行的产物 vs 基准」。
+    """
+    try:
+        return index_path.resolve().parent == golden_path.resolve().parent
+    except OSError:
+        return False
 
 
 def ensure_extracted_index(spec: GoldenSpec, verbose: bool = False) -> Tuple[bool, str]:
@@ -742,6 +761,8 @@ def run_golden_tests(
         (passed_count, failed_count, results)
     """
     results: List[ComparisonResult] = []
+    # 一次更新操作中的所有 PDF 共用一个独立基准批次。
+    update_batch_dir: Optional[Path] = None
 
     for spec in CORE_REGRESSION_SET:
         pdf_path, images_dir, index_path, golden_path = _resolve_golden_paths(spec)
@@ -816,8 +837,14 @@ def run_golden_tests(
                 "items": golden_items,
             }
 
-            # --update-golden 写入当前批次（golden_path 可能来自旧批次，不可覆盖）
-            golden_write_path = images_dir / "golden_index.json"
+            # 基准必须与生成它的 index.json 分批保存，否则比较会变成自比假绿。
+            # 批次目录只计算一次，保证同次更新的所有 PDF 归于同一批次。
+            if update_batch_dir is None:
+                update_batch_dir = _compute_batch_dir()
+            stem = Path(spec.pdf_file).stem
+            golden_write_path = (
+                update_batch_dir / stem / "images" / "golden_index.json"
+            )
             golden_write_path.parent.mkdir(parents=True, exist_ok=True)
             with open(golden_write_path, 'w', encoding='utf-8') as f:
                 json.dump(golden_to_save, f, ensure_ascii=False, indent=2)
@@ -841,6 +868,17 @@ def run_golden_tests(
                     f"golden 基准缺失（禁止空跑）: {golden_path}，"
                     f"请运行 --update-golden 生成"
                 ]
+            )
+            results.append(result)
+            if verbose:
+                print(f"  {result.messages[0]}")
+            continue
+
+        if golden_is_self_comparison(index_path, golden_path):
+            result = ComparisonResult(
+                pdf_name=spec.pdf_file,
+                passed=False,
+                messages=[f"golden 基准与被比产物同批次，禁止自比假绿: {index_path}"],
             )
             results.append(result)
             if verbose:
@@ -934,6 +972,12 @@ def test_golden_index_comparison(spec: GoldenSpec) -> None:
 
     golden_data = load_index_json(golden_path)
     assert golden_data is not None, f"无法加载 golden 基准: {golden_path}"
+
+    # 基准与被比对象同目录时比较必然全绿（假绿），必须显式失败。
+    assert not golden_is_self_comparison(index_path, golden_path), (
+        f"golden 基准与被比产物位于同一目录，比较无意义（假绿）: {index_path}。"
+        f"请将基准与产物放在不同批次后重跑。"
+    )
 
     result = compare_with_golden(spec, golden_data, current_data, images_dir)
     assert result.passed, "\n".join(result.messages)

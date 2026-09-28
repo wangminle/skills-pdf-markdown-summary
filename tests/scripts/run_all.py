@@ -23,7 +23,7 @@ QA-01 统一测试入口
   一律失败，仅用户显式授权的排除模式可跳过），
   通过/失败数从 pytest 输出解析，解析不到标记"数量未知"。
 
-测试套件（共 10 个）：
+测试套件（共 17 个）：
 1. P0 环境变量优先级测试 (test_p0_env_priority.py)
 2. P1 标识符解析测试 (test_p1_ident_parsing.py)
 3. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
@@ -34,6 +34,13 @@ QA-01 统一测试入口
 8. 正则表达式测试 (test_regex_patterns.py)
 9. A2/A3 配对与精修回归测试 (test_a2_a3_fixes.py)
 10. 统一测试入口假绿防护 (test_run_all.py)
+11. 视觉审查回归测试 (test_visual_review_20260907.py)
+12. 审查修复回归测试 (test_review_fixes_20260922.py)
+13. 结构审查回归测试 (test_structure_review_20260922.py)
+14. 剩余审查回归测试 (test_remaining_review_20260923.py)
+15. 表格尾注回归测试 (test_table_notes_20260923.py)
+16. 验收状态与题注对账测试 (test_extraction_status_inventory.py)
+17. 审查缺陷修复回归测试 (test_bugfix_20260928.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -46,7 +53,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, List, Optional, Tuple
+from typing import ClassVar, List, Optional, Set, Tuple
 
 # 项目根目录：tests/scripts/ -> 向上三级
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -314,6 +321,56 @@ def main(argv: Optional[List[str]] = None) -> int:
         "path": TESTS_SCRIPTS_DIR / "test_run_all.py",
     })
 
+    # 2026-09-22/23 审查修复回归（BUG-072 补齐：此前清单遗漏 6 个套件，
+    # 实际 pytest 收集 254 例、入口只跑 156 例并以 0 退出，形成静默假绿）
+    test_suites.append({
+        "name": "视觉审查回归测试 (20260907)",
+        "path": TESTS_SCRIPTS_DIR / "test_visual_review_20260907.py",
+    })
+    test_suites.append({
+        "name": "审查修复回归测试 (20260922)",
+        "path": TESTS_SCRIPTS_DIR / "test_review_fixes_20260922.py",
+    })
+    test_suites.append({
+        "name": "结构审查回归测试 (20260922)",
+        "path": TESTS_SCRIPTS_DIR / "test_structure_review_20260922.py",
+    })
+    test_suites.append({
+        "name": "剩余审查回归测试 (20260923)",
+        "path": TESTS_SCRIPTS_DIR / "test_remaining_review_20260923.py",
+    })
+    test_suites.append({
+        "name": "表格尾注回归测试 (20260923)",
+        "path": TESTS_SCRIPTS_DIR / "test_table_notes_20260923.py",
+    })
+    test_suites.append({
+        "name": "验收状态与题注对账测试",
+        "path": TESTS_SCRIPTS_DIR / "test_extraction_status_inventory.py",
+    })
+    test_suites.append({
+        "name": "审查缺陷修复回归 (20260928)",
+        "path": TESTS_SCRIPTS_DIR / "test_bugfix_20260928.py",
+    })
+
+    # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，
+    # 就会重演「静默跳过、退出码仍为 0」的假绿。golden 单独处理，故排除。
+    explicitly_skipped: Set[str] = set()
+    if args.skip_p0:
+        explicitly_skipped.add("test_p0_env_priority.py")
+    if args.skip_p1:
+        explicitly_skipped.add("test_p1_ident_parsing.py")
+    if args.skip_regex:
+        explicitly_skipped.add("test_regex_patterns.py")
+    unregistered = find_unregistered_suites(test_suites, ignored_files=explicitly_skipped)
+    if unregistered:
+        print("\n" + "!" * 70)
+        print("测试清单不完备，以下 test_*.py 未登记到 run_all 清单：")
+        for path in unregistered:
+            print(f"  - {path.name}")
+        print("请在 main() 的 test_suites 中补登记（golden 由 --with/--update-golden 单独处理）")
+        print("!" * 70)
+        return 1
+
     # 运行所有 pytest 套件
     for suite in test_suites:
         print(f"\n{'='*60}")
@@ -429,6 +486,27 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 1
 
     return 0 if suite_failures == 0 else 1
+
+
+GOLDEN_SUITE_FILE = "test_extraction_golden.py"
+
+
+def find_unregistered_suites(
+    test_suites: List[dict], *, ignored_files: Optional[Set[str]] = None
+) -> List[Path]:
+    """返回 tests/scripts/ 下未登记进清单的 test_*.py。
+
+    golden 套件由 --with-golden/--update-golden 单独驱动，不在此列。
+    存在的意义：让「新增测试文件忘记登记」立刻失败，而不是静默少跑。
+    """
+    listed = {Path(suite["path"]).name for suite in test_suites}
+    listed.add(GOLDEN_SUITE_FILE)
+    listed.update(ignored_files or ())
+    return sorted(
+        path
+        for path in TESTS_SCRIPTS_DIR.glob("test_*.py")
+        if path.name not in listed
+    )
 
 
 def _print_suite_result(result: TestSuiteResult) -> None:

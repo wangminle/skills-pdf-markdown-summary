@@ -173,10 +173,14 @@ def compute_global_anchor(
         image_rects: List[fitz.Rect] = []
         vector_rects: List[fitz.Rect] = []
 
+        # 收集对象。口径必须与对应提取主循环一致：图路径主循环只收 'O'
+        # （extract_figures 的 Phase A/B 不把 H/V 线段当图形对象，局部方向
+        # 证据 score_local_direction 也只看这些 rects），表格路径主循环
+        # 收 H/V/O（表格线是表格的主要证据）。锚点口径宽于主循环时，纯
+        # 折线/柱状图页会出现「锚点看得见线段、局部证据为空」的对撞。
+        wanted_orients = ('O', 'H', 'V') if is_table else ('O',)
         for item in draw_items:
-            if item.orient == 'O':
-                vector_rects.append(item.rect)
-            elif item.orient in ('H', 'V'):
+            if item.orient in wanted_orients:
                 vector_rects.append(item.rect)
 
         for blk in dict_data.get("blocks", []):
@@ -538,7 +542,11 @@ def score_local_direction(
 
     total = obj_above + obj_below
     if total < 0.001:
-        return ('below' if is_table else 'above', 0.5)
+        # 无任何对象证据：置信度必须是 0.0 而非 0.5。
+        # determine_direction 以 local_conf >= 0.5 为直接采用门槛，
+        # 0.5 哨兵与真实证据恰好 0.5 不可区分，会把零证据页面锁死在
+        # 默认方向并压制全局锚点（锚点仅在 local_conf < 0.5 时接管）。
+        return ('below' if is_table else 'above', 0.0)
 
     above_ratio = obj_above / total
     below_ratio = obj_below / total

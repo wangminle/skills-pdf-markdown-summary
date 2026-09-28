@@ -12,7 +12,7 @@ TESTS_SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(TESTS_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_SCRIPTS_DIR))
 
-from run_all import TestSuiteResult, run_pytest_suite, run_script_suite
+from run_all import TestSuiteResult, find_unregistered_suites, run_pytest_suite, run_script_suite
 
 
 def _suite_failures(results):
@@ -59,3 +59,17 @@ def test_authorized_skip_is_excluded_from_suite_failures() -> None:
     )
     assert skipped.success is False
     assert _suite_failures([skipped]) == 0
+
+
+def test_unregistered_guard_respects_explicitly_skipped_suites(tmp_path, monkeypatch) -> None:
+    import run_all
+
+    for name in ("test_p0_env_priority.py", "test_other.py", "test_new.py"):
+        (tmp_path / name).write_text("", encoding="utf-8")
+    monkeypatch.setattr(run_all, "TESTS_SCRIPTS_DIR", tmp_path)
+    selected = [{"path": tmp_path / "test_other.py"}]
+
+    missing = find_unregistered_suites(
+        selected, ignored_files={"test_p0_env_priority.py"}
+    )
+    assert [path.name for path in missing] == ["test_new.py"]

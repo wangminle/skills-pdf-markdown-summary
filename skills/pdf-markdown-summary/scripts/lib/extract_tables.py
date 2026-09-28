@@ -68,6 +68,8 @@ from .table_refine import (
     table_remainder_is_open,
     expand_clip_to_rendered_horizontal_rule,
     expand_table_clip_to_text_bounds,
+    expand_clip_to_table_notes,
+    expand_table_clip_to_border_rules,
     refine_clip_to_table_band,
     restore_table_clip_width,
     restore_table_tail_after_layout_trim,
@@ -703,6 +705,14 @@ def extract_tables(
                         direction,
                         layout_text_blocks=layout_model.text_blocks.get(pno, []) if layout_model is not None else None,
                     )
+                    # 尾注先恢复、再让后续 trim 收边：反过来的话回扩会绕开
+                    # far_side_body / 章节标题清理，被 trim 判为正文的内容
+                    # 会在最后一步重新进框（trim_table_clip_far_side_body
+                    # 已共用尾注判别，故这里先扩是安全的）。
+                    if refine_enabled:
+                        final_clip = expand_clip_to_table_notes(
+                            final_clip, text_lines, caption_bbox
+                        )
                     final_clip = trim_table_clip_far_side_body(
                         final_clip,
                         caption_bbox,
@@ -731,6 +741,16 @@ def extract_tables(
                             text_lines,
                             typical_line_h=typical_line_h,
                         )
+
+                if refine_enabled:
+                    # 尾注已在上方各 trim 之前恢复；此处只补外框线。
+                    # 文字收边会把表格外框线留在 clip 外（Qwen T6/T17 底线、
+                    # Kimi T5 顶线实测差 0.1-3.6pt），触发 object_truncation/
+                    # table_band_open 告警且截图缺边。距离 <=4pt 的横线并回，
+                    # 但不得切开紧邻的文字行（Qwen T6/T17 底线下方即脚注首行）。
+                    final_clip = expand_table_clip_to_border_rules(
+                        final_clip, page, text_lines
+                    )
 
                 def save_current_debug(
                     *,

@@ -8,7 +8,7 @@ import hashlib
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from .caption_detection import (
     is_caption_anchor_candidate,
@@ -253,6 +253,61 @@ def _file_digest(path: str) -> Optional[str]:
     return digest.hexdigest()
 
 
+def _bbox_overlap_ratio(a: Sequence[float], b: Sequence[float]) -> float:
+    """两框交叠面积占较小框面积的比例。"""
+    area_a = max(0.0, a[2] - a[0]) * max(0.0, a[3] - a[1])
+    area_b = max(0.0, b[2] - b[0]) * max(0.0, b[3] - b[1])
+    if area_a <= 0 or area_b <= 0:
+        return 0.0
+    inter = (
+        max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+        * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    )
+    if inter <= 0:
+        return 0.0
+    return inter / min(area_a, area_b)
+
+
+def mark_cross_kind_overlaps(
+    records: Sequence[AttachmentRecord],
+    *,
+    min_ratio: float = 0.05,
+) -> None:
+    """标记 figure/table 互相吞没的资产（只打标，不改框、不改状态）。
+
+    图与表各自在独立主循环里收边，主链上没有任何一处校验两者最终框是否
+    互相压盖：detect_conflicts 仅在 layout-backend 开启时运行，且只在同
+    类型内比对。某张图的框若压住上一张表的末行（或反之），两边各自的
+    局部判据都看不出问题，会静默以 accepted 落盘。
+
+    这里只追加 cross_kind_overlap 告警并置 review_required——不改几何，
+    避免用未经验证的规则去动已在 benchmark 上验证过的收边结果。
+
+    阈值取交叠占较小框 5%：实测「图框压住上表末行 18.9pt」这类场景对
+    小框只占约 9.5%，用 10% 会漏；5% 仍远高于正常排版误差
+    （benchmark 8 份实测跨类型重叠为 0 例）。
+    """
+    by_page: Dict[int, Dict[str, List[AttachmentRecord]]] = {}
+    for rec in records:
+        if not rec.final_bbox:
+            continue
+        by_page.setdefault(int(rec.page), {}).setdefault(rec.kind, []).append(rec)
+
+    for groups in by_page.values():
+        figures, tables = groups.get("figure") or [], groups.get("table") or []
+        for fig in figures:
+            for tab in tables:
+                if _bbox_overlap_ratio(fig.final_bbox, tab.final_bbox) < min_ratio:
+                    continue
+                for rec, other in ((fig, tab), (tab, fig)):
+                    tag = f"cross_kind_overlap_with_{other.kind}_{other.ident}"
+                    if tag not in rec.warnings:
+                        rec.warnings.append(tag)
+                    rec.review_required = True
+                    if rec.status == STATUS_ACCEPTED:
+                        rec.status = STATUS_REVIEW_REQUIRED
+
+
 def mark_duplicate_png_records(records: Sequence[AttachmentRecord]) -> None:
     by_page: Dict[Tuple[str, int], List[AttachmentRecord]] = {}
     for rec in records:
@@ -397,12 +452,14 @@ def objects_truncated_on_far_side(
 
 
 def text_crosses_clip_boundary(
-    final_bbox, text_bboxes, *, tolerance=1.0, min_inside_height_ratio=0.0
+    final_bbox, text_bboxes, *, tolerance=1.0, min_inside_height_ratio=0.5
 ) -> bool:
     """Detect partially clipped glyph boxes; outside prose is not figure evidence.
 
     min_inside_height_ratio 要求文本行落在框内的高度占比达到该比例才算被裁，
     用于排除只擦到上下边缘的邻行（表格路径的行间边界本就贴着相邻行）。
+    默认 0.5：图/表两条链路必须同口径——此前默认 0.0、只有表路径显式传
+    0.5，同一段几何在两侧会得出相反的截断结论。
     """
     fx0,fy0,fx1,fy1 = final_bbox
     for x0,y0,x1,y1 in text_bboxes:
@@ -446,8 +503,19 @@ def finalize_caption_inventory(
     out_dir: str,
     *,
     dpi: int = 300,
+    kinds: Optional[Set[str]] = None,
+    min_figure: Optional[int] = None,
+    max_figure: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Mark unexpected/duplicates, crop missing explicit captions, return inventory summary."""
+    """Mark unexpected/duplicates, crop missing explicit captions, return inventory summary.
+
+    kinds: 本次运行启用的资产类型（{"figure", "table"} 子集）。缺省为 None 时
+    两者都参与对账。用户用 --no-figures/--no-tables/--max-figure 显式关闭的
+    类型不参与「缺失补裁」——否则禁用类型会凭空产出 inventory_gap PNG 与
+    review_required 条目，污染输出目录与汇总数字。
+    min_figure/max_figure: 与 --min/--max-figure 同口径的 figure 编号范围；
+    范围外的编号同样不算「缺失」。
+    """
     try:
         import fitz
     except ImportError:
@@ -459,6 +527,25 @@ def finalize_caption_inventory(
     try:
         index = build_caption_index(doc)
         expected = expected_captions_from_index(index)
+        if kinds is not None:
+            expected = [item for item in expected if item.kind in kinds]
+        if min_figure is not None or max_figure is not None:
+            lo = min_figure if min_figure is not None else 1
+            hi = max_figure if max_figure is not None else 999
+
+            def _figure_in_range(item: ExpectedCaption) -> bool:
+                if item.kind != "figure":
+                    return True
+                try:
+                    num = int(item.ident)
+                except ValueError:
+                    # 非数字编号（S1 / 罗马数字 / 3a）不受范围限制，
+                    # 与 extract_figures.py 的 int(ident) except-pass 同口径。
+                    # 若这里丢弃，它们会被判成 unexpected 而误杀。
+                    return True
+                return lo <= num <= hi
+
+            expected = [item for item in expected if _figure_in_range(item)]
         report = reconcile_inventory(expected, records, verify_files=True)
         apply_unexpected_rejects(report)
         for item in report.missing:
@@ -481,16 +568,24 @@ def finalize_caption_inventory(
             else:
                 records.append(gap_record)
         mark_duplicate_png_records(records)
+        mark_cross_kind_overlaps(records)
         final_report = reconcile_inventory(expected, records, verify_files=True)
         payload = final_report.to_dict()
         payload["exported"] = sum(bool(rec.out_path) and os.path.isfile(rec.out_path) for rec in records)
+        payload["cross_kind_overlaps"] = [
+            {"type": rec.kind, "id": rec.ident, "page": rec.page, "warnings": rec.warnings}
+            for rec in records
+            if any(w.startswith("cross_kind_overlap") for w in rec.warnings)
+        ]
         payload["inferred_continuations"] = [
             {"type": rec.kind, "id": rec.ident, "page": rec.page}
             for rec in records if "table_continuation" in rec.source_signals
         ]
         payload["review_required_count"] = sum(rec.review_required for rec in records)
-        payload["missing_count"] = len(report.missing)
-        payload["unexpected_count"] = len(report.unexpected)
+        # 计数与列表必须同源自补裁后的 final_report；此前 missing_count 取自
+        # 补裁前的 report，出现 missing=[] 而 missing_count=9 的自相矛盾。
+        payload["missing_count"] = len(final_report.missing)
+        payload["unexpected_count"] = len(final_report.unexpected)
         return payload
     finally:
         doc.close()
@@ -523,7 +618,9 @@ def render_inventory_gap(
     clip = gap_clip_from_caption(caption_rect, page_rect)
     os.makedirs(out_dir, exist_ok=True)
     safe = _CAPTION_SAFE.sub("_", expected.text)[:48].strip("_") or expected.ident
-    filename = f"{expected.kind.title()}_{expected.ident}_inventory_gap_{safe}.png"
+    # 文件名带页码：跨页同编号、同题注的补漏（重复编号文档）不能共用同一路径，
+    # 否则后页渲染覆盖前页文件，两个 index 项指向同一张后页图。
+    filename = f"{expected.kind.title()}_{expected.ident}_p{expected.page}_inventory_gap_{safe}.png"
     out_path = os.path.join(out_dir, filename)
     try:
         pix = page.get_pixmap(dpi=dpi, clip=clip)

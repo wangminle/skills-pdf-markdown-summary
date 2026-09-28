@@ -65,7 +65,12 @@ def _has_small_object_band_near_trimmed_edge(
         return False
 
     trimmed = (clip.y1 - proposed_edge) if direction == "above" else (proposed_edge - clip.y0)
-    if trimmed < max(12.0, 0.08 * clip.height):
+    # 裁切量门槛：低于 3% 高度的小裁切通常只是收缝，不值得触发保护。
+    # Attention Figure 4：token 行被 _nearby_short_label_rects 并进 chosen 后
+    # proposed_edge=583.5，实际裁切 24.8pt（4.8%，clip 高 520）内含整段底部
+    # 色块带（583.5-604），5% 门槛恰好把它挡住。防误报靠后续四条硬约束
+    # （数量/并集宽/并集高/贴边），正文区不会同时满足。
+    if trimmed < max(12.0, 0.03 * clip.height):
         return False
 
     area = max(1.0, clip.width * clip.height)

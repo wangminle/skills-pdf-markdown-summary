@@ -31,7 +31,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--report-json", default=None, help="Output conversion report JSON")
     parser.add_argument("--blocks-json", default=None, help="Output Markdown blocks JSON")
     parser.add_argument("--tables", choices=["off", "auto", "screenshot", "structure"], default="off")
-    parser.add_argument("--images", choices=["off", "figures"], default="off")
+    parser.add_argument("--images", choices=["off", "figures"], default="figures")
     parser.add_argument("--ocr", choices=["off", "auto", "force"], default="off")
     parser.add_argument("--preset", default="robust", choices=["robust"], help="Asset extraction preset")
     parser.add_argument("--allow-continued", action="store_true", default=False, help="Allow repeated-caption continuation items; structurally matched captionless table pages are recovered automatically")

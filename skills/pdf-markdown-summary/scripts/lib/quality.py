@@ -135,11 +135,11 @@ def detect_truncation(
 ) -> Tuple[bool, str]:
     """检测精修框是否截断了候选内容。
 
-    判据（满足任一即截断）：
-    1. 候选框内有实质对象，但最终框对该对象覆盖率 < min_object_coverage；
-    2. 最终框对候选框整体覆盖率 < min_candidate_coverage，且候选内存在被切对象。
-
-    无对象信息时，仅在 final 相对 candidate 覆盖率显著不足时判截断。
+    判据（按优先级）：
+    1. 候选框内有实质对象（与候选重叠 >= min_object_overlap）时，只看对象：
+       任一对象落在候选内的部分被 final 覆盖率 < min_object_coverage 即截断；
+    2. 候选框内无实质对象可用（未提供 object_rects 或无实质重叠）时，退而检查
+       final 对候选框整体的覆盖率 < min_candidate_coverage。
     """
     if candidate_bbox is None:
         return False, ""

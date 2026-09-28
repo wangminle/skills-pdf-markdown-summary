@@ -162,6 +162,8 @@ def test_summarize_reuse_requires_existing_assets() -> None:
 
 
 def test_summarize_reuse_does_not_extract_again() -> None:
+    import hashlib
+
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         pdf_path = root / "paper.pdf"
@@ -170,7 +172,13 @@ def test_summarize_reuse_does_not_extract_again() -> None:
         _make_pdf(pdf_path)
         out_dir.mkdir()
         text_path.parent.mkdir()
-        (out_dir / "index.json").write_text('{"items": []}', encoding="utf-8")
+        (out_dir / "index.json").write_text(json.dumps({
+            "meta": {
+                "pdf": pdf_path.name,
+                "pdf_hash": "sha256:" + hashlib.sha256(pdf_path.read_bytes()).hexdigest()[:16],
+            },
+            "items": [],
+        }), encoding="utf-8")
         text_path.write_text("prepared text", encoding="utf-8")
 
         original_main = extract_pdf_assets.main

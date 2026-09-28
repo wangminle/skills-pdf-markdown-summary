@@ -250,11 +250,76 @@ def test_assets_disabled_returns_zero() -> None:
         original_main = extract_pdf_assets_module.main
         extract_pdf_assets_module.main = fake_extract_main
         try:
-            exit_code = main(["--pdf", str(pdf_path)])
+            # 显式关闭：--images 的裸默认已改为 figures，不再能靠「不传参」表示关闭。
+            exit_code = main(["--pdf", str(pdf_path), "--images", "off", "--tables", "off"])
         finally:
             extract_pdf_assets_module.main = original_main
 
         assert exit_code == 0
+
+
+def test_images_extracted_by_default() -> None:
+    """默认不传 --images 时必须提取 Figure。
+
+    修复前 `--images` 裸默认是 off，`pdf_to_markdown.py --pdf x.pdf` 会整段
+    跳过资产提取，Markdown 里一张图都没有，使用方必须显式补
+    `--images figures` 才有图——静默产出「无图 md」是主要坑点。
+    """
+    import json
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        out_md = root / "paper.md"
+        _make_text_pdf(pdf_path)
+
+        captured_args = []
+
+        def fake_extract_main(argv):
+            captured_args.extend(argv)
+            out_dir = Path(argv[argv.index("--out-dir") + 1])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "index.json").write_text(
+                json.dumps(
+                    {
+                        "items": [
+                            {
+                                "type": "figure",
+                                "id": "1",
+                                "file": "Figure_1.png",
+                                "caption": "A figure",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return 0
+
+        original_main = extract_pdf_assets_module.main
+        extract_pdf_assets_module.main = fake_extract_main
+        try:
+            exit_code = main(["--pdf", str(pdf_path), "--out", str(out_md)])
+        finally:
+            extract_pdf_assets_module.main = original_main
+
+        assert exit_code == 0
+        assert "--no-figures" not in captured_args, (
+            f"默认必须启用 Figure 提取，实际 argv={captured_args}"
+        )
+        assert "--no-tables" in captured_args, (
+            f"tables 默认仍为 off，应传 --no-tables，实际 argv={captured_args}"
+        )
+
+        markdown = out_md.read_text(encoding="utf-8").lower()
+        assert "figure_1.png" in markdown, "默认应把 Figure 插入 Markdown"
+        assert "a figure" in markdown
+
+        report = json.loads(
+            (out_md.parent / "text" / "conversion_report.json").read_text(encoding="utf-8")
+        )
+        assert report["assets"]["enabled"] is True
+        assert report["assets"]["count"] == 1
 
 
 def test_filter_skips_review_and_rejected_assets() -> None:
@@ -279,6 +344,7 @@ def main_test() -> int:
         test_extract_parser_accepts_no_figures,
         test_images_off_tables_on_does_not_insert_figures,
         test_assets_disabled_returns_zero,
+        test_images_extracted_by_default,
         test_filter_skips_review_and_rejected_assets,
     ]
     passed = 0

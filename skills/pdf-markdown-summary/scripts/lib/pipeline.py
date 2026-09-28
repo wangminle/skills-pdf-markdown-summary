@@ -476,7 +476,16 @@ def run_refinement_pipeline(
                         else:
                             rec.content_bboxes = [list(result.bbox)]
                         rec.source_signals = legacy_signals + ["layout_refiner"]
-                        _apply_quality_meta(result.quality.status)
+                        # 状态只降不升：legacy rejected（正文引用、文本污染等
+                        # 内容级否决）不能因几何质量可接受而晋升为可插入状态，
+                        # 否则被拒绝的资产会经 _MARKDOWN_INSERTABLE 重新进入正文。
+                        if legacy_status == STATUS_REJECTED:
+                            _apply_quality_meta(
+                                STATUS_REVIEW_REQUIRED,
+                                ["legacy_rejected_preserved"],
+                            )
+                        else:
+                            _apply_quality_meta(result.quality.status)
 
                         if rec.out_path:
                             out_path = rec.out_path
@@ -488,7 +497,9 @@ def run_refinement_pipeline(
                             )
                             if rerender_ok:
                                 rec_record.applied = True
-                                rec_record.reason = f"applied, status={result.quality.status}"
+                                rec_record.reason = (
+                                    f"applied, status={rec.status}"
+                                )
                                 report.applied += 1
                             else:
                                 rec.final_bbox = legacy_bbox

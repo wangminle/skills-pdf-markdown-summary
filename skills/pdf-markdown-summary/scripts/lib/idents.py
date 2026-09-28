@@ -34,6 +34,8 @@ from typing import Dict, List, Match, Optional, Set, Tuple
 # P1-08: 增强的 Figure 正则表达式
 # 支持：
 # - Figure 1, Fig. 2, Fig 3
+# - Figures 1, Figs. 2（复数；正则必须消费尾部 s，
+#   否则 "Figures 3" 的 s 会被 S 前缀分支吞掉，误判为附录图 S3）
 # - Figure I, Figure II（罗马数字）
 # - Figure S1, Supplementary Figure 1
 # - Figure 1a, Figure 2b（子图标签）
@@ -41,7 +43,7 @@ from typing import Dict, List, Match, Optional, Set, Tuple
 # - 图1, 图 2（中文）
 
 FIGURE_LINE_RE = re.compile(
-    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Figure|Fig\.?|图表|附图|图)\s*)"
+    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Figures?|Figs?\.?|图表|附图|图)\s*)"
     r"(?:"
     r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6})"  # S前缀 + 数字/罗马
     r"|"
@@ -69,7 +71,7 @@ FIGURE_CN_RE = re.compile(
 # - 表1, 表 2（中文）
 
 TABLE_LINE_RE = re.compile(
-    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Table|Tab\.?|表)\s*)"
+    r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Tables?|Tabs?\.?|表)\s*)"
     r"(?:"
     r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6})"  # S前缀 + 数字/罗马
     r"|"

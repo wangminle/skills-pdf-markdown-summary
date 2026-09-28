@@ -32,9 +32,9 @@
 ## 4. docs 目录规则
 
 - `docs/1-archive/` 存放旧文档归档。
-- `docs/2-plans/` 原存放重构设计与实施计划，重构完成后已归档至 `docs/1-archive/`；后续如有新计划可重建该目录。
-- `docs/2-ref/` 是只读参考目录（原 `docs/3-ref/`，已重编号；只读约束不变）。
-- `docs/3-experiments/` 是实验产物目录（已加入 .gitignore，不上传 GitHub）；其内部文件不受 `-yyyyMMDD` 命名约束。
+- `docs/2-ref/` 是只读参考目录（只读约束不变）。
+- `docs/3-plans/` 存放当前计划类文档（2026-09-23 由原 `docs/2-plans/` 重编号而来）。
+- `docs/4-experiments/` 是实验产物目录（原 `docs/3-experiments/`，2026-09-23 重编号；已加入 .gitignore，不上传 GitHub）；其内部文件不受 `-yyyyMMDD` 命名约束。
 - 所有新建 Markdown 文档文件名必须增加 `-yyyyMMDD` 时间后缀。
 - 禁止修改、删除、移动、重命名 `docs/2-ref/` 中的任何文件。
 - 禁止把新的运行产物写入 `docs/2-ref/`。
@@ -75,5 +75,5 @@
 - 每个 PDF 结果目录下应按输出类型分层保存：`markdown/` 存 Markdown，`assets/` 存通用资源，`images/` 存图片，`txt/` 存文本。
 - `pytest tests/scripts/ -q` 的「全绿」定义：golden 用例默认纳入且必须实际执行、0 跳过；golden 收集数为 0 或被跳过一律判失败。本地定向调试可用环境变量 `PDF_SKILL_ALLOW_GOLDEN_SKIP=1` 放行排除，但该模式**不算全绿**（仅 WARNING）。
 - golden 基准（`tests/results/**/images/golden_index.json`）是变更检测器而非正确性基准；基准不纳入版本控制（tests/results/ 已 gitignore），clone 后需运行 `--update-golden` 本地生成；基准更新后在 `task-list.md` 逐条说明差异原因。
-- `tests/eval/` 是版本化评测器（非 pytest 套件），可复用指标计算放这里；一次性探索脚本与大体积产物放 `docs/3-experiments/`。
+- `tests/eval/` 是版本化评测器（非 pytest 套件），可复用指标计算放这里；一次性探索脚本与大体积产物放 `docs/4-experiments/`。
 - `tests/annotations/` 存放人工 bbox 真值与标注规范（SCHEMA），标注产物不进 `docs/2-ref/`。
