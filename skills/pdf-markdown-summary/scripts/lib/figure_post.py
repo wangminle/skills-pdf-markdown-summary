@@ -12,6 +12,7 @@ try:
 except ImportError:
     fitz = None  # type: ignore
 
+from .direction import captions_share_column
 from .text_trim import _looks_like_short_figure_label
 
 
@@ -300,7 +301,13 @@ def expand_clip_to_nearby_figure_objects(
     if page_rect is None:
         return limited_clip
 
-    neighbor_caption_rects = neighbor_caption_rects or []
+    # 扩边停止线只由同栏题注给出：双栏页面上邻栏题注在纵向上同样可能落在
+    # 当前 clip 之外，不加栏位检查会把本栏扩边卡在邻栏题注处
+    # （实测 y0 由 244 卡到 318，图顶部 74pt 内容被切）。
+    neighbor_caption_rects = [
+        rect for rect in (neighbor_caption_rects or [])
+        if rect is not None and captions_share_column(rect, caption_rect)
+    ]
     page_width = max(1.0, page_rect.width)
 
     def _is_object_candidate(rect: Any) -> bool:

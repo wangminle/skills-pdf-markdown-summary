@@ -26,6 +26,10 @@ class StageDelta:
     stage_h: float
     baseline_area: float
     stage_area: float
+    y0: float = 0.0
+    y1: float = 0.0
+    x0: float = 0.0
+    x1: float = 0.0
 
     @property
     def height_ratio(self) -> float:
@@ -95,6 +99,10 @@ def parse_legend(path: Path) -> LegendAnalysis | None:
             max(1.0, y1 - y0),
             b_area,
             max(1.0, (x1 - x0) * (y1 - y0)),
+            y0=y0,
+            y1=y1,
+            x0=x0,
+            x1=x1,
         )
 
     if "phase_a" in analysis.stages and analysis.stages["phase_a"].height_ratio < 0.85:
@@ -114,7 +122,21 @@ def parse_legend(path: Path) -> LegendAnalysis | None:
         ]
         if abs(fr - 1.0) < 0.02:
             if any(r < 0.95 for r in shrink_refs):
-                analysis.notes.append("fallback_to_baseline")
+                # 仅高度比值≈1 判据过松：phase_d 收缩后经
+                # expand_clip_to_nearby_figure_title（BUG-079）把图内标题
+                # 扩回来，final 高度恰好接近 baseline 但 y 边界并不重合，
+                # 是预期精修而非回退。回退要求 y0/y1 与 baseline 基本重合
+                # （差 < 2pt）。x 同理：final x0/x1 与 baseline 基本重合
+                # （差 < 2pt）才算真回退——x 方向已收缩（如裁掉左右空白）
+                # 说明裁剪真正生效，20260929 批次中该类误报被滤除。
+                fin = analysis.stages["final"]
+                if (
+                    abs(fin.y0 - by0) < 2.0
+                    and abs(fin.y1 - by1) < 2.0
+                    and abs(fin.x0 - bx0) < 2.0
+                    and abs(fin.x1 - bx1) < 2.0
+                ):
+                    analysis.notes.append("fallback_to_baseline")
     if "rejected" in rects:
         analysis.notes.append("rejected_stage_present")
     return analysis
@@ -184,7 +206,9 @@ def main() -> int:
         print(f"  legends={len(list(dbg.glob('*_stages_legend.txt')))} flagged={len(flagged)}")
         for note in logs[:10]:
             print(f"  LOG {note}")
-        for item in flagged[:12]:
+        # 打印全部 flagged 项：旧版只打印前 12 项且不提示截断，
+        # 20260928-045 批次 98 项 flagged 实际只打印 76 项，漏列分析信号。
+        for item in flagged:
             print(f"  FLAG {item.item} p{item.page}: {', '.join(item.notes)}")
 
     # Global stats

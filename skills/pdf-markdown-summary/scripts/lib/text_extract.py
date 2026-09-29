@@ -41,6 +41,81 @@ if TYPE_CHECKING:
 # 模块日志器
 logger = logging.getLogger(__name__)
 
+_SECTION_HEADING_RE = re.compile(r"^\d+(?:\.\d+)*\s+[A-Za-z].{2,}")
+
+# 中文编号模式：第X章/第X节、一、（一）等；数字编号后允许直接跟中文
+# （要求编号与正文之间有空白或编号分隔符，避免把「2023年」误判为标题）
+_CJK_SECTION_HEADING_RE = re.compile(
+    r"^(?:第[0-9一二三四五六七八九十百]+[章节篇部]"
+    r"|[0-9一二三四五六七八九十]+[、.．]"
+    r"|[（(][0-9一二三四五六七八九十]+[）)]"
+    # 数字编号+空白后，下一个字符必须是字母或 CJK——「1 - P(E)」这类
+    # 粗体公式片段的编号后紧跟标点，不能算标题
+    r"|\d+(?:\.\d+)*\s+(?=[A-Za-z\u4e00-\u9fff]))"
+    r"\s*\S"
+)
+
+# CJK 统一表意文字区间（基本区），用于把中文字计入标题「字母」计数
+_CJK_CHAR_RE = re.compile(r"[\u4e00-\u9fff]")
+
+# 罗马数字/字母编号标题（IEEE 会议论文常见格式）：I. Introduction、
+# IV. Experiments、A. Appendix。句点+空格后须跟字母；没有这条放行，
+# 这些标题会走到句点检查被当成普通句子误杀（基准 8 份全是阿拉伯数字
+# 编号，golden 覆盖不到）。
+_ROMAN_ALPHA_HEADING_RE = re.compile(r"^(?:[IVXLCDM]{1,5}|[A-Z])\.\s+[A-Za-z]")
+
+# 正文字号的粗体统计表头常写成「P. Value」「N. Samples」
+# 「M. Mean」，外形与 A. Appendix / IV. Experiments 相同。编号标题
+# 需要保留小字号支持，因此只对明确的度量名称做定向排除。
+_SMALL_TABLE_METRIC_RE = re.compile(
+    r"^[A-Z]\.\s+(?:p[- ]?values?|values?|means?|medians?|modes?|samples?"
+    r"|counts?|scores?|std\.?|stdev|variances?|errors?|rates?)\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_structural_heading(text: str, *, is_bold: bool, font_size: float) -> bool:
+    """短粗体不一定是章节标题。
+
+    页码、公式、单字母、裸节号，以及正文字号的表头（FEELING ITEMS）
+    会把 Markdown 切碎。编号标题任何字号都保留；其余标题要求明显大于正文。
+    中文字符计入标题长度计数，编号后允许直接跟中文（如「1 绪论」「第一章 绪论」）。
+    """
+    if not is_bold:
+        return False
+    stripped = (text or "").strip()
+    if not stripped or len(stripped) >= 50:
+        return False
+    cjk_chars = _CJK_CHAR_RE.findall(stripped)
+    if len(stripped) <= 2 and not cjk_chars:
+        return False
+    if stripped[0] in ".,;:)]}-–—":
+        return False
+    if re.fullmatch(r"\d{1,4}", stripped) or re.fullmatch(r"\d+(?:\.\d+)*", stripped):
+        return False
+    if font_size < 11.5 and _SMALL_TABLE_METRIC_RE.match(stripped):
+        return False
+    if (
+        _SECTION_HEADING_RE.match(stripped)
+        or _CJK_SECTION_HEADING_RE.match(stripped)
+        or _ROMAN_ALPHA_HEADING_RE.match(stripped)
+    ):
+        return True
+    if re.match(r"^\d", stripped):
+        return False
+    if font_size < 11.5:
+        return False
+    letters = re.findall(r"[A-Za-z]", stripped)
+    if cjk_chars:
+        # 中文标题通常 2-8 字，至少 2 个 CJK 字符即可
+        if len(cjk_chars) < 2:
+            return False
+    elif len(letters) < 4:
+        return False
+    if re.search(r"[.。]\s+\S", stripped):
+        return False
+    return True
+
 
 # ============================================================================
 # PDF 文本提取
@@ -324,7 +399,7 @@ def gather_structured_text(
         font_flags = first_span.get("flags", 0)
         is_bold = bool(font_flags & 2 ** 4)
 
-        if len(text) < 50 and is_bold:
+        if looks_like_structural_heading(text, is_bold=is_bold, font_size=font_size):
             para_type = "heading"
         elif text.lower().startswith(("figure", "fig.", "table", "图", "表")):
             para_type = "caption"

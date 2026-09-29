@@ -519,6 +519,9 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
                     pdf_path=pdf_path,
                     out_dir=out_dir,
                     dpi=args.dpi,
+                    # --no-refine 的排除延续到 A3，否则被用户显式排除的 id
+                    # 仍会被 Layout 候选覆盖（评审#3 P2）。
+                    skip_idents=set(no_refine_figs),
                 )
 
                 refine_report_path = os.path.join(out_dir, "layout_refinement.json")
@@ -579,6 +582,20 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
         pruned = prune_unindexed_images(out_dir=out_dir, index_json_path=index_json, preexisting=preexisting_images)
         if pruned:
             logger.info(f"Pruned {pruned} unindexed images")
+
+    # run_end 无条件写入：BUG-047 之后回退类事件只在「拒绝」时产生，
+    # 验收门收紧（如 BUG-085 的 not polluted 门控）会让全部资产直接通过，
+    # run.log.jsonl 静默变成 0 字节——「零回退」与「日志系统坏了」无法区分。
+    # 固定写一条带统计的收尾事件，文件永不空，也保留顺带核对数量的能力。
+    figures_n = sum(1 for r in records if str(getattr(r, "kind", "")).lower() == "figure")
+    tables_n = sum(1 for r in records if str(getattr(r, "kind", "")).lower() == "table")
+    log_event(
+        "run_end",
+        pdf=os.path.basename(pdf_path),
+        message="extraction finished",
+        figures=figures_n,
+        tables=tables_n,
+    )
 
     return 0
 

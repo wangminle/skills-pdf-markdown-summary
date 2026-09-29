@@ -320,6 +320,71 @@ def test_images_extracted_by_default() -> None:
         )
         assert report["assets"]["enabled"] is True
         assert report["assets"]["count"] == 1
+        assert report["status"] == "ready"
+        assert report["assets"]["omitted"] == []
+
+
+def test_omitted_assets_are_reported_instead_of_silent_ready() -> None:
+    """review/rejected 资产不进 Markdown 时，报告必须点名，不能假装 ready。"""
+    import json
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        out_md = root / "paper.md"
+        _make_text_pdf(pdf_path)
+
+        def fake_extract_main(argv):
+            out_dir = Path(argv[argv.index("--out-dir") + 1])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "index.json").write_text(
+                json.dumps(
+                    {
+                        "items": [
+                            {
+                                "type": "figure",
+                                "id": "1",
+                                "status": "accepted",
+                                "file": "Figure_1.png",
+                                "caption": "Figure 1",
+                            },
+                            {
+                                "type": "table",
+                                "id": "2",
+                                "status": "review_required",
+                                "warnings": ["table_band_open", "object_truncation"],
+                                "file": "Table_2.png",
+                                "caption": "Table 2",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return 0
+
+        original_main = extract_pdf_assets_module.main
+        extract_pdf_assets_module.main = fake_extract_main
+        try:
+            exit_code = main(
+                ["--pdf", str(pdf_path), "--out", str(out_md), "--tables", "screenshot"]
+            )
+        finally:
+            extract_pdf_assets_module.main = original_main
+
+        assert exit_code == 0
+        markdown = out_md.read_text(encoding="utf-8")
+        assert "Figure_1.png" in markdown
+        assert "Table_2.png" not in markdown
+        report = json.loads(
+            (out_md.parent / "text" / "conversion_report.json").read_text(encoding="utf-8")
+        )
+        assert report["status"] == "review"
+        omitted = report["assets"]["omitted"]
+        assert omitted[0]["type"] == "table" and omitted[0]["id"] == "2"
+        assert "table_band_open" in omitted[0]["warnings"]
+        assert report["assets"]["extracted_count"] == 2
+        assert report["assets"]["count"] == 1
 
 
 def test_filter_skips_review_and_rejected_assets() -> None:

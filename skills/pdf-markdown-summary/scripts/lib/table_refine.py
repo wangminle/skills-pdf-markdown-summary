@@ -352,19 +352,156 @@ def refine_clip_to_table_band(
 
     return new_clip, new_clip != clip
 
+def _other_side_line_continues_table(
+    line_rect: Any,
+    text: str,
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    mid: float,
+    side: str,
+    caption_rect: Any,
+    clip: Any,
+) -> bool:
+    """判断另一侧的短文字行是否为通栏表格的延续单元格。
+
+    无边框通栏表的右侧单元格与表内行 y 居中对齐（同一行跨栏延续），
+    旧实现只数行数，会把它们当右栏正文触发收窄，把右半表切掉。
+    判据：该行不是完整正文句，且与题注侧某条表内行有
+    显著垂直重叠。PDF 字形框的 y 坐标常有几点偏移，不再使用固定
+    3.5pt 中心距离。双栏正文即使基线对齐，也先由句子形态排除。
+    """
+    txt = (text or "").strip()
+    words = re.findall(r"[A-Za-z]+(?:['’-][A-Za-z]+)?", txt)
+    has_numeric_cell = bool(re.search(r"\d", txt)) and len(words) <= 4
+    has_prose_verb = bool(re.search(
+        r"\b(?:am|is|are|was|were|be|been|has|have|had|do|does|did|can|could|"
+        r"will|would|may|might|shows?|uses?|covers?|includes?|contains?|provides?|"
+        r"achieves?|outperforms?|discuss(?:es|ed)?|evaluat(?:es|ed))\b",
+        txt,
+        re.IGNORECASE,
+    ))
+    sentence_like = (
+        len(txt) > 80
+        or len(words) > 16
+        or (
+            not has_numeric_cell
+            and len(words) >= 5
+            and (
+                has_prose_verb
+                or txt.rstrip().endswith((".", "。", "!", "?", "；", ";"))
+            )
+        )
+    )
+    if sentence_like:
+        return False
+    for partner, _fs, partner_text in text_lines or []:
+        if partner is None or partner is line_rect:
+            continue
+        if not (partner_text or "").strip():
+            continue
+        if side == "left":
+            # 另一侧在右栏：伙伴必须在题注侧（左半）
+            if partner.x0 > mid - 8:
+                continue
+        else:
+            if partner.x1 < mid + 8:
+                continue
+        # 伙伴须与表框纵向相交（即表内行），且不能是题注自身
+        if min(partner.y1, clip.y1) - max(partner.y0, clip.y0) <= 0:
+            continue
+        if (partner & caption_rect).get_area() > 0:
+            continue
+        overlap = min(partner.y1, line_rect.y1) - max(partner.y0, line_rect.y0)
+        min_height = min(max(0.0, partner.height), max(0.0, line_rect.height))
+        if min_height > 0 and overlap / min_height >= 0.30:
+            return True
+    return False
+
+
+def limit_table_clip_to_caption_column(
+    clip: Any,
+    caption_rect: Any,
+    page_rect: Any,
+    text_lines: Optional[List[Tuple[Any, float, str]]] = None,
+    drawings: Optional[List] = None,
+) -> Any:
+    """双栏页里，单栏题注的表框不要横贯另一栏。
+
+    通栏横线仍然保留整页宽度。另一栏没有独立文字时也不收窄，
+    避免把单栏论文里左对齐的通栏表裁掉。另一栏的文字行须先确认
+    不是通栏表的跨栏延续行（见 _other_side_line_continues_table）
+    才计入收窄证据。收窄前的原始框由调用方显式保存并传给
+    restore_table_clip_width 作为恢复上限（否则收窄不可逆）——
+    不要挂在返回矩形上：fitz.Rect 链上任何重建都会丢自定义属性。
+    """
+    if fitz is None or clip is None or page_rect is None or page_rect.width <= 1:
+        return clip
+    if clip.width < page_rect.width * 0.75:
+        return clip
+    mid = (page_rect.x0 + page_rect.x1) / 2.0
+    cap_cx = (caption_rect.x0 + caption_rect.x1) / 2.0
+    if abs(cap_cx - mid) < page_rect.width * 0.08:
+        return clip
+    side = "left" if cap_cx < mid else "right"
+    for drawing in drawings or []:
+        raw = drawing.get("rect") if isinstance(drawing, dict) else None
+        if raw is None:
+            continue
+        rect = fitz.Rect(raw)
+        if rect.height > 2.5 or rect.width < page_rect.width * 0.65:
+            continue
+        if min(rect.y1, clip.y1) - max(rect.y0, clip.y0) > 0:
+            return clip
+    other = 0
+    for line_rect, _fs, text in text_lines or []:
+        if line_rect is None:
+            continue
+        if min(line_rect.y1, clip.y1) - max(line_rect.y0, clip.y0) < 4:
+            continue
+        if side == "left" and line_rect.x0 > mid + 8:
+            pass
+        elif side == "right" and line_rect.x1 < mid - 8:
+            pass
+        else:
+            continue
+        if _other_side_line_continues_table(
+            line_rect, text, text_lines, mid, side, caption_rect, clip,
+        ):
+            continue
+        other += 1
+    if other < 2:
+        return clip
+    gutter = 8.0
+    if side == "left":
+        narrowed = fitz.Rect(clip.x0, clip.y0, min(clip.x1, mid - gutter), clip.y1)
+    else:
+        narrowed = fitz.Rect(max(clip.x0, mid + gutter), clip.y0, clip.x1, clip.y1)
+    return narrowed
+
+
 def restore_table_clip_width(
     clip: Any,
     base_clip: Any,
     *,
     table_band_changed: bool,
     min_width_ratio: float = 0.40,
+    pre_narrow_clip: Any = None,
 ) -> Any:
-    """可靠表格行带成立时，恢复被对象裁切误缩成局部列的 X 范围。"""
+    """可靠表格行带成立时，恢复被对象裁切误缩成局部列的 X 范围。
+
+    pre_narrow_clip 是 limit_table_clip_to_caption_column 收窄前的
+    原始框（由调用方显式保存并传入），有则以它为恢复上限；否则以
+    base_clip 为上限——若 base 本身已被收窄，40% 阈值会形同虚设，
+    通栏表被误收窄后永远无法恢复。不要用矩形自定义属性传递原始框：
+    fitz.Rect 拷贝构造会丢属性，主调用链上的任何重建都让属性失效。
+    """
     if fitz is None or not table_band_changed or base_clip.width <= 1:
         return clip
-    if clip.width >= base_clip.width * min_width_ratio:
+    original = pre_narrow_clip
+    if original is None or original.width <= 1:
+        original = base_clip
+    if clip.width >= original.width * min_width_ratio:
         return clip
-    return fitz.Rect(base_clip.x0, clip.y0, base_clip.x1, clip.y1)
+    return fitz.Rect(original.x0, clip.y0, original.x1, clip.y1)
 
 def restore_table_tail_after_layout_trim(
     original_clip: Any,

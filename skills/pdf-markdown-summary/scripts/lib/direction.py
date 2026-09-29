@@ -250,6 +250,34 @@ def compute_global_anchor(
         return None
 
 
+def captions_share_column(
+    caption_a: "fitz.Rect",
+    caption_b: "fitz.Rect",
+    *,
+    min_ratio: float = 0.5,
+) -> bool:
+    """两个题注是否处于同一栏（横向显著重叠）。
+
+    邻题注参与几何判断前必须先过栏位检查：双栏页面上两栏各有一张图表时，
+    另一栏的题注在纵向上往往正好位于当前题注的同侧，若不看横向位置：
+    - `direction.py`：`_neighbor_attaches_below` 会把它认作「向下关联」的
+      邻题注，`_owned_by_neighbor` 随即认领当前栏题注上方的所有表格行并
+      清空上方证据，方向由 above 翻成 below，截取到错误区域；
+    - `clip_limit.py` / `figure_post.py`：它会成为边界停止线，把本栏 clip
+      从邻栏题注处截断（实测 240→318，丢掉 78pt 图形内容）。
+
+    阈值取较窄者的 50%：同栏题注或通栏题注重叠比例接近 1，跨栏题注
+    重叠为 0 或仅栏间距级别的几点（pt）擦边。
+    """
+    overlap = min(caption_a.x1, caption_b.x1) - max(caption_a.x0, caption_b.x0)
+    if overlap <= 1.0:
+        return False
+    narrower = min(caption_a.width, caption_b.width)
+    if narrower <= 0:
+        return False
+    return overlap >= narrower * min_ratio
+
+
 def score_local_direction(
     caption_bbox: "fitz.Rect",
     page_rect: "fitz.Rect",
@@ -294,7 +322,11 @@ def score_local_direction(
     if is_table and text_lines:
         search_height = min(300.0, max(160.0, clip_height * 0.5))
         page_width = max(1.0, page_rect.width)
-        neighbors = [rect for rect in (neighbor_caption_rects or []) if rect is not None]
+        # 只让同栏题注参与归属判断（跨栏题注见 captions_share_column 注释）
+        neighbors = [
+            rect for rect in (neighbor_caption_rects or [])
+            if rect is not None and captions_share_column(rect, caption_bbox)
+        ]
 
         def _looks_table_line(rect: "fitz.Rect", text: str) -> bool:
             stripped = text.strip()
@@ -520,7 +552,8 @@ def score_local_direction(
         clip_above = create_rect(clip_above.x0, clip_above.y1, clip_above.x1, clip_above.y1)
     elif is_table and neighbor_caption_rects:
         for nbr in neighbor_caption_rects:
-            if nbr is None:
+            # 同样只看同栏题注：邻栏题注不该收窄本栏的上下搜索窗
+            if nbr is None or not captions_share_column(nbr, caption_bbox):
                 continue
             if nbr.y1 < caption_bbox.y0:
                 clip_above = create_rect(

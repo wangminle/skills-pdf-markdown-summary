@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.4**.
+Current package version: **0.6.5**.
 
 ## Core Workflow
 

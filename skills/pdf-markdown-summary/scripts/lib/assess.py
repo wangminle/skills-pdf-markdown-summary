@@ -273,7 +273,7 @@ def mark_cross_kind_overlaps(
     *,
     min_ratio: float = 0.05,
 ) -> None:
-    """标记 figure/table 互相吞没的资产（只打标，不改框、不改状态）。
+    """标记 figure/table 互相吞没的资产（只打标，不改框）。
 
     图与表各自在独立主循环里收边，主链上没有任何一处校验两者最终框是否
     互相压盖：detect_conflicts 仅在 layout-backend 开启时运行，且只在同
@@ -304,7 +304,9 @@ def mark_cross_kind_overlaps(
                     if tag not in rec.warnings:
                         rec.warnings.append(tag)
                     rec.review_required = True
-                    if rec.status == STATUS_ACCEPTED:
+                    # markdown_insertable 对有 status 的记录只看状态。
+                    # accepted_with_margin 同样可插入，必须和 accepted 一起降级。
+                    if rec.status in (STATUS_ACCEPTED, STATUS_ACCEPTED_WITH_MARGIN):
                         rec.status = STATUS_REVIEW_REQUIRED
 
 

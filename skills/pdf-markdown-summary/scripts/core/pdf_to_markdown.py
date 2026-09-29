@@ -104,9 +104,23 @@ def _filter_assets_by_mode(
     args: argparse.Namespace,
 ) -> List[Dict[str, Any]]:
     """按 --images / --tables 过滤提取结果，关闭的类型不得进入 Markdown。"""
+    inserted, _omitted = _split_assets_for_markdown(items, args)
+    return inserted
+
+
+def _split_assets_for_markdown(
+    items: List[Dict[str, Any]],
+    args: argparse.Namespace,
+) -> tuple:
+    """返回 (可插入条目, 被质量门拦住的条目)。
+
+    review_required / rejected 不进正文，但必须出现在转换报告里。
+    只数插入数会把「提了 13 张、正文只有 2 张」报成成功。
+    """
     from lib.assess import markdown_insertable
 
-    filtered: List[Dict[str, Any]] = []
+    inserted: List[Dict[str, Any]] = []
+    omitted: List[Dict[str, Any]] = []
     for item in items:
         kind = str(item.get("type") or "").lower()
         if kind == "figure" and args.images == "off":
@@ -118,9 +132,17 @@ def _filter_assets_by_mode(
             review_required=item.get("review_required"),
             warnings=item.get("warnings"),
         ):
+            omitted.append({
+                "type": item.get("type"),
+                "id": item.get("id"),
+                "page": item.get("page"),
+                "status": item.get("status"),
+                "warnings": list(item.get("warnings") or []),
+                "file": item.get("current_file") or item.get("file") or "",
+            })
             continue
-        filtered.append(item)
-    return filtered
+        inserted.append(item)
+    return inserted, omitted
 
 
 def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Dict[str, Any]:
@@ -150,11 +172,13 @@ def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Di
     exit_code = extract_main(extraction_args)
     index_json = os.path.join(paths["asset_dir"], "index.json")
     items = load_index_json_items(index_json) if exit_code == 0 and os.path.exists(index_json) else []
-    items = _filter_assets_by_mode(items, args)
+    inserted, omitted = _split_assets_for_markdown(items, args)
     return {
         "enabled": True,
         "exit_code": exit_code,
-        "items": items,
+        "items": inserted,
+        "omitted": omitted,
+        "extracted_count": len(inserted) + len(omitted),
         "index_json": index_json,
     }
 
@@ -215,9 +239,16 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     asset_exit = asset_result.get("exit_code")
     asset_failed = bool(asset_result.get("enabled") and asset_exit)
+    omitted = asset_result.get("omitted") or []
+    if asset_failed:
+        report_status = "failed"
+    elif omitted:
+        report_status = "review"
+    else:
+        report_status = "ready"
     report = {
         "version": 1,
-        "status": "failed" if asset_failed else "ready",
+        "status": report_status,
         "source_pdf": paths["pdf_path"],
         "markdown": paths["out_md"],
         "blocks_json": paths["blocks_json"],
@@ -225,6 +256,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "assets": {
             "enabled": asset_result.get("enabled", False),
             "count": len(asset_result.get("items", [])),
+            "extracted_count": asset_result.get(
+                "extracted_count", len(asset_result.get("items", []))
+            ),
+            "omitted": omitted,
             "index_json": asset_result.get("index_json", ""),
             "exit_code": asset_exit,
         },

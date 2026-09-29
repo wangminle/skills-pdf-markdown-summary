@@ -467,3 +467,37 @@ def test_figure_object_expand_ignores_glyph_sized_vectors() -> None:
         limited, caption, "above", [], glyph_vectors + chart, page, max_expand=80.0,
     )
     assert expanded.y0 >= 460.0, expanded
+
+
+def test_cross_column_caption_does_not_limit_vertical_bounds() -> None:
+    """邻栏题注不得成为本栏的纵向停止线（双栏页面常见）。
+
+    双栏页面上邻栏题注在纵向上同样可能落在当前题注同侧：不加栏位检查时
+    `limit_clip_by_neighbor_captions` 会把本栏 clip 从邻栏题注处截断
+    （实测 y0 240→318，丢掉上方 78pt 图形内容），
+    `expand_clip_to_nearby_figure_objects` 则把扩边卡在邻栏题注处
+    （实测 y0 由 244 卡到 318）。同栏题注仍必须生效，否则堆叠图表会串框。
+    """
+    page = fitz.Rect(0.0, 0.0, 595.0, 842.0)
+    caption = fitz.Rect(310.0, 408.0, 460.0, 420.0)
+    clip = fitz.Rect(310.0, 240.0, 460.0, 405.0)
+    other_column = fitz.Rect(60.0, 300.0, 190.0, 312.0)
+    same_column = fitz.Rect(310.0, 300.0, 460.0, 312.0)
+
+    # clip_limit：邻栏题注不改变纵向边界
+    assert limit_clip_by_neighbor_captions(clip, caption, "above", [other_column]) == clip
+    # 同栏题注仍收紧到题注下方
+    assert limit_clip_by_neighbor_captions(clip, caption, "above", [same_column]).y0 == 318.0
+
+    # figure_post：邻栏题注不阻断扩边
+    limited = fitz.Rect(310.0, 320.0, 460.0, 405.0)
+    objects = [fitz.Rect(312.0, 250.0, 460.0, 320.0)]
+    base = expand_clip_to_nearby_figure_objects(
+        limited, caption, "above", [], objects, page,
+    )
+    with_other_column = expand_clip_to_nearby_figure_objects(
+        limited, caption, "above", [], objects, page,
+        neighbor_caption_rects=[other_column],
+    )
+    assert base.y0 == 244.0, base
+    assert with_other_column == base, with_other_column

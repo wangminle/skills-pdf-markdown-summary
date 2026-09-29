@@ -751,6 +751,39 @@ def test_border_rules_never_slice_adjacent_text() -> None:
     )
 
 
+def test_short_bold_fragments_are_not_markdown_headings() -> None:
+    """页码、公式、单字母和正文字号的表头不能变成 Markdown 标题。"""
+    from lib.text_extract import looks_like_structural_heading
+
+    assert looks_like_structural_heading("1 Introduction", is_bold=True, font_size=10)
+    assert looks_like_structural_heading("Abstract", is_bold=True, font_size=14)
+    assert not looks_like_structural_heading("272", is_bold=True, font_size=9)
+    assert not looks_like_structural_heading("1 - P(E)", is_bold=True, font_size=11)
+    assert not looks_like_structural_heading("l", is_bold=True, font_size=12)
+    assert not looks_like_structural_heading("2.1", is_bold=True, font_size=12)
+    assert not looks_like_structural_heading("FEELING ITEMS", is_bold=True, font_size=9)
+    assert not looks_like_structural_heading("1997), with AVM tagging", is_bold=True, font_size=10)
+
+
+def test_full_width_table_clip_stays_in_caption_column() -> None:
+    """题注在左栏、右栏有正文、又没有通栏横线时，表框不能横贯双栏。"""
+    from lib.table_refine import limit_table_clip_to_caption_column
+
+    page = fitz.Rect(0, 0, 612, 792)
+    caption = fitz.Rect(70, 180, 280, 194)
+    clip = fitz.Rect(26, 200, 586, 360)
+    right_body = [
+        (fitz.Rect(330, 210, 540, 222), 10.0, "B1 dialogue continues on the right."),
+        (fitz.Rect(330, 226, 540, 238), 10.0, "U1 another right-column line."),
+    ]
+    limited = limit_table_clip_to_caption_column(clip, caption, page, right_body, [])
+    assert limited.x1 < 320, f"表框仍横贯右栏 (x1={limited.x1})"
+
+    full_rule = [{"rect": (40.0, 220.0, 570.0, 221.0)}]
+    kept = limit_table_clip_to_caption_column(clip, caption, page, right_body, full_rule)
+    assert kept.x1 > 500, "通栏表格线不应被收进单栏"
+
+
 def test_border_rules_do_not_slice_line_that_already_crosses_clip() -> None:
     """字框已经跨过原 clip 底边时，补边不能停在这一行内部。
 
@@ -931,6 +964,22 @@ def test_cross_kind_overlap_marked() -> None:
         assert markdown_insertable(
             rec.status, review_required=rec.review_required, warnings=rec.warnings
         ) is False, "跨类型吞没的资产不得进入 Markdown"
+
+    # accepted_with_margin 同样可插入；只改 review_required 挡不住 Markdown。
+    margin = [
+        _rec("table", "1", (66, 100, 527, 300)),
+        _rec("figure", "1", (66, 281, 527, 500)),
+    ]
+    for rec in margin:
+        rec.status = "accepted_with_margin"
+    mark_cross_kind_overlaps(margin)
+    for rec in margin:
+        assert rec.status == "review_required", (
+            f"{rec.kind} {rec.ident} 仍为 {rec.status}，会被插入 Markdown"
+        )
+        assert markdown_insertable(
+            rec.status, review_required=rec.review_required, warnings=rec.warnings
+        ) is False
 
     # 无重叠 / 轻微重叠不得误报
     for name, recs2 in (

@@ -73,6 +73,7 @@ def pair_page(
     page_height: float = 800.0,
     max_dist: float = _DEFAULT_MAX_DIST,
     kind: str = "figure",
+    ownership_captions: Optional[List[RegionBBox]] = None,
 ) -> PairingResult:
     """单页配对：caption 与 content 的一对一匹配。
 
@@ -83,11 +84,14 @@ def pair_page(
 
     Args:
         page: 页码（1-based）
-        captions: caption 区域列表
+        captions: caption 区域列表（参与配对）
         contents: content 区域列表（figure/table）
         page_height: 页面高度（pt）
         max_dist: 最大配对距离
         kind: 资产类型（'figure' | 'table'），写入 AssetCandidate.kind
+        ownership_captions: 多框归属判断用的题注全集。默认与 captions 相同；
+            调用方传入比 captions 更大的题注池（如 Layout 自带题注区域）时，
+            「相邻框是否另有更近题注」的判断不会因为池子缺项而失灵。
 
     Returns:
         PairingResult
@@ -140,10 +144,14 @@ def pair_page(
             confidence=max(0.0, 1.0 - abs(cost) / 10.0),
         )
 
-        # 多框分组：仅合并「没有更近 caption」的邻近同 kind 框，避免吞掉独立图表
+        # 多框分组：仅合并「没有更近 caption」的邻近同 kind 框，避免吞掉独立图表。
+        # 归属判断用 ownership_captions（默认即 captions）：外部候选池只覆盖
+        # 有 legacy record 的题注，缺了 Layout 题注池会让相邻独立图被误并。
         extra_frames = _find_multi_frames(
             content, contents, used_contents, page_height,
-            captions=captions, primary_caption=cap,
+            captions=ownership_captions if ownership_captions else captions,
+            primary_caption=cap,
+            max_dist=max_dist,
         )
         extra_ids = {id(ef) for ef in extra_frames}
         for ef_i, ef in enumerate(contents):
@@ -173,6 +181,50 @@ def pair_page(
     return result
 
 
+def _dedup_caption_regions(regions: List[RegionBBox]) -> List[RegionBBox]:
+    """按几何去重题注区域（外部候选与 Layout 区域可能指同一条题注）。"""
+    out: List[RegionBBox] = []
+    seen: set = set()
+    for region in regions:
+        if region is None:
+            continue
+        key = tuple(round(v, 2) for v in (region.x0, region.y0, region.x1, region.y1))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(region)
+    return out
+
+
+def _unique_best_content(
+    caption: RegionBBox,
+    contents: List[RegionBBox],
+    page_height: float,
+    max_dist: float,
+) -> Optional[RegionBBox]:
+    """该题注在配对距离内代价唯一最低的内容框。
+
+    代价打平时返回 None：打平不能证明这块框「属于」这条题注，
+    否则会把真正的多 panel 也拆开。
+    """
+    best: Optional[RegionBBox] = None
+    best_cost = float("inf")
+    tied = False
+    for content in contents:
+        if caption.edge_distance(content) > max_dist:
+            continue
+        cost = _cost_function(caption, content, page_height)
+        if best is None or cost + 1e-6 < best_cost:
+            best = content
+            best_cost = cost
+            tied = False
+        elif abs(cost - best_cost) <= 1e-6:
+            tied = True
+    if tied:
+        return None
+    return best
+
+
 def _find_multi_frames(
     primary: RegionBBox,
     all_contents: List[RegionBBox],
@@ -180,6 +232,7 @@ def _find_multi_frames(
     page_height: float,
     captions: Optional[List[RegionBBox]] = None,
     primary_caption: Optional[RegionBBox] = None,
+    max_dist: float = _DEFAULT_MAX_DIST,
 ) -> List[RegionBBox]:
     """查找主 content 框附近的额外同 kind 框（多 panel）。
 
@@ -188,19 +241,35 @@ def _find_multi_frames(
     2. 与主框距离 <= _MULTI_FRAME_MAX_GAP
     3. 尺寸 >= _MULTI_FRAME_MIN_SIZE
     4. 水平或垂直对齐（共享边或投影重叠）
-    5. 不存在比 primary_caption 更近的其他 caption（避免吞并独立图）
+    5. 不属于其他题注。某框是另一条题注的唯一最佳内容时，即使当前题注
+       在几何上更近（题注夹在上下两图之间时经常如此），也要留给那条题注。
+       只比边距会在第二张题注参与配对前把独立图并走。
+       captions 必须是本页题注「全集」（含 Layout 自带题注），只传外部候选
+       会让归属判断看不到邻居自己的题注而误并（评审#3 P1）。
 
     Args:
         primary: 主 content 框
         all_contents: 全部 content 框
         used: 已使用的索引集合
         page_height: 页面高度
-        captions: 本页全部 caption（用于归属检查）
+        captions: 本页全部 caption（用于归属检查，应为题注全集）
         primary_caption: 当前主配对 caption
+        max_dist: 题注与内容的最大配对距离，与 pair_page 同口径
 
     Returns:
         额外框列表
     """
+    # 另一条题注的唯一最佳内容属于那条题注。边距比较不够：上下两图相距
+    # <=30pt 时，夹在中间的题注到下一张图往往更近，会在该图注配对前把框占走。
+    claimed_by_other: set = set()
+    if captions and primary_caption is not None:
+        for cap in captions:
+            if cap is primary_caption:
+                continue
+            owned = _unique_best_content(cap, all_contents, page_height, max_dist)
+            if owned is not None:
+                claimed_by_other.add(id(owned))
+
     extras: List[RegionBBox] = []
     for i, content in enumerate(all_contents):
         if i in used or content is primary:
@@ -211,17 +280,30 @@ def _find_multi_frames(
         dist = primary.edge_distance(content)
         if dist > _MULTI_FRAME_MAX_GAP:
             continue
+        if id(content) in claimed_by_other:
+            continue
 
-        # 若相邻框有更近的其他 caption，应留给该 caption，不并入 multi-frame
+        # 若相邻框有更近的其他 caption，应留给该 caption，不并入 multi-frame。
+        # 距离相等不能算「没有更近的」：左右并列的两图两题注经常出现
+        # edge_distance 完全相同（两侧都是 10pt），此时要看配对代价——
+        # 另一题注与该框的水平对齐通常显著更好，实际存在独立配对关系。
         if captions and primary_caption is not None:
-            primary_dist = primary_caption.edge_distance(content)
+            primary_cost = _cost_function(
+                primary_caption, content, page_height
+            )
             better_other = False
             for cap in captions:
                 if cap is primary_caption:
                     continue
-                if cap.edge_distance(content) + 1e-6 < primary_dist:
+                cap_dist = cap.edge_distance(content)
+                prim_dist = primary_caption.edge_distance(content)
+                if cap_dist + 1e-6 < prim_dist:
                     better_other = True
                     break
+                if abs(cap_dist - prim_dist) <= 1e-6:
+                    if _cost_function(cap, content, page_height) + 1e-6 < primary_cost:
+                        better_other = True
+                        break
             if better_other:
                 continue
 
@@ -237,6 +319,45 @@ def _find_multi_frames(
             extras.append(content)
 
     return extras
+
+
+def _filter_layout_captions_by_kind(
+    caption_regions: List[RegionBBox],
+    kind: str,
+    mixed_page: bool = False,
+) -> List[RegionBBox]:
+    """从 Layout 题注池筛出与当前分组类型一致的题注。
+
+    caption_regions 是 figure/table 共用池。raw_class 带类型信息
+    （figure-caption / table-caption）时按它筛；无法判别的通用
+    caption 分两种情况：
+
+    - 单类型页（本页只有 figure 或只有 table 一种内容）：不筛。否则
+      单类型文档（后端只标通用 caption）的题注会被误丢。
+    - 混合类型页（本页 figure 与 table 并存，mixed_page=True）：通用
+      题注不再参与任何类型的配对（评审#4 第 2 条）。同一页同时有
+      figure/table 内容时，一条题注被两类同时认领会产出「一条题注
+      配两张图」的错配——通用题注无法判别归属时宁可留作孤儿，
+      由外部候选或后续精修兜底。
+
+    其余判别不出的部分保持原样，由配对代价兜底。
+    """
+    typed: List[RegionBBox] = []
+    untyped: List[RegionBBox] = []
+    for region in caption_regions:
+        raw = (getattr(region, "raw_class", "") or "").lower()
+        if "table" in raw:
+            if kind == "table":
+                typed.append(region)
+        elif "figure" in raw or "caption" in raw and raw not in ("caption",):
+            if kind == "figure":
+                typed.append(region)
+        else:
+            untyped.append(region)
+    if mixed_page and untyped:
+        # 混合页：通用题注不进任何分组（原 review「无法判别时保留孤儿」）
+        return typed
+    return typed + untyped
 
 
 def _region_to_candidate(
@@ -288,7 +409,17 @@ def pair_layout_regions(
             if not content_regions:
                 continue
 
-            # 获取 caption 区域：外部 caption 按页过滤；本页无外部时回退 Layout
+            # 混合类型页判定（评审#4 第 2 条）：本页 figure 与 table 内容并存
+            # 时，无法判别类型的通用题注不得进入任何分组——一条题注被两类
+            # 同时认领会产出「一条题注配两张图」的错配，宁可留作孤儿。
+            mixed_page = bool(page_region.figure_regions) and bool(page_region.table_regions)
+
+            # 获取 caption 区域：外部 caption 按页过滤；本页无外部时回退 Layout。
+            # 回退必须筛类型：caption_regions 是 figure/table 共用池，Layout 把
+            # 某页表格题注识别成 figure 类时，table 分组会把 figure 题注拿去
+            # 配表格内容（外部候选只覆盖部分页/类型时该分支必走）。
+            # 判别依据：每个 caption 区域的 raw_class（后端原始分类）——
+            # 无从判别时保留为孤儿，不做类型混配。
             if caption_candidates:
                 caps = [
                     RegionBBox(
@@ -299,12 +430,28 @@ def pair_layout_regions(
                     if p == page_no and k == kind
                 ]
                 if not caps:
-                    caps = list(page_region.caption_regions)
+                    caps = _filter_layout_captions_by_kind(
+                        page_region.caption_regions, kind, mixed_page=mixed_page
+                    )
             else:
-                caps = list(page_region.caption_regions)
+                caps = _filter_layout_captions_by_kind(
+                    page_region.caption_regions, kind, mixed_page=mixed_page
+                )
 
             if not caps and not content_regions:
                 continue
+
+            # 多框归属证据 = 参与配对的题注 + 本页 Layout 题注全集。
+            # 只用外部候选时，仅 Layout 检测到、legacy 无 record 的题注不可见，
+            # 相邻独立图会被并入上一张图的多框（评审#3 P1）。
+            # 混合页的通用题注从配对池排除后，归属证据同样不包含它们
+            #（避免它们以归属证据的身份反过来阻止合法合并）。
+            ownership_caps = _dedup_caption_regions(
+                list(caps)
+                + _filter_layout_captions_by_kind(
+                    page_region.caption_regions, kind, mixed_page=mixed_page
+                )
+            )
 
             # 执行配对（显式传入 kind，避免 AssetCandidate 默认成 figure）
             page_result = pair_page(
@@ -312,6 +459,7 @@ def pair_layout_regions(
                 captions=caps,
                 contents=content_regions,
                 kind=kind,
+                ownership_captions=ownership_caps,
             )
 
             # 合并到结果（同页可能有 figure 和 table 两种）

@@ -12,6 +12,8 @@ try:
 except ImportError:
     fitz = None  # type: ignore
 
+from .direction import captions_share_column
+
 
 def limit_clip_by_text_blocks(
     clip: Any,
@@ -240,8 +242,15 @@ def limit_clip_by_neighbor_captions(
 
     limited = fitz.Rect(clip)
 
+    # 纵向边界只由同栏题注给出：双栏页面上邻栏题注在纵向上同样可能位于
+    # 当前题注同侧，不加栏位检查会把本栏 clip 从邻栏题注处截断
+    # （实测 240→318，丢掉 78pt 图形内容）。
+    column_neighbors = [
+        r for r in neighbor_caption_rects if captions_share_column(r, caption_rect)
+    ]
+
     if direction == "above":
-        previous_caps = [r for r in neighbor_caption_rects if r.y1 <= caption_rect.y0]
+        previous_caps = [r for r in column_neighbors if r.y1 <= caption_rect.y0]
         if previous_caps:
             nearest_prev = max(previous_caps, key=lambda r: r.y1)
             candidate = fitz.Rect(
@@ -250,7 +259,7 @@ def limit_clip_by_neighbor_captions(
             if candidate.height >= min_height:
                 limited = candidate
     elif direction == "below":
-        next_caps = [r for r in neighbor_caption_rects if r.y0 >= caption_rect.y1]
+        next_caps = [r for r in column_neighbors if r.y0 >= caption_rect.y1]
         if next_caps:
             nearest_next = min(next_caps, key=lambda r: r.y0)
             candidate = fitz.Rect(

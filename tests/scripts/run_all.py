@@ -23,7 +23,7 @@ QA-01 统一测试入口
   一律失败，仅用户显式授权的排除模式可跳过），
   通过/失败数从 pytest 输出解析，解析不到标记"数量未知"。
 
-测试套件（共 17 个）：
+测试套件（共 20 个）：
 1. P0 环境变量优先级测试 (test_p0_env_priority.py)
 2. P1 标识符解析测试 (test_p1_ident_parsing.py)
 3. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
@@ -41,6 +41,9 @@ QA-01 统一测试入口
 15. 表格尾注回归测试 (test_table_notes_20260923.py)
 16. 验收状态与题注对账测试 (test_extraction_status_inventory.py)
 17. 审查缺陷修复回归测试 (test_bugfix_20260928.py)
+18. 审查缺陷修复回归测试 (test_bugfix_20260929.py)
+19. 中文章节标题识别回归测试 (test_text_extract_headings.py)
+20. debug 批次分析器测试 (test_analyze_debug_batch.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -61,6 +64,10 @@ TESTS_SCRIPTS_DIR = Path(__file__).parent  # tests/scripts/ 目录
 
 # 允许跳过 golden 的环境变量（与 conftest.py 同口径；本地定向调试用的显式豁免）
 ALLOW_GOLDEN_SKIP_ENV = "PDF_SKILL_ALLOW_GOLDEN_SKIP"
+
+# 逐文件套件调用时声明「golden 由本入口另行整轮执行」（conftest 零收集闸门
+# 因此对单套件会话放行；评审#4 第 3 条后单文件零收集默认判失败）
+GOLDEN_EXTERNAL_ENV = "PDF_SKILL_GOLDEN_EXTERNAL"
 
 
 @dataclass
@@ -91,13 +98,22 @@ class TestSuiteResult:
         return f"{self.passed}/{self.total}"
 
 
-def run_command(cmd: List[str], cwd: Optional[Path] = None) -> Tuple[int, str, str]:
+def run_command(
+    cmd: List[str],
+    cwd: Optional[Path] = None,
+    extra_env: Optional[dict] = None,
+) -> Tuple[int, str, str]:
     """运行命令并返回 (exit_code, stdout, stderr)"""
+    env = None
+    if extra_env:
+        env = dict(os.environ)
+        env.update(extra_env)
     result = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         cwd=str(cwd or PROJECT_ROOT),
+        env=env,
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -139,8 +155,14 @@ def run_pytest_suite(
     script_path: Path,
     pytest_args: Optional[List[str]] = None,
     verbose: bool = False,
+    golden_external: bool = True,
 ) -> TestSuiteResult:
-    """以 pytest 运行单个测试套件"""
+    """以 pytest 运行单个测试套件。
+
+    golden_external=True 时向子进程声明 PDF_SKILL_GOLDEN_EXTERNAL=1
+    （conftest 的零收集闸门据此放行单套件会话——golden 由本入口另行
+    整轮执行，评审#4 第 3 条）。golden 套件本体调用时传 False。
+    """
     result = TestSuiteResult(name=name)
 
     if not script_path.exists():
@@ -151,8 +173,10 @@ def run_pytest_suite(
     cmd = [sys.executable, "-m", "pytest", str(script_path)]
     cmd.extend(pytest_args if pytest_args is not None else ["-q"])
 
+    extra_env = {GOLDEN_EXTERNAL_ENV: "1"} if golden_external else None
+
     start_time = time.time()
-    exit_code, stdout, stderr = run_command(cmd)
+    exit_code, stdout, stderr = run_command(cmd, extra_env=extra_env)
     result.duration_ms = int((time.time() - start_time) * 1000)
     result.exit_code = exit_code
 
@@ -351,6 +375,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         "name": "审查缺陷修复回归 (20260928)",
         "path": TESTS_SCRIPTS_DIR / "test_bugfix_20260928.py",
     })
+    test_suites.append({
+        "name": "debug 批次分析器测试 (20260928)",
+        "path": TESTS_SCRIPTS_DIR / "test_analyze_debug_batch.py",
+    })
+    # 2026-09-29 并行会话产物：通栏表收窄回归与中文标题降级回归
+    test_suites.append({
+        "name": "审查缺陷修复回归 (20260929)",
+        "path": TESTS_SCRIPTS_DIR / "test_bugfix_20260929.py",
+    })
+    test_suites.append({
+        "name": "中文章节标题识别回归测试",
+        "path": TESTS_SCRIPTS_DIR / "test_text_extract_headings.py",
+    })
 
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，
     # 就会重演「静默跳过、退出码仍为 0」的假绿。golden 单独处理，故排除。
@@ -410,6 +447,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 script_path=golden_path,
                 pytest_args=(["-m", "golden"] if args.verbose else ["-q", "-m", "golden"]),
                 verbose=args.verbose,
+                golden_external=False,  # golden 本体必须真实执行，不声明外部放行
             )
         results.append(result)
         _print_suite_result(result)

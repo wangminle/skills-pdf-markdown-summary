@@ -185,14 +185,32 @@ _EXPLICIT_CAPTION_PREFIX_RE = re.compile(
     r"\s*",
     re.IGNORECASE,
 )
-_BODY_DISCOURSE_RE = re.compile(
-    r"^(?:also|we|this|the|in|as)\b",
+# 句点后能证明「这不是题注」的接续词。只有这些才算证据——它们几乎不可能
+# 出现在题注开头。the/this/our 一类常见句首词不能当判据："Figure 1. The
+# proposed architecture" / "Figure 1. Our proposed model" 都是论文里最常见
+# 的题注写法，按句首词拒绝会让真实题注既不被提取、也不进 inventory（补裁
+# 同样依赖题注识别），静默消失。
+_PERIOD_BODY_OPENER_ALT = (
+    r"also|we|here|note that|let us|in this|in the following"
+    r"|as shown|as we|as discussed"
+)
+_PERIOD_BODY_OPENER_RE = re.compile(
+    rf"^(?:{_PERIOD_BODY_OPENER_ALT})\b",
     re.IGNORECASE,
 )
 _PERIOD_BODY_CITATION_RE = re.compile(
-    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*\.\s*(?:also|we|this|the|in)\b",
-    re.IGNORECASE,
+    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*\.\s*(\S.*)$",
+    re.IGNORECASE | re.DOTALL,
 )
+
+
+def _period_tail_reads_as_body(after: str) -> bool:
+    """句点之后的内容是否读作正文接续（而非题注）。"""
+    tail = after.lstrip()
+    # 题注描述里常见 Section/Table/Equation 交叉引用；它们不能
+    # 单独推翻行首的显式题注标记。只有几乎不会开启题注的接续词
+    # （we/also/in this/as shown 等）才是足够的正文证据。
+    return bool(_PERIOD_BODY_OPENER_RE.match(tail))
 
 
 def is_explicit_caption_format(text: str) -> bool:
@@ -210,7 +228,7 @@ def is_explicit_caption_format(text: str) -> bool:
         return True
     if rest.startswith("."):
         after = rest[1:].lstrip()
-        if not after or _BODY_DISCOURSE_RE.match(after):
+        if not after or _period_tail_reads_as_body(after):
             return False
         return True
     return False
@@ -250,13 +268,18 @@ def is_likely_reference_context(text: str) -> bool:
         r'shown in (figure|table)', r'listed in (table)',
         r'^table\s+[A-Z]?\d+\s+appendix\b',
         r'^table\s+[A-Z]?\d+\s*,\s*(?:we|this|the)\b',
-        r'^(?:table|figure|fig\.?)\s+[A-Z]?\d+\s*\.\s*(?:also|we|this|the|in)\b',
+        # 与 _PERIOD_BODY_OPENER_ALT 同一口径：this/the 不算正文证据
+        # （"Figure 1. The proposed architecture" 是题注），只有真正的接续词才算。
+        rf'^(?:table|figure|fig\.?)\s+[A-Z]?\d+\s*\.\s*(?:{_PERIOD_BODY_OPENER_ALT})\b',
         # 复数标签 + 编号并列（"Figures 3 and 4"）是正文引用的强信号，
         # 真实 caption 极少以复数列举开头。
         r'^(?:tables|tabs\.?|figures|figs\.?)\s+[a-z]?\d+\s+(?:and|,|;|–|-|to)\s+[a-z]?\d+\b',
         # 「标签 + 编号 + 描述动词 + that/how 从句」是正文句；限定 that/how
         # 是为了不误伤 "Figure 3 shows the architecture" 这类句式 caption。
         r'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s*[a-z]?\d+\s+(?:shows?|demonstrates?|illustrates?|compares?|presents?|summarizes?|reports?)\s+(?:that|how)\b',
+        # 同一句式若在句号后继续写下一句，已经是正文而不是题注。
+        # "Table 4 presents the results of the factor analysis. The six factors..."
+        r'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s+[a-z]?\d+\s+(?:shows?|demonstrates?|illustrates?|compares?|presents?|summarizes?|reports?)\b.{8,}\.\s+\w',
         r'如.*所示', r'见.*图', r'参见', r'如.*表.*所示',
         r'according to (figure|table)', r'based on (figure|table)',
         r'from (figure|table)',
@@ -818,7 +841,8 @@ def is_caption_reference(
     # 其语法本身比块行数更可靠，不能因长块上下文被误判成正文引用。
     if is_explicit_caption_format(text):
         return False
-    if _PERIOD_BODY_CITATION_RE.match(text.strip()):
+    period_citation = _PERIOD_BODY_CITATION_RE.match(text.strip())
+    if period_citation and _period_tail_reads_as_body(period_citation.group(1)):
         return True
 
     num_lines = len(block.get("lines", []))

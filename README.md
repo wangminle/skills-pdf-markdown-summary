@@ -3,7 +3,7 @@
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
 >
-> 当前版本 / Current version: **0.6.4**
+> 当前版本 / Current version: **0.6.5**
 
 ---
 
@@ -177,7 +177,7 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 题注对账（caption inventory）：显式题注与裸 `Figure N` / `Table N` 标签自动对账导出资产，缺口补裁后写入索引。
 - `--prune-images` 安全化：仅清理运行前已存在且未被修改、未被当前索引引用的 PNG。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；当前回归基线为 291 passed、0 failed、0 skipped（2026-09-28 复验）。
+- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；当前回归基线为 371 passed、0 failed、0 skipped（2026-09-29 复验）。
 - Basic Benchmark 已完成多轮逐图 debug 排查，图表选取策略记录见 `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
 - 当前图表提取代码流程说明见 `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
@@ -355,7 +355,7 @@ Implemented:
 - Caption inventory reconciliation: explicit captions and bare `Figure N` / `Table N` labels are reconciled against exported assets; gaps get recovery crops and are indexed.
 - Safe `--prune-images`: only PNGs that existed before the run, are unchanged, and are unreferenced by the current index are removed.
 - Complete CLI options reference (`references/cli-options.md`).
-- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; the current regression baseline is 291 passed, 0 failed, 0 skipped (reverified on 2026-09-28).
+- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; the current regression baseline is 371 passed, 0 failed, 0 skipped (reverified on 2026-09-29).
 - Multi-round Basic Benchmark visual review is recorded in `docs/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
 - Current extraction flow diagrams are documented in `docs/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.

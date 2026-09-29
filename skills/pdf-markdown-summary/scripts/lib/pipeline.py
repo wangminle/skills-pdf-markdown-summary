@@ -19,7 +19,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .models import AttachmentRecord
 from .quality import (
@@ -43,6 +43,11 @@ _MIN_LEGACY_COVERAGE = 0.55
 
 # record↔Layout 候选匹配的最低 IoU：禁止「任意正重叠即绑定」，降低跨资产误绑
 _MIN_MATCH_IOU = 0.25
+
+# 图注框重合度：record 的 caption_bbox 与候选的 caption_bbox 重合到此值即视为
+# 「同一条图注」。同图注是比内容框 IoU 更强的身份证据——两张相邻图的截图框
+# 漂移后 IoU 可以互相倒挂，但图注框不会（评审#3 P1）。
+_MIN_CAPTION_IOU = 0.5
 
 
 @dataclass
@@ -131,6 +136,125 @@ def _union_bboxes(bboxes: List[List[float]]) -> List[float]:
     ]
 
 
+def _captions_identical(
+    caption_a: Optional[List[float]],
+    caption_b: Optional[List[float]],
+) -> bool:
+    """两个图注框是否指同一条图注（资产身份证据）。"""
+    if not caption_a or not caption_b:
+        return False
+    return _bbox_iou(list(caption_a), list(caption_b)) >= _MIN_CAPTION_IOU
+
+
+def _optimal_assignment(
+    rec_ids: List[int],
+    frames: List[tuple],
+    edge_weight: Dict[int, Dict[tuple, Tuple[float, float]]],
+) -> Dict[int, tuple]:
+    """二分图的精确字典序最优分配。
+
+    目标依次是：身份边数最大、匹配基数最大、IoU 总和最大。
+    将三层目标编码为不会进位串扰的整数权重，再用最小费用流求解。
+    每条记录还有一条零费用的「不匹配」边，因此身份优先级不会被
+    强制最大基数破坏。复杂度为多项式，高密度页也不再退化成贪心。
+
+    Args:
+        rec_ids: 记录索引（按顺序处理）
+        frames: 候选 frame 列表（右侧节点）
+        edge_weight: 记录 -> {frame -> (conf, iou) 字典序得分}
+
+    Returns:
+        记录 -> frame 的匹配（部分记录可能无匹配）
+    """
+    if not rec_ids or not frames:
+        return {}
+
+    n = len(rec_ids)
+    m = len(frames)
+    max_matches = min(n, m)
+    iou_scale = 10**9
+    match_unit = max_matches * iou_scale + 1
+    confirmed_unit = max_matches * (match_unit + iou_scale) + 1
+
+    source = 0
+    rec_offset = 1
+    frame_offset = rec_offset + n
+    sink = frame_offset + m
+    node_count = sink + 1
+    # 边结构：[to, reverse_index, residual_capacity, cost]
+    graph: List[List[List[int]]] = [[] for _ in range(node_count)]
+
+    def add_edge(u: int, v: int, capacity: int, cost: int) -> List[int]:
+        forward = [v, len(graph[v]), capacity, cost]
+        backward = [u, len(graph[u]), 0, -cost]
+        graph[u].append(forward)
+        graph[v].append(backward)
+        return forward
+
+    for i in range(n):
+        add_edge(source, rec_offset + i, 1, 0)
+        add_edge(rec_offset + i, sink, 1, 0)  # 允许该记录不匹配
+    for j in range(m):
+        add_edge(frame_offset + j, sink, 1, 0)
+
+    frame_pos = {frame: j for j, frame in enumerate(frames)}
+    match_edges: Dict[Tuple[int, tuple], List[int]] = {}
+    for i, ri in enumerate(rec_ids):
+        for frame, (confirmed, iou) in edge_weight.get(ri, {}).items():
+            j = frame_pos.get(frame)
+            if j is None:
+                continue
+            benefit = (
+                (1 if confirmed > 0 else 0) * confirmed_unit
+                + match_unit
+                + max(0, int(round(iou * iou_scale)))
+            )
+            match_edges[(ri, frame)] = add_edge(
+                rec_offset + i, frame_offset + j, 1, -benefit,
+            )
+
+    # 每条记录发送 1 单位流。残量网络里的反向边允许后续增广
+    # 重排早期匹配，避免贪心占住其他记录的唯一 frame。
+    inf = 10**100
+    for _ in range(n):
+        dist = [inf] * node_count
+        prev_node = [-1] * node_count
+        prev_edge = [-1] * node_count
+        dist[source] = 0
+        for _pass in range(node_count - 1):
+            changed = False
+            for u in range(node_count):
+                if dist[u] == inf:
+                    continue
+                for ei, edge in enumerate(graph[u]):
+                    v, _rev, capacity, cost = edge
+                    if capacity <= 0:
+                        continue
+                    candidate = dist[u] + cost
+                    if candidate < dist[v]:
+                        dist[v] = candidate
+                        prev_node[v] = u
+                        prev_edge[v] = ei
+                        changed = True
+            if not changed:
+                break
+        if prev_node[sink] < 0:
+            break
+        v = sink
+        while v != source:
+            u = prev_node[v]
+            edge = graph[u][prev_edge[v]]
+            edge[2] -= 1
+            graph[v][edge[1]][2] += 1
+            v = u
+
+    result: Dict[int, tuple] = {}
+    for (ri, frame), edge in match_edges.items():
+        if edge[2] == 0:
+            result[ri] = frame
+    return result
+
+
 def _match_records_to_candidates(
     records: List[AttachmentRecord],
     pairing_results: Dict[int, Any],
@@ -143,7 +267,18 @@ def _match_records_to_candidates(
         "caption_bbox": 可选 caption 框,
     }
 
-    约束：每个候选 pair 最多绑定一个 record（标记已使用，禁止重复占用）。
+    约束：
+    1. 每个候选 pair 最多绑定一个 record（标记已使用，禁止重复占用）；
+    2. 优先「图注身份一致」的边：record.caption_bbox 与候选 caption_bbox
+       重合即为同一条图注，该边即使内容框 IoU 低于 _MIN_MATCH_IOU 也成立。
+       内容框 IoU 只看几何，上下相邻两图的截图框漂移后会互相倒挂，导致
+       两张图互换绑定（用对方的框重渲染 = 截图串图）；图注框不受此影响。
+    3. 在一对一约束下求字典序最优分配：先最大化身份边数（身份边不可被
+       普通 IoU 边挤占），再最大化匹配基数，最后最大化 IoU 总和
+       （评审#4 第 1 条）。Kuhn 增广只保证基数，增广找到的第一条可行路径
+       不一定是总分最高的分配（实测反例：2 记录 2 候选 0.808 对最优
+       1.084，两分配基数相同；3 周旋转的改进是任何 2-opt 交换都够不到的
+       局部最优）。
     """
     mapping: Dict[int, Dict[str, Any]] = {}
 
@@ -197,37 +332,93 @@ def _match_records_to_candidates(
             }
             pair_index.setdefault((page, kind), []).append(entry)
 
-    # 贪心一对一：按 (rec_idx, cand_idx, iou) 降序分配
-    scored: List[Tuple[float, int, int, Tuple[int, str]]] = []
+    # 一对一匹配：字典序最优分配——先身份边数、再匹配基数、最后 IoU 总和。
+    # 纯 IoU 贪心会让一个可匹配两个候选的记录先占用另一条记录的唯一
+    # 候选，后者彻底失去精修机会（实测：候选 [0,0,100,100]/[65,0,165,100]
+    # 与记录 [5,0,105,100]/[0,0,80,100] 只匹配 1 条，实际可匹配 2 条）。
+
+    # 候选按 bbox_id 折叠：同框（page+kind+union bbox 相同）的多个候选
+    # 是同一几何实体，只能被一条记录占用。折叠后的图节点即 bbox_id。
+    cand_bbox_ids: Dict[Tuple[int, str], List[tuple]] = {}
+    for key, candidates in pair_index.items():
+        ids: List[tuple] = []
+        for cand in candidates:
+            bbox_id = (key[0], key[1], tuple(round(v, 2) for v in cand["bbox"]))
+            ids.append(bbox_id)
+        cand_bbox_ids[key] = ids
+
+    adj: Dict[int, List[Tuple[int, float, int, Tuple[int, str]]]] = {}
     for i, rec in enumerate(records):
         rec_page = getattr(rec, "page", 0)
         rec_kind = getattr(rec, "kind", "figure")
         rec_bbox = getattr(rec, "final_bbox", None)
         if rec_bbox is None:
             continue
+        rec_caption = getattr(rec, "caption_bbox", None)
         key = (rec_page, rec_kind)
         candidates = pair_index.get(key, [])
         for ci, cand in enumerate(candidates):
             iou = _bbox_iou(rec_bbox, cand["bbox"])
-            if iou >= _MIN_MATCH_IOU:
-                scored.append((iou, i, ci, key))
+            confirmed = _captions_identical(rec_caption, cand.get("caption_bbox"))
+            # 图注身份一致的边不受 IoU 阈值限制：身份是真值，几何只是估计。
+            if confirmed or iou >= _MIN_MATCH_IOU:
+                adj.setdefault(i, []).append((1 if confirmed else 0, iou, ci, key))
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    used_recs: set = set()
-    used_cands: set = set()  # (key, cand_idx)
-    used_bbox_ids: set = set()  # (page, kind, rounded union bbox) 防同框重复占用
+    # 用最小费用流精确求解「先最大化身份边数、再最大化匹配基数、
+    # 最后最大化 IoU 总和」的分配（Kuhn 增广只保证基数，且增广找到的第一条
+    # 可行路径不一定是总分最高的分配——实测反例：2 记录 2 候选可得 0.808
+    # 而最优为 1.084，两分配基数相同；另有 3 周旋转的改进是任何 2-opt
+    # 交换都够不到的局部最优；身份边不设优先级时又会被普通 IoU 边挤占，
+    # A3 按错误区域重渲染 = 截图串图）。该求解器为多项式复杂度，高密度页
+    # 也保持同一优化目标，不再超过阈值就退回贪心。
+    def _same_frame(key: Tuple[int, str], ci: int) -> tuple:
+        return cand_bbox_ids[key][ci]
 
-    for iou, ri, ci, key in scored:
-        if ri in used_recs or (key, ci) in used_cands:
-            continue
-        cand = pair_index[key][ci]
-        bbox_id = (key[0], key[1], tuple(round(v, 2) for v in cand["bbox"]))
-        if bbox_id in used_bbox_ids:
-            continue
-        used_recs.add(ri)
-        used_cands.add((key, ci))
-        used_bbox_ids.add(bbox_id)
-        mapping[ri] = cand
+    # 每条边只保留「该记录对该 frame 的最佳边」：同 frame 的多个候选
+    # 是同一几何实体，记录对其分数取最高即可（其余边不可能进入解）。
+    # 值 = (conf, iou, ci, key)：conf/iou 是字典序得分，ci/key 回定位候选。
+    best_edge_per_frame: Dict[int, Dict[tuple, Tuple[float, float, int, Tuple[int, str]]]] = {}
+    for ri, edges in adj.items():
+        per_frame: Dict[tuple, Tuple[float, float, int, Tuple[int, str]]] = {}
+        for conf, iou, ci, key in edges:
+            frame = _same_frame(key, ci)
+            cur = per_frame.get(frame)
+            if cur is None or (conf, iou) > (cur[0], cur[1]):
+                per_frame[frame] = (float(conf), float(iou), ci, key)
+        best_edge_per_frame[ri] = per_frame
+
+    # 按 (page, kind) 分组求解；frame 天然只属于一个组（bbox_id 含组键）。
+    group_of: Dict[Tuple[int, str], List[int]] = {}
+    for ri, edges in adj.items():
+        for conf, iou, ci, key in edges:
+            group_of.setdefault(key, []).append(ri)
+    for key in group_of:
+        group_of[key] = sorted(set(group_of[key]))
+
+    match_of_record: Dict[int, Tuple[Tuple[int, str], int]] = {}
+    for key, rec_ids in group_of.items():
+        frames: List[tuple] = []
+        seen_frames: set = set()
+        for ri in rec_ids:
+            for frame in best_edge_per_frame.get(ri, {}):
+                if frame not in seen_frames:
+                    seen_frames.add(frame)
+                    frames.append(frame)
+        edge_weight: Dict[int, Dict[tuple, Tuple[float, float]]] = {}
+        for ri in rec_ids:
+            wmap: Dict[tuple, Tuple[float, float]] = {}
+            for frame, (conf, iou, ci, k) in best_edge_per_frame.get(ri, {}).items():
+                if frame not in seen_frames:
+                    continue
+                wmap[frame] = (conf, iou)
+            edge_weight[ri] = wmap
+        chosen = _optimal_assignment(rec_ids, frames, edge_weight)
+        for ri, frame in chosen.items():
+            _conf, _iou, ci, k = best_edge_per_frame[ri][frame]
+            match_of_record[ri] = (k, ci)
+
+    for ri, (key, ci) in match_of_record.items():
+        mapping[ri] = pair_index[key][ci]
 
     return mapping
 
@@ -275,6 +466,7 @@ def run_refinement_pipeline(
     pdf_path: str,
     out_dir: str,
     dpi: int = 300,
+    skip_idents: Optional[Set[str]] = None,
 ) -> RefinementReport:
     """执行 A3 精修管道。
 
@@ -287,14 +479,37 @@ def run_refinement_pipeline(
         pdf_path: PDF 文件路径
         out_dir: 输出目录
         dpi: 渲染 DPI
+        skip_idents: 不参与精修的 id 集合（对应 CLI 的 --no-refine）。
+            这些 record 既不参与候选匹配（不占用候选），也不做精修，
+            但在报告中留一条 skipped 记录，便于核对排除范围。
 
     Returns:
         RefinementReport
     """
     report = RefinementReport(total_records=len(records))
 
+    # --no-refine 的排除必须延续到 A3：legacy 阶段已按同一列表跳过裁剪微调，
+    # A3 再按 Layout 候选覆盖同一 id 就等于无视用户显式排除（评审#3 P2）。
+    skip_set = {str(x).strip() for x in (skip_idents or []) if str(x).strip()}
+    pool = records
+    if skip_set:
+        pool = [r for r in records if str(getattr(r, "ident", "")) not in skip_set]
+        for rec in records:
+            if str(getattr(rec, "ident", "")) not in skip_set:
+                continue
+            report.records.append(
+                RefinementRecord(
+                    ident=rec.ident,
+                    kind=rec.kind,
+                    page=rec.page,
+                    legacy_bbox=list(rec.final_bbox) if rec.final_bbox else None,
+                    applied=False,
+                    reason="skipped: id listed in --no-refine",
+                )
+            )
+
     # 匹配 records 到 Layout 候选框
-    candidate_map = _match_records_to_candidates(records, pairing_results)
+    candidate_map = _match_records_to_candidates(pool, pairing_results)
     report.matched = len(candidate_map)
 
     if not candidate_map:
@@ -329,7 +544,7 @@ def run_refinement_pipeline(
                 cand_frames = [list(cand_bbox)]
                 cand_caption = None
 
-            rec = records[rec_idx]
+            rec = pool[rec_idx]
             rec_record = RefinementRecord(
                 ident=rec.ident,
                 kind=rec.kind,

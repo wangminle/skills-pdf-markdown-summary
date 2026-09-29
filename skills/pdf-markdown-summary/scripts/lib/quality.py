@@ -135,11 +135,12 @@ def detect_truncation(
 ) -> Tuple[bool, str]:
     """检测精修框是否截断了候选内容。
 
-    判据（按优先级）：
-    1. 候选框内有实质对象（与候选重叠 >= min_object_overlap）时，只看对象：
-       任一对象落在候选内的部分被 final 覆盖率 < min_object_coverage 即截断；
-    2. 候选框内无实质对象可用（未提供 object_rects 或无实质重叠）时，退而检查
-       final 对候选框整体的覆盖率 < min_candidate_coverage。
+    判据：
+    1. 候选框内有实质对象（与候选重叠 >= min_object_overlap）时，任一对象落在
+       候选内的部分被 final 覆盖率 < min_object_coverage 即截断；
+    2. 对象都保留时仍检查 final 对候选框整体的覆盖率。对象存在不能屏蔽
+       候选里对象之外的文字：覆盖率 < min_candidate_coverage 同样算截断；
+    3. 候选框内无实质对象时，只按整体覆盖率判断。
     """
     if candidate_bbox is None:
         return False, ""
@@ -183,6 +184,15 @@ def detect_truncation(
                 cut_objs += 1
         if cut_objs > 0:
             return True, f"truncated_objects={cut_objs}, worst_obj_cov={worst:.3f}"
+        # 对象都在，但候选里还有对象之外的文字内容（表格单元、图内标签），
+        # 同样是候选内容的一部分：对象检查通过不能屏蔽整体覆盖率判据，
+        # 否则「final 保留对象却裁掉 y=82-100 的文字带」会静默通过
+        # （实测 candidate_coverage=0.820 < 0.85 时仍返回未截断）。
+        if final_cov < min_candidate_coverage:
+            return True, (
+                f"candidate_coverage={final_cov:.3f} < {min_candidate_coverage}"
+                f" (objects kept, worst_obj_cov={worst:.3f})"
+            )
         return False, ""
 
     # 无对象时：final 对 candidate 覆盖不足视为截断风险

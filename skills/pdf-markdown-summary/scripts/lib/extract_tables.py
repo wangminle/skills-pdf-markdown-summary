@@ -70,6 +70,7 @@ from .table_refine import (
     expand_table_clip_to_text_bounds,
     expand_clip_to_table_notes,
     expand_table_clip_to_border_rules,
+    limit_table_clip_to_caption_column,
     refine_clip_to_table_band,
     restore_table_clip_width,
     restore_table_tail_after_layout_trim,
@@ -418,6 +419,20 @@ def extract_tables(
 
                 base_clip = create_rect(x_left, y_top, x_right, y_bottom)
                 table_search_clip = create_rect(x_left, search_top, x_right, search_bottom)
+                # 收窄前的原始框显式保存：后续 limit/expand 链会多次重建
+                # base_clip，restore_table_clip_width 只能靠显式传参拿到
+                # 恢复上限（矩形自定义属性在拷贝构造时丢失，不可用）。
+                pre_caption_column_clip = create_rect(x_left, y_top, x_right, y_bottom)
+                try:
+                    page_drawings = page.get_drawings()
+                except Exception:
+                    page_drawings = []
+                base_clip = limit_table_clip_to_caption_column(
+                    base_clip, caption_bbox, page_rect, text_lines, page_drawings,
+                )
+                table_search_clip = limit_table_clip_to_caption_column(
+                    table_search_clip, caption_bbox, page_rect, text_lines, page_drawings,
+                )
                 if neighbor_caption_rects:
                     base_clip = limit_clip_by_neighbor_captions(
                         base_clip,
@@ -696,6 +711,7 @@ def extract_tables(
                         final_clip,
                         base_clip,
                         table_band_changed=table_band_changed,
+                        pre_narrow_clip=pre_caption_column_clip,
                     )
                     final_clip = expand_table_clip_to_text_bounds(
                         final_clip,

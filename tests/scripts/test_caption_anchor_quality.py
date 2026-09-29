@@ -1501,6 +1501,160 @@ def test_table_direction_prefers_nearest_structured_rows_over_chart_labels() -> 
     assert confidence >= 0.6
 
 
+def test_two_column_neighbor_caption_does_not_steal_rows() -> None:
+    """双栏页面上，邻栏题注不得认领当前栏题注上方的表格行。
+
+    两栏各有一张表时，另一栏较早的题注在纵向上正好位于当前题注上方，
+    `_neighbor_attaches_below` 会把它当成「向下关联」的邻题注，进而把当前栏
+    题注上方的表格行全部判为对方所有，上方证据清零、方向由 above 翻成
+    below，截取到错误区域。归属判断必须先过栏位检查。
+    """
+    page_rect = fitz.Rect(0, 0, 595, 842)
+    caption = fitz.Rect(310, 408, 460, 420)       # 右栏题注，表格行在其上方
+    left_caption = fitz.Rect(60, 88, 190, 100)    # 左栏题注，表格行在其下方
+
+    text_lines = []
+    for row, (name, value) in enumerate(
+        [("GPT-4o", "92.3"), ("Claude", "94.1"), ("Ours", "96.7"), ("Llama", "88.5"), ("Mistral", "90.2")]
+    ):
+        y0 = 118 + row * 13
+        text_lines.append((fitz.Rect(62, y0, 120, y0 + 10), 9.0, name))
+        text_lines.append((fitz.Rect(180, y0, 250, y0 + 10), 9.0, value))
+    for row, (name, value) in enumerate(
+        [("BERT", "81.2"), ("RoBERTa", "85.4"), ("DeBERTa", "87.9"), ("T5", "79.3"), ("GPT-2", "76.8")]
+    ):
+        y0 = 330 + row * 13
+        text_lines.append((fitz.Rect(312, y0, 380, y0 + 10), 9.0, name))
+        text_lines.append((fitz.Rect(430, y0, 500, y0 + 10), 9.0, value))
+
+    def _direction(neighbors):
+        return score_local_direction(
+            caption,
+            page_rect,
+            [],
+            [],
+            clip_height=520,
+            is_table=True,
+            text_lines=text_lines,
+            neighbor_caption_rects=neighbors,
+        )[0]
+
+    assert _direction([]) == "above"
+    assert _direction([left_caption]) == "above", "跨栏题注不应改变本栏方向"
+
+    # 栏位判据本身：同栏/通栏题注必须保留（否则堆叠表归属判断失效），
+    # 跨栏题注必须剔除。
+    from lib.direction import captions_share_column
+
+    same_column = fitz.Rect(310, 88, 460, 100)
+    full_width = fitz.Rect(60, 88, 535, 100)
+    assert captions_share_column(same_column, caption)
+    assert captions_share_column(full_width, caption)
+    assert not captions_share_column(left_caption, caption)
+
+
+def test_period_caption_with_common_opener_is_real_caption() -> None:
+    """`Figure 1. The proposed architecture` 是最常见的题注写法，不能当正文。
+
+    按句首常见词（the/this）拒绝会让真实题注既不被提取、也不进 inventory
+    补裁，静默消失。只有 also/we/in this/as shown 这类几乎不可能出现在题注
+    开头的接续词才算正文证据。
+    """
+    from lib.caption_detection import is_caption_anchor_candidate, is_explicit_caption_format
+
+    for caption in (
+        "Figure 1. The proposed architecture of our method.",
+        "Table 2. This comparison shows the ablation results.",
+    ):
+        assert is_explicit_caption_format(caption), caption
+        assert is_caption_anchor_candidate(caption), caption
+        assert not is_likely_reference_context(caption), caption
+
+    for body in (
+        "Table 6. Also, we evaluate different modes of the model",
+        "Figure 1. In this section we describe the architecture",
+        "Table 3. As shown in the previous section, the trend holds",
+    ):
+        assert not is_explicit_caption_format(body), body
+        assert is_likely_reference_context(body), body
+
+
+def test_period_caption_with_our_opener_is_real_caption() -> None:
+    """`Figure 1. Our proposed model architecture.` 是常见题注写法，不能当正文。
+
+    our 若留在正文接续词表里，explicit/anchor 均为 False，题注既不被提取、
+    也不进 inventory 补裁，静默消失。题注描述中常会引用 Section/Table/
+    Equation；仅凭尾部交叉引用不能推翻行首的显式题注标记。
+    """
+    from lib.caption_detection import (
+        is_caption_anchor_candidate,
+        is_caption_reference,
+        is_explicit_caption_format,
+    )
+
+    for caption in (
+        "Figure 1. Our proposed model architecture.",
+        "Figure 2. Our framework consists of three modules.",
+        "Table 3. Our results on the benchmark datasets.",
+    ):
+        assert is_explicit_caption_format(caption), caption
+        assert is_caption_anchor_candidate(caption), caption
+        assert not is_likely_reference_context(caption), caption
+
+    for caption in (
+        "Figure 1. Our results in Section 3 confirm the effectiveness of our method.",
+        "Figure 1. Our approach builds on Table 2 and Equation 4.",
+    ):
+        assert is_explicit_caption_format(caption), caption
+        assert is_caption_anchor_candidate(caption), caption
+        assert not is_likely_reference_context(caption), caption
+        assert not is_caption_reference(
+            caption,
+            {"lines": []},
+            re.compile(r"^Figure\s+\d+"),
+        ), caption
+
+
+def test_period_tail_cross_reference_unifies_body_opener_criteria() -> None:
+    """句点题注的正文判据统一口径：this/the/our 不算证据，接续词才算。
+
+    :263 旧模式里的 this/the/in 与 _PERIOD_BODY_OPENER_ALT 并存、口径冲突；
+    统一后 "Figure 1. The proposed architecture" 仍为题注，真正的接续词
+    （also/in this/as shown）仍判正文。
+    """
+    from lib.caption_detection import is_explicit_caption_format
+
+    for body in (
+        "Table 6. Also, we evaluate different modes of the model",
+        "Figure 1. In this section we describe the architecture",
+        "Table 3. As shown in the previous section, the trend holds",
+        "Figure 2. We also compare against supervised baselines",
+    ):
+        assert not is_explicit_caption_format(body), body
+        assert is_likely_reference_context(body), body
+
+    assert is_explicit_caption_format("Figure 1. The proposed architecture of our method.")
+    assert not is_likely_reference_context("Figure 1. The proposed architecture of our method.")
+
+
+def test_body_sentence_after_table_verb_is_reference() -> None:
+    """「Table N presents the results. The six factors...」是正文，不是题注。
+
+    没有 that/how，但句号后还在续写。显式题注和单句
+    "Figure 3 shows the architecture" 不能被这条误伤。
+    """
+    from lib.caption_detection import is_explicit_caption_format
+
+    body = (
+        "Table 4 presents the results of the factor analysis.  "
+        "The six factors are listed in order of the variance they explain."
+    )
+    assert is_likely_reference_context(body)
+    assert not is_explicit_caption_format(body)
+    assert not is_likely_reference_context("Figure 3 shows the architecture")
+    assert not is_likely_reference_context("Table 9: Vision to Text performance.")
+
+
 def test_table_appendix_reference_is_not_caption_context() -> None:
     assert is_likely_reference_context(
         "Table 11 Appendix 8.1 for benchmarks and evaluation details."
@@ -2269,6 +2423,11 @@ def main() -> int:
         test_table_direction_ignores_adjacent_table_reference_line,
         test_table_direction_keeps_short_numeric_cells_as_evidence,
         test_table_direction_prefers_nearest_structured_rows_over_chart_labels,
+        test_two_column_neighbor_caption_does_not_steal_rows,
+        test_period_caption_with_common_opener_is_real_caption,
+        test_period_caption_with_our_opener_is_real_caption,
+        test_period_tail_cross_reference_unifies_body_opener_criteria,
+        test_body_sentence_after_table_verb_is_reference,
         test_table_appendix_reference_is_not_caption_context,
         test_colon_caption_is_not_reference_even_inside_long_text_block,
         test_limit_clip_by_neighbor_captions_bounds_same_page_items,
