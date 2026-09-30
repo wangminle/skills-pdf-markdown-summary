@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="936pt" height="604.8pt" viewBox="0 0 936 604.8" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-09-30T16:00:18.613484</dc:date>
+    <dc:description>正式BUG表每个唯一ID计一条；同BUG在同功能/函数内只计一次；多归属分别关联；关联项不计主榜；日志ID冲突单列。</dc:description>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 604.8 
+L 936 604.8 
+L 936 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 222.65 537.19675 
+L 925.2 537.19675 
+L 925.2 47.92 
+L 222.65 47.92 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 222.65 537.19675 
+L 222.65 47.92 
+" clip-path="url(#p41f21abf95)" style="fill: none; stroke: #dae4e9; stroke-opacity: 0.8; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_2">
+      <defs>
+       <path id="m2cefaaecb8" d="M 0 0 
+L 0 3.5 
+" style="stroke: #000000; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m2cefaaecb8" x="222.65" y="537.19675" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'Hiragino Sans GB'; text-anchor: middle" x="222.65" y="551.856125" transform="rotate(-0 222.65 551.856125)">0</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 330.734615 537.19675 
+L 330.734615 47.92 
+" clip-path="url(#p41f21abf95)" style="fill: none; stroke: #dae4e9; stroke-opacity: 0.8; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4">
+      <g>
+       <use xlink:href="#m2cefaaecb8" x="330.734615" y="537.19675" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'Hiragino Sans GB'; text-anchor: middle" x="330.734615" y="551.856125" transform="rotate(-0 330.734615 551.856125)">1</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 438.819231 537.19675 
+L 438.819231 47.92 
+" clip-path="url(#p41f21abf95)" style="fill: none; stroke: #dae4e9; stroke-opacity: 0.8; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#m2cefaaecb8" x="438.819231" y="537.19675" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="font-size: 10px; font-family: 'Hiragino Sans GB'; text-anchor: middle" x="438.819231" y="551.856125" transform="rotate(-0 438.819231 551.856125)">2</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_7">
+      <path d="M 546.903846 537.19675 
+L 546.903846 47.92 
+" clip-path="url(#p41f21abf95)" style="fill: none; stroke: #dae4e9; stroke-opacity: 0.8; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8">
+      <g>
+       <use xlink:href="#m2cefaaecb8" x="546.903846" y="537.19675" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="font-size: 10px; font-family: 'Hiragino Sans GB'; text-anchor: middle" x="546.903846" y="551.856125" transform="rotate(-0 546.903846 551.856125)">3</text>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_9">
+      <path d="M 654.988462 537.19675 
+L 654.988462 47.92 
+" clip-path="url(#p41f21abf95)" style="fill: none; stroke: #dae4e9; stroke-opacity: 0.8; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10">
+      <g>
+       <use xlink:href="#m2cefaaecb8" x="654.988462" y="537.19675" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <text style="font-size: 10px; font-family: 'Hiragino Sans GB'; text-anchor: middle" x="654.988462" y="551.856125" transform="rotate(-0 654.988462 551.856125)">4</text>
+     </g>
+    </g>
+    <g id="xtick_6">
+     <g id="line2d_11">
+      <path d="M 763.073077 537.19675 
+L 763.073077 47.92 
+" clip-path="url(#p41f21abf95)" style="fill: none; stroke: #dae4e9; stroke-opacity: 0.8; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_12">
+      <g>
+       <use xlink:href="#m2cefaaecb8" x="763.073077" y="537.19675" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <text style="font-size: 10px; font-family: 'Hiragino Sans GB'; text-anchor: middle" x="763.073077" y="551.856125" transform="rotate(-0 763.073077 551.856125)">5</text>
+     </g>
+    </g>
+    <g id="xtick_7">
+     <g id="line2d_13">
+      <path d="M 871.157692 537.19675 
+L 871.157692 47.92 
+" clip-path="url(#p41f21abf95)" style="fill: none; stroke: #dae4e9; stroke-opacity: 0.8; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_14">
+      <g>
+       <use xlink:href="#m2cefaaecb8" x="871.157692" y="537.19675" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <text style="font-size: 10px; font-family: 'Hiragino Sans GB'; text-anchor: middle" x="871.157692" y="551.856125" transform="rotate(-0 871.157692 551.856125)">6</text>
+     </g>
+    </g>
+    <g id="text_8">
+     <text style="font-size: 12px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="573.925" y="567.088" transform="rotate(-0 573.925 567.088)">关联的正式 BUG 条目数（同 BUG 在同功能内去重）</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_15"/>
+     <g id="text_9">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="508.867715" transform="rotate(-0 219.15 508.867715)">F14.004  表格连续行带与分组桥接</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_16"/>
+     <g id="text_10">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="478.568189" transform="rotate(-0 219.15 478.568189)">F14.003  表格强弱单元格行识别</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_17"/>
+     <g id="text_11">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="448.268663" transform="rotate(-0 219.15 448.268663)">F13.003  baseline外相连图形恢复</text>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_18"/>
+     <g id="text_12">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="417.969136" transform="rotate(-0 219.15 417.969136)">F11.003  邻题注纵向归属与横向分离</text>
+     </g>
+    </g>
+    <g id="ytick_5">
+     <g id="line2d_19"/>
+     <g id="text_13">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="387.66961" transform="rotate(-0 219.15 387.66961)">F10.008  Table验收与阶段框回退</text>
+     </g>
+    </g>
+    <g id="ytick_6">
+     <g id="line2d_20"/>
+     <g id="text_14">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="357.816099" transform="rotate(-0 219.15 357.816099)">F09.014  Figure 低比例纯净内容软保留</text>
+     </g>
+    </g>
+    <g id="ytick_7">
+     <g id="line2d_21"/>
+     <g id="text_15">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="327.070558" transform="rotate(-0 219.15 327.070558)">F02.005  稳健提取参数预设</text>
+     </g>
+    </g>
+    <g id="ytick_8">
+     <g id="line2d_22"/>
+     <g id="text_16">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="296.870719" transform="rotate(-0 219.15 296.870719)">F01.010  可选A1/A2/A3报告及精修编排</text>
+     </g>
+    </g>
+    <g id="ytick_9">
+     <g id="line2d_23"/>
+     <g id="text_17">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="266.895177" transform="rotate(-0 219.15 266.895177)">F20.004  记录对Layout候选绑定及去重</text>
+     </g>
+    </g>
+    <g id="ytick_10">
+     <g id="line2d_24"/>
+     <g id="text_18">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="236.171979" transform="rotate(-0 219.15 236.171979)">F13.002  图内短标题分层恢复</text>
+     </g>
+    </g>
+    <g id="ytick_11">
+     <g id="line2d_25"/>
+     <g id="text_19">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="205.872452" transform="rotate(-0 219.15 205.872452)">F08.008  邻表内容归属与上下搜索窗限定</text>
+     </g>
+    </g>
+    <g id="ytick_12">
+     <g id="line2d_26"/>
+     <g id="text_20">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="175.572926" transform="rotate(-0 219.15 175.572926)">F07.009  显式题注标记及裸编号锚点识别</text>
+     </g>
+    </g>
+    <g id="ytick_13">
+     <g id="line2d_27"/>
+     <g id="text_21">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="145.2734" transform="rotate(-0 219.15 145.2734)">F19.013  逐页分类型配对与外部题注回退</text>
+     </g>
+    </g>
+    <g id="ytick_14">
+     <g id="line2d_28"/>
+     <g id="text_22">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="115.491217" transform="rotate(-0 219.15 115.491217)">F09.008  Figure验收与阶段框回退</text>
+     </g>
+    </g>
+    <g id="ytick_15">
+     <g id="line2d_29"/>
+     <g id="text_23">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: end" x="219.15" y="84.674347" transform="rotate(-0 219.15 84.674347)">F07.010  题注与正文引用语义区分</text>
+     </g>
+    </g>
+   </g>
+   <g id="feature-F14-004">
+    <path d="M 222.65 514.956898 
+L 546.903846 514.956898 
+L 546.903846 494.35322 
+L 222.65 494.35322 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F14-003">
+    <path d="M 222.65 484.657371 
+L 546.903846 484.657371 
+L 546.903846 464.053694 
+L 222.65 464.053694 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F13-003">
+    <path d="M 222.65 454.357845 
+L 546.903846 454.357845 
+L 546.903846 433.754167 
+L 222.65 433.754167 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F11-003">
+    <path d="M 222.65 424.058319 
+L 546.903846 424.058319 
+L 546.903846 403.454641 
+L 222.65 403.454641 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F10-008">
+    <path d="M 222.65 393.758793 
+L 546.903846 393.758793 
+L 546.903846 373.155115 
+L 222.65 373.155115 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F09-014">
+    <path d="M 222.65 363.459266 
+L 546.903846 363.459266 
+L 546.903846 342.855589 
+L 222.65 342.855589 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F02-005">
+    <path d="M 222.65 333.15974 
+L 546.903846 333.15974 
+L 546.903846 312.556062 
+L 222.65 312.556062 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F01-010">
+    <path d="M 222.65 302.860214 
+L 546.903846 302.860214 
+L 546.903846 282.256536 
+L 222.65 282.256536 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F20-004">
+    <path d="M 222.65 272.560688 
+L 654.988462 272.560688 
+L 654.988462 251.95701 
+L 222.65 251.95701 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F13-002">
+    <path d="M 222.65 242.261161 
+L 654.988462 242.261161 
+L 654.988462 221.657484 
+L 222.65 221.657484 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F08-008">
+    <path d="M 222.65 211.961635 
+L 654.988462 211.961635 
+L 654.988462 191.357957 
+L 222.65 191.357957 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F07-009">
+    <path d="M 222.65 181.662109 
+L 654.988462 181.662109 
+L 654.988462 161.058431 
+L 222.65 161.058431 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F19-013">
+    <path d="M 222.65 151.362583 
+L 763.073077 151.362583 
+L 763.073077 130.758905 
+L 222.65 130.758905 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F09-008">
+    <path d="M 222.65 121.063056 
+L 763.073077 121.063056 
+L 763.073077 100.459379 
+L 222.65 100.459379 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="feature-F07-010">
+    <path d="M 222.65 90.76353 
+L 763.073077 90.76353 
+L 763.073077 70.159852 
+L 222.65 70.159852 
+z
+" clip-path="url(#p41f21abf95)" style="fill: #247d88"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 222.65 537.19675 
+L 925.2 537.19675 
+" style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_24">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="508.026309" transform="rotate(-0 559.874 508.026309)">3</text>
+   </g>
+   <g id="text_25">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="477.726783" transform="rotate(-0 559.874 477.726783)">3</text>
+   </g>
+   <g id="text_26">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="447.427256" transform="rotate(-0 559.874 447.427256)">3</text>
+   </g>
+   <g id="text_27">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="417.12773" transform="rotate(-0 559.874 417.12773)">3</text>
+   </g>
+   <g id="text_28">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="386.828204" transform="rotate(-0 559.874 386.828204)">3</text>
+   </g>
+   <g id="text_29">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="356.528678" transform="rotate(-0 559.874 356.528678)">3</text>
+   </g>
+   <g id="text_30">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="326.229151" transform="rotate(-0 559.874 326.229151)">3</text>
+   </g>
+   <g id="text_31">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="559.874" y="295.929625" transform="rotate(-0 559.874 295.929625)">3</text>
+   </g>
+   <g id="text_32">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="667.958615" y="265.630099" transform="rotate(-0 667.958615 265.630099)">4</text>
+   </g>
+   <g id="text_33">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="667.958615" y="235.330572" transform="rotate(-0 667.958615 235.330572)">4</text>
+   </g>
+   <g id="text_34">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="667.958615" y="205.031046" transform="rotate(-0 667.958615 205.031046)">4</text>
+   </g>
+   <g id="text_35">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="667.958615" y="174.73152" transform="rotate(-0 667.958615 174.73152)">4</text>
+   </g>
+   <g id="text_36">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="776.043231" y="144.431994" transform="rotate(-0 776.043231 144.431994)">5</text>
+   </g>
+   <g id="text_37">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="776.043231" y="114.132467" transform="rotate(-0 776.043231 114.132467)">5</text>
+   </g>
+   <g id="text_38">
+    <text style="font-size: 12px; font-family: 'Hiragino Sans GB'; text-anchor: start" x="776.043231" y="83.832941" transform="rotate(-0 776.043231 83.832941)">5</text>
+   </g>
+   <g id="text_39">
+    <text style="font-size: 19px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="573.925" y="25.92" transform="rotate(-0 573.925 25.92)">历史 BUG 功能关联数 · 前 15 项</text>
+   </g>
+  </g>
+  <g id="text_40">
+   <text style="font-size: 11px; font-family: 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: start; fill: #5a6b77" x="18.72" y="595.728" transform="rotate(-0 18.72 595.728)">台账 125 条均标已修复；多功能条目可同时计入多栏。不是当前缺陷数或故障率。</text>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p41f21abf95">
+   <rect x="222.65" y="47.92" width="702.55" height="489.27675"/>
+  </clipPath>
+ </defs>
+</svg>

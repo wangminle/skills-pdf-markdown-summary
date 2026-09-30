@@ -33,6 +33,16 @@ from .idents import (
     extract_table_ident,
 )
 
+# 正文引用句式开头（"Table 8 shows that ..."）：段首恰好以编号对象开头、
+# 后接陈述动词的句子是正文引用而非题注；其后续行会被 merge_caption_lines
+# 误合并成高大的假题注。
+_BODY_CITATION_OPENER_RE = re.compile(
+    r"^\s*(?:Table|Tab\.?|Figure|Fig\.?)\s+[A-Za-z]?\d+\s+"
+    r"(?:shows?|demonstrates?|presents?|describes?|illustrates?|reports?|compares?|"
+    r"summarizes?|lists?|gives?|provides?|indicates?|suggests?)\b",
+    re.I,
+)
+
 # 模块日志器
 logger = logging.getLogger(__name__)
 
@@ -63,9 +73,8 @@ def get_page_images(page: Union[PDFPage, Any]) -> List[Any]:
     try:
         raw_page = _unwrap_page(page)
         dict_data = raw_page.get_text("dict")
-        for blk in dict_data.get("blocks", []):
-            if blk.get("type", 0) == 1 and "bbox" in blk:  # type=1 表示图像
-                images.append(create_rect(*blk["bbox"]))
+        from .extract_helpers import collect_image_rects
+        images = collect_image_rects(dict_data, raw_page.rect)
     except Exception as e:
         page_no = getattr(_unwrap_page(page), "number", None)
         extra = {'stage': 'get_page_images'}
@@ -377,9 +386,10 @@ def find_all_caption_candidates(
                     if not number:
                         continue
 
+                    merged = merge_caption_lines(blk, ln_idx, pattern)
                     candidate = CaptionCandidate(
-                        rect=create_rect(*ln.get("bbox", [0, 0, 0, 0])),
-                        text=text_stripped,
+                        rect=merged.rect if merged else create_rect(*ln.get("bbox", [0, 0, 0, 0])),
+                        text=merged.text if merged else text_stripped,
                         number=number,
                         kind=kind,
                         page=page_num,
@@ -770,11 +780,15 @@ def merge_caption_lines(
 
         line_bbox = create_rect(*line.get("bbox", [0, 0, 0, 0]))
 
-        if pattern.match(line_text):
+        if (pattern.match(line_text) or DEFAULT_FIGURE_LINE_RE.match(line_text)
+                or DEFAULT_TABLE_LINE_RE.match(line_text)):
             break
 
         y_gap = line_bbox.y0 - prev_y1
-        if y_gap > max_y_gap:
+        if y_gap > max_y_gap or line_bbox.y0 < start_bbox.y0 - 1:
+            break
+        if (min(line_bbox.x1, merged_rect.x1) <= max(line_bbox.x0, merged_rect.x0)
+                and line_bbox.y0 > prev_y1 - 1.0):
             break
 
         line_sizes = [float(sp.get("size", 10.0)) for sp in line_spans if "size" in sp]
@@ -789,6 +803,15 @@ def merge_caption_lines(
         prev_y1 = line_bbox.y1
 
     full_text = " ".join(merged_text_parts)
+
+    # 正文句 "Table 8 shows that RL plays..." 从段首开始，五条续行全部
+    # 通过间距/字号/x 重叠检查，会合并成 60pt+ 的"题注"；这种假题注作为
+    # 邻居参与方向判定时会把真题注的 above 证据挤掉（FunAudio T8 实测
+    # 方向翻成 below）。正文引用句式（Table/Figure N + 陈述动词）不是
+    # 冒号式题注，按正文处理，调用方回退为首行矩形。不能用合并高度判
+    # 断：Kimi K3 F12 的四行长题注（60.6pt）是真实的。
+    if _BODY_CITATION_OPENER_RE.match(start_text):
+        return None
 
     return CaptionBlock(
         rect=merged_rect,

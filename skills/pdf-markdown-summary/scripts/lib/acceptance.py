@@ -266,6 +266,16 @@ def detect_text_pollution(
 
     return False, ""
 
+def looks_like_questionnaire_rows(clip: Any, text_lines: List[Tuple[Any, float, str]]) -> bool:
+    """至少五条同列独立问句组成的问卷行；普通问答段落不算。"""
+    rows = [(r, t.strip()) for r, _size, t in text_lines
+            if t.strip() and (r & clip).get_area() >= 0.9 * r.get_area()]
+    questions = [(r, t) for r, t in rows if t.endswith(("?", "？")) and len(t) <= 100]
+    if len(questions) < 5 or len(questions) < 0.85 * len(rows):
+        return False
+    return max(r.x0 for r, _ in questions) - min(r.x0 for r, _ in questions) <= 3.0
+
+
 def looks_like_table_text(
     clip: Any,
     text_lines: List[Tuple[Any, float, str]],
@@ -279,6 +289,8 @@ def looks_like_table_text(
     """判断候选框是否以短单元格文本为主，而不是连续正文段落。"""
     if fitz is None or clip.width <= 1 or clip.height <= 1:
         return False
+    if looks_like_questionnaire_rows(clip, text_lines):
+        return True
 
     lines_in_clip: List[Tuple[Any, str]] = []
     for line_rect, _font_size, text in text_lines:

@@ -93,7 +93,7 @@
 | BUG-080 | 修复 | visual-review：左右独立图合并、多子图文本裁切丢掉上排 | 2026-09-07 16:17 | 2026-09-07 17:30 | 已修复 | DeepSeek Figure 11/12 同页左右独立编号却导出同一全宽框。`limit_clip_by_neighbor_captions()` 对 y 重叠的左右 caption 在中点拆 X。K3 Figure 13 的 phase_a 把上边界从 260 收到 447，丢掉上排绘图区；`trim_clip_head_by_text_v2` 增加 `object_rects` 保护远侧绘图带。004：Fig11 `[67.2,240.5,292.5,381.7]`，Fig12 `[302.9,240.5,528.9,382.5]`；K3 F13 `y0=318.8`。 |
 | BUG-081 | 修复 | visual-review：长表搜索窗不足、表头被脚注重叠裁切 | 2026-09-07 16:17 | 2026-09-07 17:45 | 已修复 | K3 Table 2 / DeepSeek Table 12 初始窗口过短导致行带截断。Table 路径在方向判定前收集邻接 caption，并用 caption 到页边（再按邻接限制）的 `table_search_clip` 做行带搜索。K3 Table 3 合并题注 y1=120 与 Proprietary 表头 y0=118.2 重叠，窗口从 126 起切字；`expand_clip_to_nearby_table_header()` 在 below 方向即使 original 未被收紧也对 clip 上方短表头做 peek，允许轻擦题注的短标签，并在 final 再恢复一次。004：K3 T2 `y1=689.2`，T3 `y0=114.2`（含 Proprietary/Open Weight）；DeepSeek T12 `y1=753.4`。 |
 | BUG-082 | 修复 | visual-review：Figure 摘要小矢量回扩、Table 远端调查正文被扩边吞入 | 2026-09-07 16:17 | 2026-09-07 17:40 | 已修复 | DeepSeek Figure 1 的 phase_d 已到 466，但 `expand_clip_to_nearby_figure_objects` 把摘要文字小矢量当绘图对象把 y0 扩回 433。过滤过小矢量（w<20 或 h<14 或面积<120）并在对象扩边后再裁残留正文。DeepSeek Table 8 被 `expand_table_clip_to_text_bounds` 吃进表后调查段落；新增 `trim_table_clip_far_side_body()`。004：Figure 1 `y0=466.0`，Table 8 `y1=304.8`。 |
-| BUG-083 | 修复 | 复数标签 "Figures 3 and 4 …" 起句的正文被解析成附录编号 S3 并产出 accepted 假图资产（表同款 S2） | 2026-09-28 11:00 | 2026-09-28 14:10 | 已修复 | 根因：`FIGURE_LINE_RE`/`TABLE_LINE_RE` 的 label 正则 `(?:Figure|Fig\.?)` 不消费复数尾巴 s，`re.IGNORECASE` 下 `(S\s*)` 分支把 "Figures 3" 的 s 吞为 S 前缀产出 S3。修复：label 改 `(?:Figures?\|Figs?\.?\|…)` / `(?:Tables?\|Tabs?\.?\|表)`，与 QC 正则 `QC_FIGURE_REF_EN_RE` 的 `Figures?` 写法对齐。合成 PDF（真实 Figure 1 + 复数正文句）端到端复测：修复前产出 `Figure_S3_…` / `Table_S2_…`，修复后仅 `Figure_1_Architecture_of_the_proposed_model.png`，index 中无 S3/S2。 |
+| BUG-083 | 修复 | 复数标签 "Figures 3 and 4 …" 起句的正文被解析成附录编号 S3 并产出 accepted 假图资产（表同款 S2） | 2026-09-28 11:00 | 2026-09-28 14:10 | 已修复 | 根因：`FIGURE_LINE_RE`/`TABLE_LINE_RE` 的 label 正则 `(?:Figure \| Fig\\.?)` 不消费复数尾巴 s，`re.IGNORECASE` 下 `(S\\s*)` 分支把 "Figures 3" 的 s 吞为 S 前缀产出 S3。修复：label 改 `(?:Figures?\|Figs?\\.?\|…)` / `(?:Tables?\|Tabs?\\.?\|表)`，与 QC 正则 `QC_FIGURE_REF_EN_RE` 的 `Figures?` 写法对齐。合成 PDF（真实 Figure 1 + 复数正文句）端到端复测：修复前产出 `Figure_S3_…` / `Table_S2_…`，修复后仅 `Figure_1_Architecture_of_the_proposed_model.png`，index 中无 S3/S2。 |
 | BUG-084 | 修复 | 双栏检测恒失效：`candidate_gap` 公式把右页边距当栏宽相减，标准 Letter 双栏实测恒 -62pt 必判单栏 | 2026-09-28 11:00 | 2026-09-28 14:10 | 已修复 | `layout_model.py` 旧式 `peak_sep - (page_width - peak2_x)` 在对称布局下恒等于 栏间距-页边距（≈30-54<0）。修复：采样段落行宽，用行宽中位数估计栏宽，`candidate_gap = peak_sep - median(width)`。合成单元直调：标准双栏（峰 54/321、行宽 237）判 2 栏、column 标注 60/60；单栏全宽+居中标题仍判 1 栏。 |
 | BUG-085 | 修复 | 【回归 15f4e08】图路径验收门被写死 `allow_low_ratio_keep=True` 架空：正文污染且低比例的精裁框被强留为 accepted，reason 文本仍写「不通过」 | 2026-09-28 11:00 | 2026-09-28 14:10 | 已修复 | 参数机制为 V0.5.10（a1affd6）引入、调用点写死 True 为 15f4e08。注意不能简单翻回 False：15f4e08 同时放宽了回退链判据（`max(80, base*min(0.20, h_ratio))`），False 会使 Kimi F12/F14、Kearns F7 的合理精裁框被误杀后回退到切顶小框（4 个结构审查用例回归，已 bisect 确认）。最终方案与表路径 `table_like_refined` 同构：`detect_text_pollution` 提前到验收之前，`allow_low_ratio_keep=not polluted`——污染框必拒（直调验证 8/8 wide_lines + height_ratio 0.19 → accepted=False），干净图形框低比例保留（benchmark 8 份输出与旧基准零差异）。 |
 | BUG-086 | 修复 | 方向回退哨兵 0.5 与采用门槛重合：对象覆盖率总和为 0 时返回 (dir, 0.5)，与真实证据 0.5 不可区分，零证据页面锁死默认方向并压制全局锚点 | 2026-09-28 11:00 | 2026-09-28 14:10 | 已修复 | `score_local_direction()` 无证据分支改返回 (dir, 0.0)；`determine_direction()` 门槛 `local_conf >= 0.5` 不变，0.0 落入 `< 0.5` 分支让位全局锚点。直调验证：local(0.0)+anchor=below → below；local(0.0) 无锚点无启发式 → 默认 above（与原哨兵方向一致，无锚点场景行为不变）；真实证据 0.8 仍优先于锚点。 |
@@ -132,6 +132,10 @@
 | BUG-119 | 修复 | 评审#4 第 1 条：A3 匹配只保最大基数，不保 IoU 总和最优——Kuhn 增广找到的第一条可行路径不一定是总分最高的分配。确定性复现：2 记录 2 候选总 IoU 0.808，另一同基数分配 1.084；随机搜索 5 万例（n=2..4）另命中 3 周旋转反例（2.862 对最优 2.892），该改进形态任何 2-opt 交换都够不到，必须精确求解 | 2026-09-29 13:30 | 2026-09-29 14:10 | 已修复 | `_match_records_to_candidates` 改为按 (page,kind) 分组、同框折叠后用位掩码 DP（`_optimal_assignment`）精确求「先最大化身份边数、再最大化 IoU 总和」的分配；状态数 2^m×n（单页个位数）可忽略，frame>12 时退回贪心防御。身份边仍不受 IoU 阈值限制且字典序最优先。回归 `test_matching_maximizes_iou_sum_within_cardinality`（含 2×2 与 3 周旋转两个反例）。 |
 | BUG-120 | 修复 | 评审#4 第 2 条：混合类型页上 `raw_class="caption"` 的通用题注进入 `untyped` 分支，figure 与 table 两个分组都拿它配对——同一条题注产出两张配对（直调复现：一页一图一表一通用题注 → 2 pairs，题注同时绑 figure 框和 table 框） | 2026-09-29 13:30 | 2026-09-29 14:10 | 已修复 | `_filter_layout_captions_by_kind` 新增 `mixed_page` 参数：本页 figure/table 内容并存时通用题注不进任何分组（留作孤儿，原 review「无法判别时保留孤儿」的落实）；单类型页行为不变（否则单类型文档题注全变孤儿）。归属证据池同步排除。回归 `test_untyped_caption_not_shared_across_kinds_on_mixed_page`。 |
 | BUG-121 | 修复 | 评审#4 第 3 条：golden 零收集闸门只对目录级选择生效，单文件选择（`pytest tests/scripts/test_xxx.py`）零收集照常 exit 0——与 AGENTS §8「golden 收集数为 0 一律判失败；定向排除需显式设置环境变量」不符 | 2026-09-29 13:30 | 2026-09-29 14:10 | 已修复 | conftest `_selection_covers_golden` 恒 True（单文件零收集同样判失败）；新增 `PDF_SKILL_GOLDEN_EXTERNAL` 供 run_all.py 逐文件套件调用显式声明「golden 由本入口另行整轮执行」（`run_pytest_suite` 经 `extra_env` 传入，golden 本体调用不声明）。人工定向调试仍用 `PDF_SKILL_ALLOW_GOLDEN_SKIP=1`（仅 WARNING）。回归 `test_single_suite_selection_zero_collection_fails` 等 4 例。 |
+| BUG-122 | 修复 | `Our` 题注只要引用 Section/Table 等编号对象仍会静默漏提：`_period_tail_reads_as_body` 将 `our` 开头且含交叉引用的 tail 一律判正文，真实题注正常引用章节或另一张表时丢资产 | 2026-09-29 00:00 | 2026-09-29 00:00 | 已修复 | P2。修复：删除「our 开头 + tail 含 Section/Table/Equation 引用」就否定题注的特例；显式 `Figure/Table N.` 题注只在 tail 以 `we/also/in this/as shown` 等强正文接续词开头时拒绝，题注描述内交叉引用不再导致资产静默消失。原记录于文件尾部「2026-09-29 第五轮复查遗留」日志小节，2026-09-30 台账整理转入本分区；回归验证明细见该日志小节。 |
+| BUG-123 | 修复 | 通栏表保护启发式双向误判，且恢复阈值救不回典型半栏误收：同行判定固定 3.5pt 中心距离误收偏 5pt 的通栏表，反向把双栏短正文当通栏单元格 | 2026-09-29 00:00 | 2026-09-29 00:00 | 已修复 | P2。修复：同行判定改为垂直框重叠率（至少 30%），容忍字形框 5~7pt 偏移；加入正文句形判定（含无句号但有谓语的短正文）。原记录于文件尾部「2026-09-29 第五轮复查遗留」日志小节，2026-09-30 台账整理转入本分区；回归验证明细见该日志小节。 |
+| BUG-124 | 修复 | 罗马/字母编号修复会把小字号表头判为 Markdown 标题：`P. Value`/`N. Samples`/`M. Mean` 被切碎（BUG-097 同类问题回归） | 2026-09-29 00:00 | 2026-09-29 00:00 | 已修复 | P2。修复：单字母/罗马数字标题放行前，对正文字号的明确统计度量表头做定向排除；`A. Introduction`/`IV. Experiments` 任意字号章节识别保持不变。原记录于文件尾部「2026-09-29 第五轮复查遗留」日志小节，2026-09-30 台账整理转入本分区；回归验证明细见该日志小节。 |
+| BUG-125 | 修复 | A3 最优分配 `_optimal_assignment` 在同页同类型候选超过 12 个时退回贪心，违反自身硬约束（13 frame 构造只返回 12 条匹配） | 2026-09-29 00:00 | 2026-09-29 00:00 | 已修复 | P3。修复：移除 m>12 贪心降级，改为多项式最小费用流，整数权重精确实现字典序目标（身份边数→匹配基数→IoU 总和）；13 frame 反例恢复 13/13。原记录于文件尾部「2026-09-29 第五轮复查遗留」日志小节，2026-09-30 台账整理转入本分区；回归验证明细见该日志小节。 |
 
 ## 调整事项
 
@@ -175,6 +179,8 @@
 | CHK-018 | 检查 | 按架构报告方案用独立实验验证 PyMuPDF4LLM Layout 粗定位可行性 | 2026-07-28 15:13 | 2026-07-28 15:30 | 已完成 | 在 `docs/3-experiments/20260728-pymupdf4llm-layout-bbox/` 对 basic-benchmark 8 PDF 跑 Layout+legacy；建立 provisional bbox GT（180 caption）；Layout 配对率 95.6%，与 legacy final mean IoU 0.72；结论：报告 Phase 2 方向可行，须保留精修，未合入主链 |
 | CHK-019 | 检查 | 二次独立复核 Layout 实验指标口径、代表案例与正式 Skill 架构边界 | 2026-07-28 16:30 | 2026-07-28 17:00 | 已完成 | 阅读 GT、metrics、compare、实验脚本和正式 `AttachmentRecord`/Figure/Table 主链；确认 Layout 0.68 秒/页、legacy 0.57 秒/页，Figure/Table mean IoU 分别为 0.664/0.780；发现 provisional GT 由 Layout 自身构造、8 组候选框被重复分给 16 条资产、legacy 对比仅按 type+ident 且忽略页码，故 95.6% 配对率和硬失败比例不能作为真实准确率；架构结论收紧为 Layout 作可插拔候选/证据后端、全页一对一配对独立成层、现有规则降级为专用小幅精修和 legacy fallback |
 | CHK-020 | 检查 | 对照三轮审查逐条核对句点题注、双栏归属、缺口补裁、golden 分批、配对与精修、benchmark 路径 | 2026-09-29 12:00 | 2026-09-29 12:16 | 已完成 | 17 项中 16 项在当前工作区已有对应实现与回归；仍复现的是上下相邻独立图被多框吞并，见 [[BUG-118]]。通用 raw_class=caption 仍参与回退配对（否则无类型标注的单类型页会全部变成孤儿）；逐文件 pytest 不因未收集 golden 失败，避免 run_all 的套件式调用全红，目录级零收集仍失败。 |
+| CHK-021 | 检查 | 独立复核 0.6.5 三篇案例修复后的裁剪与 Markdown，并执行台账/插图/T7 回归收尾 | 2026-09-30 11:20 | 2026-09-30 11:29 | 已完成 | 三篇共 24 资产全部 accepted，词坐标核对无截词/污染/漏行。Markdown 由文末附录改为题注旁插入。PARADISE T7 框约 [59.6, 108.1, 286.2, 169.3]。 |
+| CHK-022 | 检查 | 核对 Basic 结构定位修复计划与提取状态/题注对账设计的完成情况 | 2026-09-30 16:27 | 2026-09-30 16:27 | 已完成 | 逐项核对 design/3-plans/basic结构定位修复计划-20260922.md 与 extraction-status-inventory-20260907.md、正式 assess/pipeline 实现、回归及历史验收；Basic 6项待办均已落地，状态对账及2026-09-28五项补充已实现。A3“状态只降不升”文案需限定为 legacy rejected 不恢复 Markdown 插入资格：实际可转 review_required，非所有状态单调。执行 python3 -m pytest tests/scripts/test_structure_review_20260922.py tests/scripts/test_review_fixes_20260922.py tests/scripts/test_extraction_status_inventory.py tests/scripts/test_bugfix_20260928.py tests/scripts/test_extraction_golden.py -q --basetemp=tests/results/20260930-028/pytest-tmp：111 passed、0 failed、0 skipped，含Golden；日志 tests/results/20260930-028/pytest.log。本轮为相关套件复核，未重跑全目录套件；未修改业务源码或两份计划，功能编号与SVG无需更新。 |
 
 ## 测试数据
 
@@ -226,6 +232,7 @@
 | TST-044 | 检查 | 0.6.2 版本与文档审计全量验证 | 2026-08-30 13:00 | 2026-08-30 13:06 | 已完成 | pytest tests/ -q 为 155 passed、0 skipped（含 8 PDF Golden 重提取比较）；run_all.py 为 10 常规套件 + Golden 全 OK，155 通过、0 失败、0 跳过；compileall、四入口 --help、eval selfcheck、23 项针对性回归、CLI 87 旗标文档对照、10 份当前 Markdown 本地链接检查与 git diff --check 均通过。 |
 | TST-045 | 检查 | 验证 visual-review 17+1 项修复（BUG-077~082） | 2026-09-07 16:17 | 2026-09-07 17:45 | 已完成 | 新增 `tests/scripts/test_visual_review_20260907.py`；`pytest tests/scripts/test_visual_review_20260907.py tests/scripts/test_caption_anchor_quality.py` 95 passed；`pytest tests/scripts/ -k "not golden"` 161 passed（golden 排除按规则不算全绿）；compileall 与四入口 `--help` 通过。问题 PDF 重提至 `tests/results/20260907-004/`（benchmark 只读）。002 `run_benchmark.sh` 统计改为 `type` 回退 `kind`。未跑 `--update-golden`。 |
 | TST-046 | 检查 | 验证主链三态验收与题注对账（DEV-016） | 2026-09-07 22:47 | 2026-09-07 23:10 | 已完成 | `test_extraction_status_inventory.py` 13 passed；`compileall` 与四入口 `--help` 通过；`PDF_SKILL_ALLOW_GOLDEN_SKIP=1 pytest tests/scripts -k "not golden"` 175 passed、9 deselected（不算全绿）；Attention/Gemini 冒烟写入 `tests/results/20260907-005/`：Attention 9/9 accepted、inventory expected=exported=9；Gemini Figure 9 p31 accepted，Table 12 `review_required`（object_truncation），inventory 28/28。未更新 Golden。 |
+| TST-047 | 检查 | 补 PARADISE 第 9 页 Table 7 真实页面回归，防止宽度恢复吞右栏正文 | 2026-09-30 11:20 | 2026-09-30 11:29 | 已完成 | test_real_layout_regressions_20260929.py：优先从 1-参考素材 PARADISE PDF 抽第 9 页跑完整 extract_tables；另用该页实测坐标约束 restore_table_clip_width。去掉短单元格过滤时 x1=524.8，过滤恢复后保持左栏。 |
 
 ## 文档维护
 
@@ -289,6 +296,12 @@
 | DOC-056 | 文档 | 深度审查发现 `test_extraction_golden.py` 两处过期 docstring 与「tests/results/ 整体 gitignore」决议矛盾 | 2026-08-29 00:00 | 2026-08-29 00:00 | 已完成 | `_find_golden_index` 与 `_resolve_golden_paths` docstring 原称 golden 为「版本化 fixture，通过 .gitignore 例外跟踪」；改为「本地基准，不纳入版本控制（tests/results/ 已整体 gitignore）」，并补充新 clone 需先运行 `--update-golden` 生成基准的说明 |
 | DOC-057 | 文档 | Golden 模块顶层说明仍要求「基准更新必须单独提交」，与 tests/results 整体 gitignore 冲突 | 2026-08-30 12:53 | 2026-08-30 13:20 | 已完成 | 顶层说明与命令示例改为：基准更新后在 task-list.md 记录差异原因；基准由本地 `--update-golden` 生成，不纳入版本控制 |
 | DOC-058 | 文档 | 版本升级到 0.6.2 并审计所有当前可维护文档 | 2026-08-30 12:59 | 2026-08-30 13:06 | 已完成 | 更新 scripts/__init__.py、README、SKILL、CLI/workflow reference、技术迭代方案、架构历史快照声明、eval README 与 Golden 说明；归档、docs/2-ref 和 old-version 未改。 |
+| DOC-059 | 文档 | 更正 task-list 中三篇外部 PDF 不在本机的错误记录，并同步 Markdown 插图策略文档 | 2026-09-30 11:20 | 2026-09-30 11:29 | 已完成 | 更正 2026-09-30 P2 修复节误写；补独立复核收尾节；更新 references/pdf-to-markdown.md 与 Skill Output Rules。 |
+| DOC-060 | 文档 | 将顶层 `docs/` 正式改名为 `design/`，并同步当前文档与规则引用 | 2026-09-30 12:48 | 2026-09-30 12:55 | 已完成 | `git mv docs design`；更新 AGENTS.md、README.md、现行设计文档、`tests/eval/` 引用；`design/2-ref/` 内部文件未改内容；`old-version/` 与 `design/1-archive/` 历史快照未改写；task-list 已完成历史条目中的 `docs/` 路径为当时事实，保持不动 |
+| DOC-061 | 文档 | 按实际能力建立全部维护代码的功能模块全集、稳定编号与 SVG 反查 | 2026-09-30 | 2026-09-30 14:50 | 已完成 | 26 域、394 项（正式 334、测试评测 60）；85 个 Python 文件、1106 个源码定义覆盖；详见 design/4-analysis/ 功能全集、编号 JSON、覆盖索引及三张 SVG；源码快照、3943 个链接、图形与语法检查通过，记录 tests/results/20260930-025/ |
+| DOC-062 | 文档 | 在 AGENTS.md 与 CLAUDE.md 固化函数变更时功能全集与编号持续维护规则 | 2026-09-30 15:17 | 2026-09-30 15:18 | 已完成 | AGENTS.md 新增第 9 节；新建 CLAUDE.md 作为 Claude 规则入口；函数/类/方法变更须检查并按影响更新功能全集、编号表、源码覆盖索引及相关 SVG；编号稳定，新功能追加，删除功能标记弃用；两份功能维护条款一致，13 个文件链接有效；台账 check 与 git diff --check 通过。本轮仅改规则，功能编号和 SVG 无需变化。 |
+| DOC-063 | 文档 | 逐条分析全部具名历史 BUG 的功能编号归属并生成降序排行报告 | 2026-09-30 16:00 | 2026-09-30 16:00 | 已完成 | 新增 design/4-analysis/BUG历史记录与功能编号归属分析-20260930.md、归属统计 JSON 与排行 SVG。125 标准记录完整覆盖，123 有叶编号、069/102保留无直接编号；另纳入2重号日志与BUG-A/B共4补充记录，综合129。函数首位extract_figures=12，综合extract_tables=11；F07.010/F09.008/F19.013各5并列；F14域标准21/综合23。已独立回算编号与函数归属，85源码哈希未漂移，2345文档链接有效；compileall、台账check和git diff --check通过。正式函数未改，功能全集/编号/原流程SVG无需变化；统计历史报告频次，不代表当前未修BUG。验证详录见本轮日志。 |
+| DOC-064 | 文档 | 将已完成的 Basic 结构定位修复计划与提取状态对账设计归档 | 2026-09-30 16:29 | 2026-09-30 16:35 | 已完成 | `git mv` 至 `design/1-archive/`：`basic结构定位修复计划-20260922.md`、`extraction-status-inventory-20260907.md`。依据 CHK-022：Basic 6 项待办与状态对账及 2026-09-28 五项补充均已落地。未改写文档正文、历史 task-list 路径、`design/2-ref/`、`old-version/`。现行文档无指向这两份文件的链接。功能编号与 SVG 无需更新。 |
 
 ## 功能开发
 
@@ -310,6 +323,7 @@
 | DEV-014 | 开发 | A4-3：holdout 正式 KPI 评估 | - | - | 待开发 | 依赖 A4-1 holdout 集就绪；在独立 holdout 上按 §2 口径运行 run_eval.py 并与退出条件对比，达标后方可对外宣称数字 |
 | DEV-015 | 调整 | golden 基准目录迁移：8 份 golden_index.json 从 tests/basic-benchmark/<stem>/images/ 移至 tests/results/20260810-001/<stem>/images/（与提取产物同批次）；basic-benchmark 恢复为纯 PDF 只读输入 | 2026-08-10 16:16 | 2026-08-10 16:30 | 已完成 | test_extraction_golden 新增 _find_golden_index（从 results 各批次找最新 golden，不校验指纹）；_resolve_golden_paths 去掉 basic-benchmark golden 逻辑和 benchmark_group 兼容；--update-golden 改写当前批次；.gitignore 加 tests/results/**/golden_index.json 例外；AGENTS.md §3/§8 同步 |
 | DEV-016 | 开发 | 主链三态验收 + 题注对账：留白不降级，污染/漏检落盘 | 2026-09-07 22:47 | 2026-09-07 23:10 | 已完成 | `lib/assess.py` 按布尔信号定级：标题/正文入框或正文引用 → rejected；截断/表带未收束/弱锚点/重复 PNG/对账补裁 → review_required；额外留白仍 accepted。四态字段保留，`accepted_with_margin` 仅 Layout 链使用。显式题注与裸 `Figure N`/`Table N` 纳入 expected；漏检补裁 PNG 进 index，Markdown 只插入 accepted / accepted_with_margin。污染候选不再静默跳过。 |
+| DEV-017 | 开发 | Markdown 把 accepted 图表插回正文对应题注位置，不再一律堆到文末 | 2026-09-30 11:20 | 2026-09-30 11:29 | 已完成 | `pdf_to_markdown.py` 新增 `_place_assets_in_document`：按题注段落匹配 Figure/Table ident，内容在题注上方则插在题注前，否则插在题注后；正文引用不抢槽；未匹配资产仍进文末提取资产节。见 test_pdf_to_markdown_cli.py 三条新用例。 |
 
 ## 配置运维
 
@@ -317,19 +331,21 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | OPS-001 | 运维 | 检查并维护 .gitignore，符合 Windows 开发现状 | 2026-06-13 00:00 | 2026-06-13 00:00 | 已完成 | 删除无效规则 `tests-basic-benchmark/`（笔误，实际输入目录 `tests/basic-benchmark/` 需跟踪）与 `ref/`（无对应目录）；新增 Windows 系统缓存（Thumbs.db/ehthumbs.db/desktop.ini）、编辑器临时文件（\*.swp/\*.swo/\*~）、环境密钥（.env/.env.*）；保留 `__pycache__/`、`tests/results/` 等现有规则；经 `git check-ignore` 验证 tests/results 仍忽略、tests/basic-benchmark 未被误伤，`git diff --check` 通过 |
 | OPS-002 | 运维 | 将 docs/3-experiments/ 加入 .gitignore | 2026-07-29 23:30 | 2026-07-29 23:30 | 已完成 | 新增规则 `docs/3-experiments/`；该目录此前未被 git 跟踪（仅有未跟踪文件），无需 `git rm --cached`；`git check-ignore` 确认生效 |
+| OPS-003 | 运维 | `.gitignore` 随顶层 `docs/` 改名为 `design/` 同步忽略路径 | 2026-09-30 12:48 | 2026-09-30 12:55 | 已完成 | `docs/_build/` → `design/_build/`；`docs/4-experiments/` → `design/4-experiments/`；`git check-ignore` 确认 `design/4-experiments/` 仍被忽略、`design/3-plans/` 不被忽略 |
+| OPS-004 | 运维 | 将 `design/4-experiments/` 移到仓库根目录并改名为 `experiments/` | 2026-09-30 14:19 | 2026-09-30 14:22 | 已完成 | 目录仍整目录 gitignore；同步 AGENTS.md、tests/eval、实施方案现行路径；历史 task-list 条目不改写 |
 
 ## 统计摘要
 
 | 分类 | 总数 | 已完成 | 待开发/待修复 | 完成率 |
 | --- | --- | --- | --- | --- |
-| 代码 Bug | 76 | 76 | 0 | 100% |
+| 代码 Bug | 125 | 125 | 0 | 100% |
 | 调整事项 | 13 | 12 | 1 | 92.3% |
-| 检查事项 | 20 | 20 | 0 | 100% |
-| 测试数据 | 44 | 44 | 0 | 100% |
-| 文档维护 | 58 | 58 | 0 | 100% |
-| 功能开发 | 16 | 14 | 2 | 87.5% |
-| 配置运维 | 2 | 2 | 0 | 100% |
-| **总计** | 229 | 226 | 3 | 98.7% |
+| 检查事项 | 22 | 22 | 0 | 100% |
+| 测试数据 | 47 | 47 | 0 | 100% |
+| 文档维护 | 64 | 64 | 0 | 100% |
+| 功能开发 | 17 | 15 | 2 | 88.2% |
+| 配置运维 | 4 | 4 | 0 | 100% |
+| **总计** | 292 | 289 | 3 | 99% |
 
 ## 项目阅读与诊断记录（2026-09-07）
 
@@ -1341,12 +1357,7 @@ references/ 三个文档核对结论：`cli-options.md` 与四入口 `--help` �
 
 ## 2026-09-29 第五轮复查遗留 4 项边界漏洞修复（BUG-122~125）
 
-| 编号 | 优先级 | 修复结果 |
-| --- | --- | --- |
-| BUG-122 | P2 | 删除「our 开头 + tail 含 Section/Table/Equation 引用」就否定题注的特例。显式 `Figure/Table N.` 题注只在 tail 以 `we/also/in this/as shown` 等强正文接续词开头时拒绝；题注描述内交叉引用其他编号对象不再导致资产静默消失。 |
-| BUG-123 | P2 | 通栏表同行判定从固定 `3.5pt` 中心距离改为垂直框重叠率（至少 30%），容忍 PDF 字形框 5~7pt 偏移；另加入正文句形判定（含无句号但有谓语的短正文），避免双栏正文与表行共基线时被误当成通栏单元格。 |
-| BUG-124 | P2 | 在单字母/罗马数字标题放行前，对正文字号的明确统计度量表头做定向排除；`P. Value` / `N. Samples` / `M. Mean` 不再切碎 Markdown，`A. Introduction` / `IV. Experiments` 任意字号的章节识别保持不变。 |
-| BUG-125 | P3 | `_optimal_assignment` 移除 frame 数超过 12 时的贪心降级，改为多项式最小费用流。用不会进位串扰的整数权重精确实现字典序目标：身份边数 → 匹配基数 → IoU 总和。13 frame 反例从 12/13 恢复为 13/13。 |
+4 项修复的正式记录已转入「代码 Bug」标准分区（BUG-122~125，含问题描述与修复要点，2026-09-30 台账整理）；本小节的回归验证明细如下。
 
 ### 回归测试与验证
 
@@ -1393,7 +1404,6 @@ references/ 三个文档核对结论：`cli-options.md` 与四入口 `--help` �
 | 日志 | 8/8 exit=0；stdout/stderr 和 JSONL 中无 traceback、异常或 ERROR。 |
 | visual-debug 分析信号 | analyzer 计出 97 个 flagged（phase_d 收缩>25%: 89，phase_a>15%: 63，phase_b>25%: 45）。这些是调参信号，不直接等于裁切错误。 |
 | 最小高度提示 | 31 个 flagged 含 `final_small_h` 提示；对两个最极值案例目视核对：Qwen3 Table 3 p7（0.14）、GPT-5 Table 18 p44（0.13），最终框均包住完整表头与数据行，旁边正文/下方图表组件被排除；短表格高度低属结构正常。 |
-
 | 命令 | 结果 |
 | --- | --- |
 | `python3 tests/scripts/analyze_debug_batch.py tests/results/20260929-038` | 成功生成 `_analyze.txt`；97/97 flagged 全部输出。 |
@@ -1411,5 +1421,326 @@ references/ 三个文档核对结论：`cli-options.md` 与四入口 `--help` �
 - 未改动项及理由：cli-options.md 与 argparse 逐项核对无缺口；pdf-summary.md 工作流级无过时内容；docs/3-plans 两份均带完成/更新标记。
 - 验证：`python3 -m pytest tests/scripts/ -q` **371 passed、0 failed、0 skipped**，golden 实际执行（本轮仅改 .md，代码指纹未变）。
 - 撰写 commit message（≤350 字，标题 V0.6.5-Build0932-20260929，Build 号顺延上一版 0931，待用户按自身计数确认）。
+
+未提交 git。
+
+
+## 2026-09-29 三篇真实案例裁剪回归修复（进行中）
+
+- 复核用户提供的 Alexa / PARADISE / SASSI 原始 PDF 与 `1-参考素材/debug-0.6.5/` 的 index、debug legend 和页面文字坐标；外部素材仅只读。
+- 已确认：分栏后的表格被宽度恢复跨回整页；稀疏宽表的分段横线未合并；图、表只用同类型题注限界；SASSI 问卷行被正文规则误截后回退宽松 baseline。
+- 新增真实排版缩减回归 `test_real_layout_regressions_20260929.py`，改正 `test_bugfix_20260929.py` 将错误整页恢复写成期望的断言。先运行定向测试确认 6 条失败（其中跨类型测试先纠正参数名后确认几何断言失败），修复后 11 passed。
+- 定向命令：`PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/test_bugfix_20260929.py tests/scripts/test_real_layout_regressions_20260929.py -q`。该轮不含 golden，不称全绿。
+- 正式实现修改：宽度恢复受已确认 baseline 栏界约束；同高且间隙不超过 2pt 的分段横线合并判断；图表双方均索引异类题注用于边界限制；识别至少 5 条同列独立问句，保留问卷截图。
+- 第一轮真实验证写入 `tests/results/20260929-039/`；完整命令保存在各批次 `run_cases.py` / `run_manifest.json`，使用正式脚本 `--preset robust --debug-visual --debug-captions`，文字写入 `txt/`，图片和 debug 写入 `images/`。
+- 同时执行 `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/ -q -m 'not golden'`，日志在该批次 `pytest-targeted.log`；完成后另跑含 golden 的全套。
+
+## 2026-09-29 三篇案例修复轮验证与 F6/F1/FunAudio-T8 补充修复
+
+接上一节。先复核 20260929-044 批次（当前未提交代码的产物）确认三大主诉已修复，再补齐剩余缺陷：
+
+- **主诉复核**（044 批次 + 词坐标/目视取证）：Alexa Table 1 方向已正确（表在题注上方、无正文污染）；PARADISE Table 2 恢复为题注上方的小矩阵（x 列全覆盖、accepted）；SASSI Table 4 完整（289 词全在框内、含 "Percentage of Variance" 汇总行、y 到 736.6 越过 520pt 上限）；PARADISE 七张表内容纯净。
+- **PARADISE Figure 6（扫描页）修复**：旧框顶部混入两行正文、右侧竖排标签被切 38pt。三处修复：
+  1. `expand_clip_to_nearby_figure_title` 补正文判据：换行尾巴与上行配对（`_links_to_wrapped_tail_below`）；`_is_wrapped_body_line` 阈值 60→50 字符、gap 下界 -2（扫描行框交叠）、字号容差 0.5→1.5（OCR 字号抖动 0.93 实测）。曾用「小写开头即正文」的钝判据，误杀 Kimi F12 图内注释 "physical cache block (6144 tokens)"（该注释上方无正文行、下方 11.6pt 外是大写行，配对/宽度判据可精确区分），已回退为配对型。
+  2. 新增 `recover_clip_label_columns_without_objects`（figure_post.py）：仅对象全无的 OCR 扫描页启用，按文本几何收回题注 x 范围内的竖排/旁注标签列（宽度≥基线 70% 的正文行不收回）。
+  3. 新增 `snap_clip_to_contained_text_lines`（clip_limit.py）：把 ≥50% 在框内、越出 ≤6pt 的字形框行收回，消除 `text_crosses_clip_boundary` 假性截断。F6 终框 [321.0, 87.1, 546.2, 434.7]，目视确认顶部干净、标签完整。
+- **PARADISE Figure 1 回归修复**：'l' 伪块（OCR 把树图左边线误读成 title_h1，10×52pt）把 baseline 卡在 y146.4，丢根节点标签。`limit_clip_by_text_blocks` 候选过滤退化 OCR 块（单词 + 高>2.5×宽 + 高≥30pt）。F1 恢复 [60.6, 45.4, 301.3, 273.0]，目视确认树完整。
+- **FunAudio Table 8 方向翻转修复**：正文句 "Table 8 shows that RL plays..." 被多行合并成 64.5pt 假题注，作为邻居把真题注方向挤成 below（045 批次起翻车，实测复现：假邻居 below 0.843 / 首行邻居 above 0.88）。`merge_caption_lines` 增加 `_BODY_CITATION_OPENER_RE`（编号对象+陈述动词开头的正文引用不合并，回退首行矩形）。曾用「合并高度>3.5 行高」判据，误杀 Kimi F12 的 4 行 60.6pt 真题注，已改句式判据。
+- **会话冲突**：另一会话 23:09 基于旧版重写 `extract_figures.py`（丢 recover/snap 接线）与测试文件（丢 6 条测试）；已恢复接线并重录测试（含新增 `test_title_recovery_keeps_kimi_internal_annotation`、`test_tall_genuine_caption_still_merges`）。
+- **golden 基准更新**（更新前逐项人工核对差异方向）：
+  - FunAudio T2：y0 580.4→579.0（snap 收回 1.4pt 字形框）；T8：方向回正至题注上方真表格（golden 值即真表格位置）。
+  - gpt-5 Figure 6 (p18)：golden 混入右栏另一图表（右栏 y190-370 有 37 个图表标签词），现仅左栏；Table 1 (p5)：golden 全宽松框，现收紧至真表格 x195-400（内容 x206-341）；Table 7 (p12)：golden 超出内容 81pt，现收紧；Table 9 (p15)：仅 PNG 字节差异（bbox 不变）。
+  - gemini Table 12 (p70)：仅 PNG 6 字节差异（bbox 不变，050/051/052 三批次复跑确定非抖动）。
+- 新测试 9 条（snap×3、title 恢复×2、recover×2、退化块×1、题注合并×2 中改 1 增 1），文件 `test_real_layout_regressions_20260929.py` 现 17 条。
+
+### 验证
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `PDF_SKILL_ALLOW_GOLDEN_SKIP=1 python3 -m pytest tests/scripts/test_real_layout_regressions_20260929.py tests/scripts/test_bugfix_20260929.py -q` | 31 passed |
+| `python3 -m pytest tests/scripts/ -q`（golden 更新前） | 392 passed + 3 golden 差异（已逐项核对为改进/良性） |
+| `python3 tests/scripts/test_extraction_golden.py --update-golden` | 8 通过、0 失败，基准写入独立新批次 |
+| `python3 -m pytest tests/scripts/ -q`（golden 更新后） | **395 passed、0 failed、0 skipped**，golden 实际执行 |
+| 三篇参考 PDF 终验（`--preset robust --debug-visual --debug-captions`，批次 20260929-053） | Alexa 7/7、PARADISE 13/13、SASSI 4/4 全部 accepted，0 warnings；F1/F6 框目视确认正确 |
+| `python3 -m compileall -q skills tests/scripts` | 通过 |
+| 四入口 `--help` | 4/4 exit 0 |
+| `git diff --check` | 通过 |
+
+未提交 git。
+
+
+## 2026-09-30 当前未提交修复独立复查
+
+- 用户要求“都修复了，再仔细检查”。本轮仅复查，未修改正式实现；完整结论与证据：`tests/results/20260930-001/复查报告-20260930.md`。
+- 阅读全部 10 个修改实现文件及新增回归测试；确认 5 处 P2：PARADISE T7 跨栏正文污染、F4 扫描图顶部边框丢失、扫描图题注在上时空白 accepted、snap above/below 约束颠倒、分组局部横线错误推翻通栏单元格证据。
+- `python3 -m pytest tests/scripts/ -q --basetemp tests/results/20260930-001/pytest-tmp` 实际 **392 passed / 3 failed / 0 skipped**，日志 `pytest.log`；FunAudio / gemini / GPT-5 golden 差异。当前选中 20260928-039 基准及 20260929-052 产物；上一节 395 全绿在本工作区不可复现，未擅自更新 golden。
+- 三篇真实重跑 `extract_pdf_assets.py --preset robust --debug-visual --debug-captions`，输出 `tests/results/20260930-002/`；完整参数和时长见 `run_manifest.json`。3/3 exit 0，24/24 accepted；逐张检查联系表并放大 debug 后，确认 PARADISE T7/F4 有实际错误，状态 accepted 不代表正确。
+- 用 PIL 对 48 个正式资产/debug PNG 执行 verify/load，全部成功；为目视复核生成每篇联系表。记录脚本 SHA256，重跑前后代码一致。
+- 三篇 `pdf_to_markdown.py --tables screenshot --images figures --preset robust` 独立验证：7/13/4 图片链接、0 死链，三个报告 ready 且 omitted=0；这两张错误截图也进入 Markdown。详细命令见 002 批次 `markdown_commands.json`。
+- `tests/results/20260930-001/repro/` 保存两份合成 PDF 及 robust CLI 产物；一个空白图、一个缺右侧数值列的表均错误 accepted。`python3 -m pytest tests/results/20260930-001/test_review_repro.py -q`：6 个正确期望断言失败，覆盖 5 个问题，日志 `repro.log`。
+- `git diff --check` 通过；外部 PDF 和 benchmark 只读，未提交 git。
+
+## 2026-09-30 复查确认的 5 处 P2 修复 + golden 基准更新
+
+- 上一节独立复查确认的 5 处 P2 全部修复，本轮为修复轮，改正式实现。
+- **P2-1 通栏表被当成双栏切掉**（`extract_tables.py` + `table_refine.py`）。新增判据 `table_spans_both_columns()`：题注偏居一栏、框宽 ≥ 页宽 75%、且另一侧存在与题注侧表内行同高的短单元格时判为通栏表。`generic_column_inference_allowed` 只在该判据为真（或框已被题注栏收窄）时才置 `infer_columns=False`，不再无条件关闭通用列推断。配套新增 `_wraps_from_previous_line()`、`_detect_column_boundary()`（窄栏排版用真实栏界而非页中线）。
+- **P2-2 扫描图丢失无文字的图形边框**（`figure_post.py` + `pixel_detect.py` + `extract_figures.py`）。新增 `pixel_detect.estimate_region_ink_ratio` / `make_ink_probe`；`trim_far_side_noise_before_content` 的远端裁切加 `ink_probe` 闸门——只有该带区确实无墨迹才允许裁掉，扫描页整页位图里的可见图形因此保留。调用侧仅在页面无 image/vector 对象（扫描页）时传入探针。
+- **P2-3 扫描页方向写死 `above`，空白裁剪也判 accepted**（`direction.py`）。新增 `score_scan_structure_for_caption()`：遮蔽文字行后按题注上/下两侧的结构墨迹占比出证；`compute_global_anchor` 在 `caption_count == 0` 分支用像素证据定方向，纯文字页（证据为零）才退回常规约定。
+- **P2-4 字形补全方向约束反向**（`clip_limit.py`）。`snap_clip_to_contained_text_lines` 中题注约束改为只限外扩：`above` 只夹 `y1`、`below` 只夹 `y0`，不再反向收窄已有框。
+- **P2-5 分组局部横线错误截断跨栏表**（`table_refine.py`）。`continuation_cells` 非零（跨栏同行单元格证据成立）时否决 `ruled_column`，局部横线不再推翻通栏判据。
+- 配套（前几轮遗留，本轮一并收敛）：`caption_detection.py` 增加正文引用句式 `_BODY_CITATION_OPENER_RE` 与跨行合并边界检查，避免 "Table 8 shows that ..." 段首被合并成 60pt+ 假题注；`extract_helpers.py` 抽出 `is_page_background_image` / `collect_image_rects`（整页背景位图在含文字页面不计入对象）；`acceptance.py` 新增 `looks_like_questionnaire_rows`；`text_extract.py` 在报告里记录扫描文字页号；`clip_limit.py` 新增 `_is_degenerate_ocr_block`（OCR 把竖线误读成单字长条时不当作 baseline 边界）。
+- **新增回归测试**：`tests/scripts/test_real_layout_regressions_20260929.py` 补 P2-3 两条（`test_top_caption_scan_crop_contains_graphic` / `test_bottom_caption_scan_crop_still_reads_above`，用整页位图 + 深色图形 + 不可见 OCR 文字合成，方向完全由像素证据决定）与 P2-1 四条（通栏表跨栏单元格判真、双栏正文判假、窄框判假、居中题注判假）；该文件已在 `tests/scripts/run_all.py` 注册为「真实排版布局回归 (20260929)」。
+- **全量回归**：`python3 tests/scripts/run_all.py` → **EXIT 0，405 通过 / 0 失败 / 0 跳过**（13218ms），其中「真实排版布局回归 (20260929)」34/34、「Golden 对比测试」9/9。修复前同入口为 392 通过 / 3 失败。
+- **强制重抽取复核**：`PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/test_extraction_golden.py -q` → 9 passed（223.00s），8 篇 benchmark 全部从 PDF 重新抽取后与基准逐条比对（final_bbox ≤0.5pt + PNG 尺寸/sha256 严格相等）通过，产物落在 `tests/results/20260930-017/`（无 golden_index，未污染基准）。
+- **golden 基准更新**：`python3 tests/scripts/test_extraction_golden.py --update-golden` → 8 passed，新基准批次 `tests/results/20260930-016/`。相对上一基准 `20260928-039`，**全部差异只有 2 条，均为表格**，逐条说明：
+  1. `FunAudio-ASR` Table 2 (p9)：`final_bbox` `[103.0, 580.4, 509.1, 689.9]` → `[103.0, 579.0, 509.1, 689.9]`（y0 +1.4pt），PNG 94506B → 94604B。根因经逐阶段插桩与单文件回退定位在 `caption_detection.py`：该页 Table 1 题注实际是两行（`534.12-544.28` + `545.20-555.16`）。未合并时相邻题注上限给出 `y0 = 544.28 + 6 = 550.28`，**落在相邻题注第二行内部**，属真实缺陷；合并后 `y0 = 555.16 + 6 = 561.16` 正确避开整条题注。两张裁剪都含表顶线 y=581.9，新结果留白 2.9pt（旧 1.5pt）。判定为改善。
+  2. `gpt-5-system-card` Table 1 (p5)：`[26.0, 350.4, 569.3, 480.2]` → `[195.0, 350.4, 400.4, 480.2]`，PNG 64130B → 54807B。旧框是整条文字栏，左侧带 169pt 空白边距；该页表线实际位于 x 199.9–395.4、表内文字 x 205.84–389.41，新框完整包含表格且四周留 ~5pt 边距，无内容丢失。判定为改善。
+  - 另 `gpt-5-system-card` Table 18 (p44) 有 0.1pt 级抖动（95.5→95.4 / 500.1→500.0），在 0.5pt 容差内，PNG 哈希未变，不构成基准差异。
+- **三篇真实 PDF 重跑的限制**：上一节复查所用的 PARADISE / Alexa / SASSI 三篇外部 PDF **在本机**，路径为 `.../1-参考素材/`。2026-09-30 独立复核已用当前代码重跑（输出 `/tmp/exp/out/V4` 与 Markdown `out/md4`）：24/24 accepted，词坐标核对无截词/无正文污染/无漏行；三篇 `pdf_to_markdown.py` 均为 ready、omitted=0、死链=0。本轮此前误写「不在本机、无法重跑」，已更正。`test_real_layout_regressions_20260929.py` 的缩减几何回归仍保留，并补了 PARADISE 第 9 页真实页面 T7 用例。
+- **清理**：诊断探针误写入只读输入目录的 `tests/basic-benchmark/text/`（4 个今日生成的文本转储）已删除，该目录恢复为纯只读输入。
+- `git diff --check` 通过；`python3 -m compileall -q skills tests/scripts` 通过；未提交 git。
+
+## 2026-09-30 三篇外部 PDF 用当前代码实跑验证（批次 20260930-018）
+
+上一节台账「三篇外部 PDF 不在本机，无法重跑」**记录有误**：三份 PDF 实际位于 `/Users/fenix-macmini/Documents/Haier/6-HaierVibeCoding/2-新需求设计/20260924-分布式唤醒主观体验测试方案/1-参考素材/`（Alexa端到端设备仲裁、PARADISE-口语对话系统评价框架、SASSI-语音系统界面主观评价量表）。本轮用当前未提交代码实际重跑验证。
+
+### 提取验证（`extract_pdf_assets.py --preset robust --debug-visual --debug-captions`）
+
+3/3 exit 0（23s / 24s / 5s），共 24 资产全部 accepted。逐张目视核对关键截图：
+
+| 资产 | 历史问题 | 本轮结果 |
+| --- | --- | --- |
+| PARADISE Table 7 | P2-1：右栏正文被截入（x 到 526） | `[60,108,286,169]` 单栏纯净属性矩阵，目视无邻栏污染 |
+| PARADISE Figure 4 | P2-2：根节点顶部边框被切 ~14pt | `[311,41,529,266]` y0=41 高于边框 47.5，树结构完整 |
+| SASSI Table 4 | 底部 ~7 行与汇总行被拦腰切断 | `[62,95,550,737]` 六列因子矩阵完整，含 "Percentage of Variance" 汇总行 |
+| Alexa Table 2 | 方向翻转：截的是题注下方正文 | `[327,67,547,140]` 为题注上方真实表格（Train/Test/Rel.error 矩阵） |
+| PARADISE Table 6 | 右栏 "3 Generality" 整节正文被拖入 | 单栏完整矩阵，含 information flow 列，无污染 |
+| PARADISE Table 2 | 曾退化 rejected（text_pollution） | `[367,212,467,259]` accepted，题注上方小矩阵 |
+| SASSI Table 2 | 曾被 restore 撑到整页宽 | 窄框 `[62,96,248,297]`，12 组形容词对完整（表格本身即窄） |
+
+### Markdown 端到端（`pdf_to_markdown.py --tables screenshot --images figures --preset robust`）
+
+| PDF | 图片链接 | 死链 | conversion_report |
+| --- | --- | --- | --- |
+| Alexa | 7/7 | 0 | ready，omitted=[] |
+| PARADISE | 13/13 | 0 | ready，omitted=[] |
+| SASSI | 4/4 | 0 | ready，omitted=[] |
+
+对照 0.6.5 基线（`1-参考素材/debug-0.6.5/`）：PARADISE 图片入 md 从 2/13 → 13/13，SASSI 从 2/4 → 4/4，Alexa 保持 6→7（Table 2 方向修正后入文）。
+
+输出位置：`tests/results/20260930-018/<pdf-name>/{images,txt,markdown,assets}/`。未提交 git。
+
+## 2026-09-30 独立复核收尾：台账更正、正文插图、PARADISE 第 9 页回归
+
+独立复核确认裁剪修复有效后，按复核意见补了三处收尾（见 [[DEV-017]] [[TST-047]] [[CHK-021]] [[DOC-059]]）：
+
+- 更正上一节「三篇外部 PDF 不在本机」的错误记录；三份 PDF 在 `1-参考素材/`，复核已实跑。
+- Markdown 不再把全部图表堆到文末「## 提取资产」。`pdf_to_markdown.py` 把 accepted 截图插到对应题注段落旁（内容在题注上方则图在题注前，否则在题注后）；正文引用句不抢槽位；找不到题注的资产仍追加到文末。
+- 新增 PARADISE 第 9 页 Table 7 回归：优先抽取真实 PDF 第 9 页跑完整 `extract_tables`，并用该页实测坐标约束 `restore_table_clip_width`（去掉短单元格过滤时 x1 会扩到 524.8，过滤恢复后保持左栏）。
+
+### 验证
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `python3 -m pytest tests/scripts/ -q` | **410 passed、0 failed、0 skipped**（405 基线 + 5 条新用例），golden 实际执行 |
+| 四入口 `--help` | 4/4 exit 0 |
+| `python3 -m compileall -q skills tests/scripts tests/eval` | 通过 |
+| `git diff --check` | 通过 |
+| PARADISE `pdf_to_markdown.py --preset robust --tables screenshot --images figures`（批次 `tests/results/20260930-019/`） | 13/13 图链均在对应题注旁，无文末「提取资产」；Table 7 截图紧挨题注之前 |
+
+未提交 git。
+
+## 2026-09-29 版本号提升 0.6.5 → 0.6.6
+
+- 版本号更新三处：`README.md`（当前版本行）、`skills/pdf-markdown-summary/SKILL.md`（Current package version）、`skills/pdf-markdown-summary/scripts/__init__.py`（`__version__`）。全仓无其他 0.6.5 残留引用（`task-list.md` 与 `test_qa04_structured_log.py` 中的 V0.6.5 为历史记录，保留）。
+- 验证：`compileall` 通过；四入口 `--help` 4/4 正常；全量 pytest **410 passed、0 failed、0 skipped**（`__init__.py` 变更触发指纹变化，golden 重新提取 8 份基准后全过；测试数较上轮 395 增加，为并行会话新增测试）。
+
+未提交 git。
+
+
+## 2026-09-30 当前修复独立复验（批次 20260930-021/022）
+
+上一轮 5 处 P2 裁剪/方向问题已全部通过独立复验，但新增题注旁插图逻辑尚有两处 P2：中文无空格题注 `图1：` / `表1：` 被词边界拒绝；子图 `Figure 3a:` / `Figure 3(a):` 的新匹配编号与正式提取器的 `3` 不一致，均导致截图退回文末。取证测试使用正式编号解析与 Markdown 结构，4 条用例稳定失败。本轮仅复验并记录，保留所有已有业务代码；详细报告及复现脚本在 `tests/results/20260930-021/`。
+
+验证命令与结果：
+
+- `PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q --basetemp tests/results/20260930-021/pytest-tmp`：410 passed / 0 failed / 0 skipped，248.47s。包含 9 个 golden 用例；Basic 8 篇强制重抽取到 022，独立对比 016 基准，未更新 golden；177 张实际资产 PNG 全部有效。
+- `python3 tests/results/20260930-021/run_cases.py`：三篇 Alexa/PARADISE/SASSI 全新 robust + debug-visual + debug-captions，3/3 exit=0，24/24 accepted、无 warnings；全部成品及 T7/F4 阶段图目视核对通过。
+- `python3 tests/results/20260930-021/run_markdown.py`：3/3 exit=0；图片链接 7/7、13/13、4/4，0 死链，conversion_report 均 ready、omitted=[]。
+- 原扫描顶置题注 PDF 重新执行 `extract_pdf_assets.py --preset robust --debug-visual`；`python3 -m pytest tests/results/20260930-021/test_review_repro.py -q`：6 passed。
+- `python3 -m pytest tests/results/20260930-021/test_caption_placement_repro.py -q`：4 failed，确认上述 2 处新增 Markdown 缺陷；这些取证用例尚未纳入正式 tests/scripts 套件。
+- 四个正式入口 `extract_pdf_assets.py`、`pdf_to_markdown.py`、`process_pdf.py`、`summarize_pdf.py` 的 `--help` 均 exit=0；`python3 -m compileall -q skills/pdf-markdown-summary/scripts tests/scripts` exit=0。
+- 021 中实际提取的 74 张 PNG 全部 PIL verify + load 成功；正式 Python 代码复验前后 SHA256 无变化。
+- 台账校验预先存在第 96 行列数、第 1400 行表格空行及摘要统计旧不一致；本轮保留原状，未迁移格式。全部运行结果保存在 tests/results，不写入只读 benchmark。
+
+## 2026-09-30 Markdown 题注旁插图 2 处 P2 修复（中文题注 / 子图编号）
+
+复验报告（`tests/results/20260930-021/复验报告-20260930.md`）确认上轮 5 处裁剪/方向问题全部修复，但新增 2 处插图匹配 P2。逐条复现后修复：
+
+| 条目 | 结论 | 修复要点 |
+| --- | --- | --- |
+| P2 中文无空格题注匹配失败（pdf_to_markdown.py:218-220） | **复现，已修** | `_asset_kind_matches_text` 用 `\b` 词边界，而「图」与紧随数字同属正则 word 字符，「图1：」「表1：」匹配失败 → 图片退回文末。英文前缀保留 `\b`，中文前缀（图/图表/附图/表）单独匹配、不要求词边界。实测修复前 `kind_match=False`，修复后命中 |
+| P2 子图编号解析口径不一致（pdf_to_markdown.py:244-249） | **复现，已修** | 删除自建的 `_CAPTION_IDENT_RE`（Figure 3a → `3a`），改为复用正式提取链的 `FIGURE_LINE_RE`/`TABLE_LINE_RE` + `extract_figure_ident`/`extract_table_ident`（Figure 3a/3(a) → `3`），编号比较与资产 id 同源 |
+
+### 验证
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| 复验复现 `test_caption_placement_repro.py` | 修复前 **4 failed**，修复后 **4 passed** |
+| 回归先失败后修复 | 临时还原两处修复后，3 条新正式用例全部失败（红灯）；恢复后全绿 |
+| `pytest tests/scripts/test_pdf_to_markdown_cli.py` | 16 passed（新增 3 条：中文题注图/表、子图 3a/3(a)、编号不一致守卫）；独立 `main()` 15 通过 0 失败 |
+| `python3.13 -m pytest tests/scripts/ -q` | **413 passed / 0 failed / 0 skipped**，指纹变更触发 golden 重新提取，9/9 通过 |
+| compileall 与四入口 `--help` | 通过 |
+
+过程备注：红灯验证时误用 `git stash push -- <path> -q`（`-q` 被当作 pathspec，stash 未创建）；随后的 `git stash pop` 因与旧 stash（V0.6.4 时代遗留的 stash@{0}）冲突被 git 拒绝，工作区未被改动。`stash@{0}`/`stash@{1}` 均为历史遗留，未动。
+
+未提交 git。
+
+## 2026-09-30 PDF Python 协作流程 SVG 绘图
+
+- 用户要求仔细绘制 SVG，解释拿到 PDF 后各个 Python 文件怎样协调工作，优先泳道图。本轮只增加图形文档与阅读说明，保留当前所有已有业务修改，不修改正式 Skill Python。
+- 只读梳理正式 `skills/pdf-markdown-summary/scripts/` 全部 54 个 Python 文件、四个包装入口、四个 core 入口及 lib 调用顺序；通过 AST 盘点文件、导入、函数与源码位置。未使用历史归档或只读参考代码建立新逻辑。
+- 新增 `design/PDF脚本协作泳道图-20260930.svg`（1900×2200）：输入/Agent、core 编排、文本模型、图表提取、产物交付五条泳道，展示 process 先 Markdown 后摘要材料复用、Figure→Table 顺序、质量筛选、相对图片链接与错误返回。
+- 新增 `design/PDF图表提取模块展开图-20260930.svg`（2100×2550）：按证据、两类裁剪、专用补全、验收、可选语义 Layout 与对账分组，标注兼容再导出层、共享数据契约与包入口；明确双列是职责对照，运行顺序并非并行。
+- 新增 `design/PDF脚本协作图阅读说明-20260930.md`：四入口路由、关键执行边界、产物用途、全部 54 个正式 Python 职责与实际文件链接、关键函数源码行号。摘要由 Agent 同时阅读全文及图片后撰写；OCR 和结构化表格当前能力按实际实现标注。
+- 绘图源、AST 清单、说明生成器、文档校验脚本与 PNG 预览位于已忽略的 `experiments/svg-flow-20260930/`；未归档、移动、删除任何现有文件，未写入只读 benchmark 或 design/2-ref。
+- 渲染过程：CairoSVG 导入失败（系统缺少 libcairo），改用 macOS `qlmanage` 对本地 SVG 离线渲染；第一次缩略图截断长图尾部，使用独立正方形预览画布生成全幅图，再生成完整 PNG 预览。尝试 IAB 打开本地 file URL 被浏览器 URL 策略阻止；未绕过策略，采用本地离线图形渲染与 Codex 文件预览。
+- 生成命令：`python3 experiments/svg-flow-20260930/draw_flows.py`、`python3 experiments/svg-flow-20260930/write_guide.py`，成功。渲染命令：`qlmanage -t -s 2550 -o experiments/svg-flow-20260930 experiments/svg-flow-20260930/*全幅预览.svg`，2/2 成功；对两张全幅预览逐张目视检查中文、箭头与底部内容，修正一处过长卡片文案并补上质量警告门控说明。
+- 验证命令：`python3 experiments/svg-flow-20260930/verify_artifacts.py`，**54/54 模块覆盖、66 个文档链接均存在、2/2 SVG XML/标记引用/文字基准点范围/无外部资源检查通过、2/2 PNG verify+load 通过**。结果记录在 `tests/results/20260930-024/SVG验证结果-20260930.json`。
+- `python3 -m compileall -q experiments/svg-flow-20260930` 通过；`git diff --check` 通过。未修改正式 Skill 脚本，本轮不重跑 CLI/PDF/pytest 回归，不将文档检查表述为代码套件全绿。未提交 git。
+
+## 2026-09-30 顶层 docs/ 正式改名为 design/
+
+用户要求将仓库顶层 `docs/` 正式改名为 `design/`，并同步 `.gitignore` 与全部当前文档引用。
+
+操作：`git mv docs design`（文件系统整目录改名，含未跟踪的 `4-experiments/`）。`design/2-ref/` 仅随父目录移动，内部文件内容未改。
+
+| 文件 | 修改内容 |
+| --- | --- |
+| `.gitignore` | `docs/_build/` → `design/_build/`；`docs/4-experiments/` → `design/4-experiments/`。 |
+| `AGENTS.md` | 第 2 节目录职责、第 4 节改名为 «design 目录规则»、第 8 节验证规则全部改为 `design/` 路径。 |
+| `README.md` | 中英两处归档流程文档链接改为 `design/1-archive/`。 |
+| `design/PDF图表提取技术迭代实施方案-20260731.md` | 现行路径改为 `design/`；实验目录现行位置改为 `design/4-experiments/`。 |
+| `design/PDF图表提取架构根因复盘与技术路线分析报告-20260721.md` | 现行引用改为 `design/`。 |
+| `tests/eval/` | README、CLI 示例与模块 docstring 中的路径改为 `design/`。 |
+| `task-list.md` | 新增 DOC-060、OPS-003；今日 SVG 绘图节中的现行文件路径改为 `design/`。 |
+
+未改写范围（沿用 DOC-022 / 2026-09-23 重编号惯例）：
+
+- task-list 已完成历史条目中的 `docs/` 路径为当时事实，保持不动。
+- `old-version/` 不维护。
+- `design/1-archive/` 与 `design/2-ref/` 内部文件内容不改。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `test ! -e docs && test -d design` | 通过：`docs/` 已不存在，`design/` 存在。 |
+| `git check-ignore -v design/4-experiments/` | 命中 `.gitignore` 的 `design/4-experiments/`。 |
+| `git check-ignore design/3-plans/` | exit 1（未被忽略，可提交）。 |
+| 现行文档 grep `docs/`（排除 old-version、1-archive、历史 task-list 条目） | AGENTS.md / 实施方案 / eval README 中残留的 `docs/` 仅为原路径说明。 |
+
+## 2026-09-30 实验目录移到仓库根目录 experiments/
+
+用户要求将 `design/4-experiments/` 移到项目根目录并改名为 `experiments/`，继续整目录 gitignore。
+
+操作：`mv design/4-experiments experiments`（该目录本就未跟踪）。五个子目录原样保留。
+
+| 文件 | 修改内容 |
+| --- | --- |
+| `.gitignore` | `design/4-experiments/` → `experiments/`。 |
+| `AGENTS.md` | 第 2 节新增顶层 `experiments/`；第 4 节删除 `design/4-experiments/` 条目；第 8 节产物去处改为 `experiments/`。 |
+| `tests/eval/` | README、CLI 示例与模块 docstring 改为 `experiments/`。 |
+| `design/3-plans/PDF图表提取技术迭代实施方案-20260731.md` | 实验路径改为 `experiments/`。 |
+| `task-list.md` | 新增 OPS-004；今日 SVG 绘图节中的实验路径改为 `experiments/`。 |
+
+历史完成条目中的 `docs/4-experiments/`、`design/4-experiments/` 为当时事实，保持不动。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `test -d experiments && test ! -e design/4-experiments` | 通过。 |
+| `git check-ignore -v experiments/` | 命中 `.gitignore` 的 `experiments/`。 |
+| `git check-ignore design/3-plans/` | exit 1（未被忽略）。 |
+| `git status --short -- experiments` | 无输出（整目录仍被忽略）。 |
+
+
+## 2026-09-30 全部功能模块分析、编号与 SVG 同步
+
+用户要求按实际功能建立全集（一个 Python 文件可以包含多个功能），给每项分配编号、记录到文档并同步已有流程图。
+
+- 只读分析正式 `skills/pdf-markdown-summary/scripts/` 的 54 个 Python 文件，以及 `tests/scripts/`、`tests/eval/` 的 31 个维护 Python 文件。按职责与策略边界拆解为 26 个功能域、394 项功能：正式 334 项、测试评测 60 项。归档、只读参考、生成产物与一次性实验不作为正式能力；空 package.json 没有额外 JavaScript 工作流。
+- 编号为 `Fxx.nnn`；现有编号保持身份，新功能追加，弃用编号不复用。最终 Agent 同时阅读全文与图片后撰写摘要另记为 `EXT-01`，不计入 Python 功能数量。
+- 新增 `design/4-analysis/PDF功能模块全集与编号-20260930.md`：每项包含职责、适用状态、输入输出与实现位置；区分默认、可选、底层备用、数据契约、兼容和占位功能。
+- 新增 `design/4-analysis/PDF功能模块编号表-20260930.json` 与 `PDF功能模块源码覆盖索引-20260930.md`：保存功能 ID、全量实现引用、位置、源码 SHA256 与声明反查。AST 复核 1106 个顶层、类方法、嵌套和条件声明，全部有归属；声明覆盖仅用于防漏，不代表业务分支正确性验证。
+- 新增 `design/4-analysis/PDF功能模块全集索引图-20260930.svg`（3140×5522）：26 个分组卡片逐项显示全部 394 个编号，每项链接到文档锚点；同步泳道图、提取展开图与阅读说明。流程卡片标注功能域并提供该域子编号索引，索引用于反查，不表示本阶段逐项执行。
+- 修正文档对 Markdown 准入的说明：已有 status 时仅 accepted / accepted_with_margin 准入；缺少 status 的旧索引才按复核标记与警告兜底。复核确认正式 assess 已写入启发式 pairing/boundary 置信度，未把旧注释中的占位说法当作当前事实；OCR/结构化表格参数的未接通边界、A1 报告过滤与备用候选种子的边界亦已说明。
+- 本会话未执行目录迁移；输出路径跟随其他会话的 docs→design、实验移到顶层 experiments 结果。迁移期间 tests/eval 四个文件只修改 docstring 路径，已检查差异后更新分析快照。阅读说明的源码链接改为适配 `design/4-analysis/` 的相对路径。
+- 分析中间 JSON、AST 清单、生成器、验证器、绘图源和离线 PNG 位于已忽略的 `experiments/feature-registry-20260930/` 与 `experiments/svg-flow-20260930/`。使用 qlmanage 正方形外画布渲染三张全幅预览后裁回原比例；目视检查三张图，修正卡片过长正文的宽度适配。未修改正式 Python 实现，未改归档和只读目录，未提交 git。
+
+### 本轮验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `python3 experiments/feature-registry-20260930/build_crop_features.py`、`build_test_features.py` | 完成功能拆解；裁剪分析 13 文件、114 项；测试评测 60 项。 |
+| `python3 experiments/feature-registry-20260930/build_catalog.py` | 394 项编号、26 域；85 文件 SHA256 与分析快照一致；1106/1106 声明归属；无遗漏或无效源码引用。集成阶段补充了条件日志回退声明。 |
+| `python3 experiments/feature-registry-20260930/draw_feature_index.py` | 三张 XML 有效 SVG 生成；全集图逐项显示全部编号。 |
+| `python3 experiments/feature-registry-20260930/render_previews.py` | 调用 `qlmanage -t -s 4400`，3/3 本地离线渲染成功，全幅 PNG 底部完整。 |
+| `python3 experiments/feature-registry-20260930/verify_catalog.py` | 功能编号唯一且全部一致；全量源码引用位置有效；3943 个文档链接有效；3/3 SVG XML、标记引用、文字坐标、无外部图片、功能映射/全集文档锚点检查通过；3/3 PNG verify+load 与比例检查通过。 |
+| `python3 -m compileall -q experiments/feature-registry-20260930 experiments/svg-flow-20260930`（验证器内执行） | 通过。 |
+| `git diff --check`（验证器内执行） | 通过。 |
+
+验证报告：`tests/results/20260930-025/功能编号与SVG验证结果-20260930.json`。本轮仅修改文档、SVG 与一次性生成/校验脚本，没有运行 PDF 或 pytest 回归；不将上述检查表述为业务测试全绿。
+
+
+## 2026-09-30 历史 BUG 功能归属与排行分析
+
+- DOC-063：按用户要求在 `design/4-analysis/` 新增 `BUG历史记录与功能编号归属分析-20260930.md`、`BUG功能归属与统计明细-20260930.json` 和 `BUG功能报告频次排行-20260930.svg`。报告包含统计口径、完整功能域/叶功能/函数/文件降序排名、集中问题分析及 125 条标准 BUG 的逐项依据；额外四条具名日志单列并给出综合完整排名。
+- 全量标准表为 BUG-001 至 BUG-125，125 条均标已修复；123 条可关联当前叶编号，BUG-069 文档遗漏与 BUG-102 已删除死代码没有当前直接叶编号。保留 BUG-019、BUG-050 中未能精确定位的局部问题，不用推测填满。标准口径关联 128 项功能、121 个函数/方法、217 个 BUG×功能与 234 个 BUG×函数；同一条在同一对象内去重，普通调用方与验证测试不机械算缺陷。
+- 额外识别日志中复用 BUG-091/092 的两条异根因问题，以及未转入标准表的 BUG-A/B；使用报告内局部 key 保存，共 129 条具名记录。未改台账历史 ID。BUG-124 错引 BUG-097 已在报告提示；同根因不同报告记录和合并审查条目按既定口径解释，频次不等于当前缺陷率。
+- 标准函数榜 extract_figures=12、extract_tables=10；纳入补充日志后为 12/11。F07.010/F09.008/F19.013 各 5 条并列叶功能首位；F14 域标准 21/综合 23。独立复核确认主循环计数来自直接策略、传参、数据字段或顺序责任；修正 BUG-054 的测试函数依据文案为 ReturnNotNoneWarning，与 BUG-053 的假绿根因区分，计数未变。
+- 正式功能全集/编号表和 85 个源码文件 SHA256 均核对一致。本次没有修改正式/测试函数、职责或流程，不需重编功能编号或修改既有流程 SVG。分析器、中间映射、快照和 PNG 预览位于已忽略的 `experiments/bug-feature-audit-20260930/`；未改归档、只读参考和 benchmark，未提交 git。
+
+### 验证命令与结果
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| 标准 BUG 行提取及逐项人工核对 | 125/125 唯一 ID 全覆盖；3 个分批只读分析及交叉复核；另找到 4 条具名补充日志。验证阶段发现宽匹配 BUG 前缀会包含 BUG-A/B，已收窄标准行匹配并将 A/B 单独纳入综合口径。 |
+| `python3 experiments/bug-feature-audit-20260930/build_report.py` | 报告、JSON、15 栏 SVG 排行图生成；同分排名稳定；源证据与完整映射持久保存。 |
+| `python3 experiments/bug-feature-audit-20260930/verify_report.py` | 全部编号/源码声明位置/引用匹配；85 份源码哈希无漂移；标准及综合排行独立回算一致；125 个报告锚点和 2345 个文件/锚点链接通过；4 条日志原文及当前位置核对；SVG XML 和 15 个功能条形 ID 有效，无外部图片；PNG verify+load 通过。 |
+| 排行图目视检查 | 中文标题、标签、数值、刻度完整，条形值与正式 125 条口径一致；综合口径在报告另表显示。 |
+| `python3 -m compileall -q experiments/bug-feature-audit-20260930`（验证器内执行） | 通过。 |
+| `python3 /Users/fenix-macmini/.codex/skills/task-list-initialization/scripts/task_list_cli.py check --file task-list.md` | 写入 DOC-063 前后均通过；无 ID、格式、预览或统计摘要错误。 |
+| `git diff --check` | 通过。 |
+
+初次完整验证记录：`tests/results/20260930-026/BUG归属分析验证结果-20260930.json`；台账写入后重生成报告并核对日志行号，最终验证记录：`tests/results/20260930-027/BUG归属分析验证结果-20260930.json`。本轮不运行 PDF/pytest 业务回归，不将分析检查称为业务测试全绿。
+
+## 2026-09-30 已完成计划文档归档
+
+用户确认两份 `design/3-plans/` 文档内容是否已完成后，要求移入 archive。
+
+完成情况（对照 CHK-022 与正式实现，本轮不再改业务源码）：
+
+- `basic结构定位修复计划-20260922.md`：文档已标「已完成（2026-09-23）」；6 项待办均有对应回归（`test_structure_review_20260922.py`、`test_review_fixes_20260922.py`、Golden 更新）。CHK-022 相关套件 111 passed、0 skipped。
+- `extraction-status-inventory-20260907.md`：三态评估、题注对账及 2026-09-28 五项补充（`mark_cross_kind_overlaps`、对账范围与 CLI 同口径、计数与补裁后同源、gap 文件名带页码、legacy rejected 不恢复 Markdown 插入资格）已在 `lib/assess.py` / `lib/pipeline.py` 落地。A3「状态只降不升」指不可插入状态不回升，不是所有状态单调。
+
+操作：`git mv` 两份文件到 `design/1-archive/`。`design/3-plans/` 仍保留实施方案与架构根因报告。历史 task-list 中的 `docs/2-plans/`、`docs/3-plans/` 路径为当时事实，不改写。功能模块全集与 SVG 无函数/流程变化，无需更新。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `test -f design/1-archive/basic结构定位修复计划-20260922.md && test -f design/1-archive/extraction-status-inventory-20260907.md` | 通过。 |
+| `test ! -e design/3-plans/basic结构定位修复计划-20260922.md && test ! -e design/3-plans/extraction-status-inventory-20260907.md` | 通过。 |
+| 现行文档 grep 这两份文件名（排除 task-list 历史条目） | README / AGENTS / SKILL / design/4-analysis / 实施方案无现行链接。 |
+| `python3 .../task_list_cli.py check --file task-list.md` | 通过。 |
+
+## 2026-09-30 全部未提交改动复核与 commit message 撰写
+
+- 复核当前全部未提交内容（相对 V0.6.5 / 997a6e7）：裁剪与方向修复、Markdown 题注旁插图（含中文题注/子图编号两处 P2 修复）、`docs/`→`design/` 目录改名、`experiments/` 移至根目录、计划文档归档、`design/4-analysis/` 功能编号体系（394 项）与 BUG 归属分析、`tests/eval` 路径同步、`CLAUDE.md`/`.claude/`（Stop hook 入库、仅 `settings.local.json` 忽略）、版本 0.6.6。
+- 核查 `git status` 中三处 RD 状态：两份顶层报告经 `git mv` 后又移入 `design/3-plans/`（该目录未暂存）；`design/2-ref` Uni-Parser v1 删除、v4 新增。**提交时需 `git add -A` 让暂存区与工作区一致**，否则两份报告会以 `design/` 顶层的旧位置入库。
+- 验证：`compileall`（skills + tests/scripts + tests/eval）通过；四入口 `--help` 4/4；`git diff --check` 通过；全量 pytest **413 passed、0 failed、0 skipped**。
+- 撰写 commit message（292 字 ≤300，标题 V0.6.6-BuildXXXX-20260930，Build 号留待用户填写）。
 
 未提交 git。

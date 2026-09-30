@@ -71,6 +71,7 @@ from .table_refine import (
     expand_clip_to_table_notes,
     expand_table_clip_to_border_rules,
     limit_table_clip_to_caption_column,
+    table_spans_both_columns,
     refine_clip_to_table_band,
     restore_table_clip_width,
     restore_table_tail_after_layout_trim,
@@ -79,6 +80,7 @@ from .table_refine import (
 )
 from .text_trim import trim_clip_head_by_text_v2
 from .extract_helpers import (
+    collect_image_rects,
     collect_draw_items,
     collect_text_lines,
     estimate_document_line_metrics,
@@ -210,7 +212,7 @@ def extract_tables(
             print(f"{'='*60}")
         caption_index = build_caption_index(
             doc,
-            figure_pattern=False,  # 跳过 Figure（使用 False 而非 None）
+            figure_pattern=None,  # 图题注同样是表格搜索区的边界
             table_pattern=TABLE_LINE_RE,
             debug=debug_captions
         )
@@ -272,11 +274,7 @@ def extract_tables(
                 vector_rects.append(item.rect)
 
         # 从 dict_data 收集图像
-        for blk in dict_data.get("blocks", []):
-            if blk.get("type") == 1:  # 图像块
-                bbox = blk.get("bbox")
-                if bbox:
-                    image_rects.append(create_rect(*bbox))
+        image_rects = collect_image_rects(dict_data, page_rect)
 
         # 查找 Table captions
         for blk in dict_data.get("blocks", []):
@@ -363,10 +361,9 @@ def extract_tables(
                 # 修复3: 方向判定 - 局部优先，全局锚点 tie-break
                 # ============================================================
                 neighbor_caption_rects = []
+                table_neighbor_caption_rects = []
                 if caption_index is not None:
                     for key, cands in caption_index.candidates.items():
-                        if not key.startswith("table_"):
-                            continue
                         for cand in cands:
                             if cand.page != pno or cand.score < 25.0:
                                 continue
@@ -376,6 +373,8 @@ def extract_tables(
                             ):
                                 continue
                             neighbor_caption_rects.append(cand.rect)
+                            if key.startswith("table_"):
+                                table_neighbor_caption_rects.append(cand.rect)
 
                 local_evidence = score_local_direction(
                     caption_bbox, page_rect,
@@ -385,7 +384,7 @@ def extract_tables(
                     caption_gap=table_caption_gap,
                     is_table=True,
                     text_lines=text_lines,
-                    neighbor_caption_rects=neighbor_caption_rects,
+                    neighbor_caption_rects=table_neighbor_caption_rects,
                 )
 
                 direction = determine_direction(
@@ -419,16 +418,24 @@ def extract_tables(
 
                 base_clip = create_rect(x_left, y_top, x_right, y_bottom)
                 table_search_clip = create_rect(x_left, search_top, x_right, search_bottom)
-                # 收窄前的原始框显式保存：后续 limit/expand 链会多次重建
-                # base_clip，restore_table_clip_width 只能靠显式传参拿到
-                # 恢复上限（矩形自定义属性在拷贝构造时丢失，不可用）。
-                pre_caption_column_clip = create_rect(x_left, y_top, x_right, y_bottom)
                 try:
                     page_drawings = page.get_drawings()
                 except Exception:
                     page_drawings = []
                 base_clip = limit_table_clip_to_caption_column(
                     base_clip, caption_bbox, page_rect, text_lines, page_drawings,
+                )
+                # 通用题注列启发式（"题注窄 ⇒ 内容与题注同栏"）只在没有
+                # 更强证据时才能用，否则会把左置题注的宽表、居中题注的跨栏
+                # 表切半：
+                #   * 栏位限制已按证据收窄 —— 栏界已确认；
+                #   * 另一栏只是本表跨栏延续的单元格 —— 这是通栏表。
+                generic_column_inference_allowed = not (
+                    base_clip.x0 > x_left + 1.0
+                    or base_clip.x1 < x_right - 1.0
+                    or table_spans_both_columns(
+                        base_clip, caption_bbox, page_rect, text_lines,
+                    )
                 )
                 table_search_clip = limit_table_clip_to_caption_column(
                     table_search_clip, caption_bbox, page_rect, text_lines, page_drawings,
@@ -585,6 +592,9 @@ def extract_tables(
                         x_margin=table_margin_x,
                         min_width_ratio=0.30,
                         debug=debug_captions,
+                        # 上方已按证据确认栏位时，通用题注启发式不得再次把
+                        # 左置题注的宽表或居中题注的跨栏表切半。
+                        infer_columns=generic_column_inference_allowed,
                     )
 
                     # ================================================================
@@ -711,7 +721,7 @@ def extract_tables(
                         final_clip,
                         base_clip,
                         table_band_changed=table_band_changed,
-                        pre_narrow_clip=pre_caption_column_clip,
+                        text_lines=text_lines,
                     )
                     final_clip = expand_table_clip_to_text_bounds(
                         final_clip,
@@ -885,9 +895,9 @@ def extract_tables(
                             fallback_clip = None
                             fallback_stage = ""
                             for stage_name, candidate in (
-                                ("phase_a", clip_after_A),
-                                ("phase_b", clip_after_B),
                                 ("phase_d", clip_after_D),
+                                ("phase_b", clip_after_B),
+                                ("phase_a", clip_after_A),
                                 ("baseline", base_clip),
                             ):
                                 candidate_polluted, _ = detect_text_pollution(candidate, text_lines)
@@ -958,8 +968,17 @@ def extract_tables(
                         float(caption_bbox.x1),
                         float(caption_bbox.y1),
                     ]
+                    assessment_reference = table_assessment_clip
+                    # A height-limited crop cannot prove completeness by checking
+                    # only inside that same window.
+                    reaches_height_limit = (
+                        direction == "below" and final_clip.y1 >= table_assessment_clip.y1 - 6
+                        or direction == "above" and final_clip.y0 <= table_assessment_clip.y0 + 6
+                    )
+                    if reaches_height_limit:
+                        assessment_reference = table_search_clip
                     table_band_open = table_remainder_is_open(
-                        final_clip, table_assessment_clip, text_lines, direction
+                        final_clip, assessment_reference, text_lines, direction
                     )
 
                     # 自评信号：最终框是否仍留着远侧正文段落 / 是否把表头切在框外。

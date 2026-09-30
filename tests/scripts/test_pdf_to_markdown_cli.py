@@ -400,6 +400,206 @@ def test_filter_skips_review_and_rejected_assets() -> None:
     assert [item["id"] for item in filtered] == ["1", "2", "5"]
 
 
+def _make_captioned_pdf(path: Path, lines: list[tuple[float, str]]) -> None:
+    doc = fitz.open()
+    page = doc.new_page(width=420, height=480)
+    for y, text in lines:
+        page.insert_text((48, y), text, fontsize=12)
+    doc.save(path)
+    doc.close()
+
+
+def _run_markdown_with_fake_assets(
+    pdf_path: Path, out_md: Path, items: list, extra_argv: list | None = None,
+) -> str:
+    import json
+
+    def fake_extract_main(argv):
+        out_dir = Path(argv[argv.index("--out-dir") + 1])
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "index.json").write_text(
+            json.dumps({"items": items}), encoding="utf-8"
+        )
+        return 0
+
+    original_main = extract_pdf_assets_module.main
+    extract_pdf_assets_module.main = fake_extract_main
+    try:
+        argv = ["--pdf", str(pdf_path), "--out", str(out_md)]
+        if extra_argv:
+            argv.extend(extra_argv)
+        exit_code = main(argv)
+    finally:
+        extract_pdf_assets_module.main = original_main
+    assert exit_code == 0
+    return out_md.read_text(encoding="utf-8")
+
+
+def test_assets_insert_after_matching_caption_not_in_appendix() -> None:
+    """题注在正文里时，截图必须跟在该题注后面，而不是堆到文末。"""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        out_md = root / "paper.md"
+        _make_captioned_pdf(
+            pdf_path,
+            [
+                (72, "Intro paragraph about the method."),
+                (140, "Figure 1: System architecture overview."),
+                (210, "The following section discusses results."),
+            ],
+        )
+        markdown = _run_markdown_with_fake_assets(
+            pdf_path,
+            out_md,
+            [
+                {
+                    "type": "figure",
+                    "id": "1",
+                    "page": 1,
+                    "status": "accepted",
+                    "file": "Figure_1.png",
+                    "caption": "Figure 1: System architecture overview.",
+                }
+            ],
+        )
+        lines = [line for line in markdown.splitlines() if line.strip()]
+        caption_i = next(
+            i for i, line in enumerate(lines)
+            if line.startswith("Figure 1:") and "Figure_1.png" not in line
+        )
+        image_i = next(i for i, line in enumerate(lines) if "Figure_1.png" in line)
+        later_i = next(i for i, line in enumerate(lines) if line.startswith("The following section"))
+        assert caption_i < image_i < later_i, markdown
+        assert "## 提取资产" not in markdown
+
+
+def test_body_citation_does_not_steal_in_body_slot() -> None:
+    """「Figure 1 shows that ...」是正文引用，截图仍应落到文末附录。"""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        out_md = root / "paper.md"
+        _make_captioned_pdf(
+            pdf_path,
+            [(72, "Figure 1 shows that the system works well in practice.")],
+        )
+        markdown = _run_markdown_with_fake_assets(
+            pdf_path,
+            out_md,
+            [
+                {
+                    "type": "figure",
+                    "id": "1",
+                    "page": 1,
+                    "status": "accepted",
+                    "file": "Figure_1.png",
+                    "caption": "Figure 1: Hidden caption.",
+                }
+            ],
+        )
+        assert "Figure_1.png" in markdown
+        assert "## 提取资产" in markdown
+        citation_at = markdown.find("Figure 1 shows that")
+        appendix_at = markdown.find("## 提取资产")
+        image_at = markdown.find("Figure_1.png")
+        assert citation_at < appendix_at < image_at, markdown
+
+
+def test_table_above_caption_inserts_image_before_caption() -> None:
+    """表格在题注上方时，截图插在题注段落之前，保持表→题注阅读顺序。"""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        pdf_path = root / "paper.pdf"
+        out_md = root / "paper.md"
+        _make_captioned_pdf(
+            pdf_path,
+            [
+                (72, "Intro paragraph about the method."),
+                (140, "Table 7: Attribute value matrix, circuit domain."),
+                (210, "The following section discusses results."),
+            ],
+        )
+        markdown = _run_markdown_with_fake_assets(
+            pdf_path,
+            out_md,
+            [
+                {
+                    "type": "table",
+                    "id": "7",
+                    "page": 1,
+                    "status": "accepted",
+                    "file": "Table_7.png",
+                    "caption": "Table 7: Attribute value matrix, circuit domain.",
+                    "final_bbox": [60.0, 108.0, 286.0, 169.0],
+                    "caption_bbox": [84.0, 174.0, 268.0, 187.0],
+                }
+            ],
+            extra_argv=["--tables", "screenshot"],
+        )
+        lines = [line for line in markdown.splitlines() if line.strip()]
+        intro_i = next(i for i, line in enumerate(lines) if line.startswith("Intro paragraph"))
+        image_i = next(i for i, line in enumerate(lines) if "Table_7.png" in line)
+        caption_i = next(
+            i for i, line in enumerate(lines)
+            if line.startswith("Table 7:") and "Table_7.png" not in line
+        )
+        later_i = next(i for i, line in enumerate(lines) if line.startswith("The following section"))
+        assert intro_i < image_i < caption_i < later_i, markdown
+        assert "## 提取资产" not in markdown
+
+
+def _place_single_asset_blocks(kind: str, caption_text: str, ident: str) -> list:
+    """直调插图逻辑：题注段落 + 后续正文 + 一个资产，返回最终块类型序列。"""
+    from core.pdf_to_markdown import _place_assets_in_document
+    from lib.markdown import MarkdownBlock, MarkdownDocument
+
+    document = MarkdownDocument(
+        title="示例",
+        source_pdf="example.pdf",
+        blocks=[
+            MarkdownBlock(type="paragraph", text=caption_text, page=1),
+            MarkdownBlock(type="paragraph", text="后续正文", page=1),
+        ],
+    )
+    item = {
+        "type": kind,
+        "id": ident,
+        "page": 1,
+        "file": "image.png",
+        "caption": caption_text,
+    }
+    _place_assets_in_document(
+        document,
+        {"items": [item], "index_json": "/tmp/assets/index.json"},
+        "/tmp/document.md",
+    )
+    return [block.type for block in document.blocks]
+
+
+def test_chinese_no_space_caption_keeps_image_in_body() -> None:
+    """中文无空格题注「图1：」「表1：」必须命中插图（词边界不能夹在汉字与数字之间）。"""
+    blocks = _place_single_asset_blocks("figure", "图1：系统架构", "1")
+    assert blocks == ["paragraph", "image", "paragraph"], blocks
+    blocks = _place_single_asset_blocks("table", "表1：实验结果", "1")
+    assert blocks == ["paragraph", "image", "paragraph"], blocks
+
+
+def test_subfigure_caption_matches_parent_ident() -> None:
+    """子图题注 Figure 3a / Figure 3(a) 的资产编号是 3（与提取链同口径），必须命中插图。"""
+    for caption in ("Figure 3a: Detail", "Figure 3(a): Detail"):
+        blocks = _place_single_asset_blocks("figure", caption, "3")
+        assert blocks == ["paragraph", "image", "paragraph"], (caption, blocks)
+
+
+def test_caption_ident_mismatch_still_goes_to_appendix() -> None:
+    """编号不一致的题注不得抢位（守卫：编号比较仍然生效，附录带标题块）。"""
+    blocks = _place_single_asset_blocks("figure", "图2：另一张图", "1")
+    assert blocks == ["paragraph", "paragraph", "heading", "image"], blocks
+    blocks = _place_single_asset_blocks("figure", "Figure 4: Other figure.", "3")
+    assert blocks == ["paragraph", "paragraph", "heading", "image"], blocks
+
+
 def main_test() -> int:
     tests = [
         test_relative_asset_dir_resolves_next_to_markdown,
@@ -411,6 +611,12 @@ def main_test() -> int:
         test_assets_disabled_returns_zero,
         test_images_extracted_by_default,
         test_filter_skips_review_and_rejected_assets,
+        test_assets_insert_after_matching_caption_not_in_appendix,
+        test_body_citation_does_not_steal_in_body_slot,
+        test_table_above_caption_inserts_image_before_caption,
+        test_chinese_no_space_caption_keeps_image_in_body,
+        test_subfigure_caption_matches_parent_ident,
+        test_caption_ident_mismatch_still_goes_to_appendix,
     ]
     passed = 0
     failed = 0

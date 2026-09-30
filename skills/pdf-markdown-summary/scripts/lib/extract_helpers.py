@@ -27,6 +27,25 @@ from .pixel_detect import estimate_ink_ratio
 logger = logging.getLogger(__name__)
 
 
+def is_page_background_image(rect: Any, page_rect: Any) -> bool:
+    """A nearly full-page bitmap is a page carrier, not a local figure."""
+    overlap = rect & page_rect
+    return (overlap.width >= page_rect.width * 0.90
+            and overlap.height >= page_rect.height * 0.90)
+
+
+def collect_image_rects(dict_data: Dict, page_rect: Any) -> List[Any]:
+    has_text = any(
+        span.get("text", "").strip()
+        for block in dict_data.get("blocks", []) if block.get("type", 0) == 0
+        for line in block.get("lines", []) for span in line.get("spans", [])
+    )
+    rects = [fitz.Rect(block["bbox"]) for block in dict_data.get("blocks", [])
+             if block.get("type") == 1 and block.get("bbox")]
+    return [rect for rect in rects
+            if not (has_text and is_page_background_image(rect, page_rect))]
+
+
 # ============================================================================
 # 绘图项收集
 # ============================================================================

@@ -145,6 +145,93 @@ def region_has_ink(
     return nonwhite / float(total) >= min_ratio
 
 
+def estimate_region_ink_ratio(
+    page: "fitz.Page",
+    rect: Any,
+    *,
+    mask_rects: Optional[List[Any]] = None,
+    dpi: int = 72,
+    white_threshold: int = 200,
+    step_px: int = 2,
+) -> float:
+    """
+    区域内非白像素占比（可排除遮罩区域）。
+
+    与 estimate_ink_ratio 的区别：支持文本行遮罩，因而能测量「结构墨迹」——
+    扫描页上遮掉 OCR 文字后剩下的图形边框/连线/箭头。区域无效或渲染失败
+    返回 0.0（视为无证据）。
+
+    Args:
+        page: PyMuPDF 页面对象
+        rect: 待测量区域（页面坐标）
+        mask_rects: 忽略的区域列表（页面坐标），通常为文本行
+        dpi: 渲染精度
+        white_threshold: 白色阈值（0-255）
+        step_px: 像素采样步长
+
+    Returns:
+        遮罩后非白像素占比（0.0~1.0）
+    """
+    if fitz is None:
+        return 0.0
+
+    r = fitz.Rect(rect) & page.rect
+    if r.is_empty or r.width <= 0.5 or r.height <= 0.5:
+        return 0.0
+
+    try:
+        pix = page.get_pixmap(clip=r, dpi=dpi, alpha=False)
+    except Exception:
+        return 0.0
+
+    w, h = pix.width, pix.height
+    if w <= 0 or h <= 0:
+        return 0.0
+    n = pix.n
+    samples = memoryview(pix.samples)
+    stride = pix.stride
+    scale = dpi / 72.0
+    pad_px = int(math.ceil(scale)) + 1
+    ox, oy = tuple(pix.irect)[:2]
+
+    masks_px: List[Tuple[int, int, int, int]] = []
+    for m in (mask_rects or []):
+        mr = fitz.Rect(m)
+        if (mr & r).is_empty:
+            continue
+        masks_px.append((
+            int(math.floor(mr.x0 * scale)) - ox - pad_px,
+            int(math.floor(mr.y0 * scale)) - oy - pad_px,
+            int(math.ceil(mr.x1 * scale)) - ox + pad_px,
+            int(math.ceil(mr.y1 * scale)) - oy + pad_px,
+        ))
+
+    def masked(x: int, y: int) -> bool:
+        for (lx, ty, rx, by) in masks_px:
+            if lx <= x < rx and ty <= y < by:
+                return True
+        return False
+
+    step = max(1, step_px)
+    nonwhite = 0
+    total = 0
+    for y in range(0, h, step):
+        row = samples[y * stride:(y + 1) * stride]
+        for x in range(0, w, step):
+            if masked(x, y):
+                continue
+            total += 1
+            off = x * n
+            r_ = row[off + 0]
+            g_ = row[off + 1] if n > 1 else r_
+            b_ = row[off + 2] if n > 2 else r_
+            if r_ < white_threshold or g_ < white_threshold or b_ < white_threshold:
+                nonwhite += 1
+    if total == 0:
+        return 0.0
+    return nonwhite / float(total)
+
+
 def make_ink_probe(
     page: "fitz.Page",
     text_lines: List[Tuple[Any, float, str]],

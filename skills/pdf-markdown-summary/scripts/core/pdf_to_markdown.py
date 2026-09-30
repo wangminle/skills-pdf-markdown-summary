@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -183,6 +184,99 @@ def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Di
     }
 
 
+def _caption_ident_for_kind(kind: str, text: str) -> str:
+    """用正式提取器的编号口径解析题注编号（与资产 id 同源）。
+
+    子图题注 Figure 3a / Figure 3(a) 的资产编号是 3（子图后缀不进入
+    ident）；自建一套独立正则会得到 3a / 3(a)，比较必然失败、图片退回
+    文末。这里直接复用 lib.idents 的 FIGURE_LINE_RE/TABLE_LINE_RE 与
+    extract_figure_ident/extract_table_ident。
+    """
+    from lib.idents import (
+        FIGURE_LINE_RE,
+        TABLE_LINE_RE,
+        extract_figure_ident,
+        extract_table_ident,
+    )
+
+    if kind == "figure":
+        match = FIGURE_LINE_RE.match(text.lstrip())
+        return extract_figure_ident(match) if match else ""
+    if kind == "table":
+        match = TABLE_LINE_RE.match(text.lstrip())
+        return extract_table_ident(match) if match else ""
+    return ""
+
+
+def _make_image_block(item: Dict[str, Any], out_md: str, index_json: str):
+    from lib.markdown import MarkdownBlock
+
+    file_value = item.get("current_file") or item.get("file") or ""
+    if not file_value:
+        return None
+    md_dir = os.path.dirname(os.path.abspath(out_md))
+    asset_abs = os.path.join(os.path.dirname(index_json), file_value)
+    rel_path = os.path.relpath(asset_abs, md_dir).replace("\\", "/")
+    label = f"{item.get('type', 'asset')} {item.get('id', '')}".strip()
+    caption = item.get("caption") or label
+    return MarkdownBlock(
+        type="image",
+        text=label,
+        path=rel_path,
+        caption=caption,
+        page=item.get("page"),
+        meta=item,
+    )
+
+
+def _asset_kind_matches_text(kind: str, text: str) -> bool:
+    head = text.lstrip()
+    # 英文前缀用词边界防止 "Figures"/"tables" 之外的误匹配；中文「图/表」
+    # 与紧随的数字同属正则 word 字符，\b 会让「图1：」「表1：」匹配失败，
+    # 故中文前缀单独匹配、不要求词边界。
+    if kind == "figure":
+        return bool(re.match(r"^(?:(?:figure|fig\.?)\b|图|图表|附图)", head, re.IGNORECASE))
+    if kind == "table":
+        return bool(re.match(r"^(?:(?:table|tab\.?)\b|表)", head, re.IGNORECASE))
+    return False
+
+
+def _block_is_caption_for_asset(block, item: Dict[str, Any]) -> bool:
+    from lib.caption_detection import is_bare_caption_label, is_explicit_caption_format
+
+    if getattr(block, "type", "") not in ("paragraph", "heading"):
+        return False
+    text = (getattr(block, "text", "") or "").strip()
+    if not text:
+        return False
+    page = item.get("page")
+    block_page = getattr(block, "page", None)
+    if page is not None and block_page is not None and int(block_page) != int(page):
+        return False
+    kind = str(item.get("type") or "").lower()
+    ident = str(item.get("id") or "").strip()
+    if not ident:
+        return False
+    if not (is_explicit_caption_format(text) or is_bare_caption_label(text)):
+        return False
+    if not _asset_kind_matches_text(kind, text):
+        return False
+    found = _caption_ident_for_kind(kind, text)
+    if not found:
+        return False
+    found_norm = re.sub(r"\s+", "", found).lower()
+    expected = re.sub(r"\s+", "", ident).lower()
+    return found_norm == expected
+
+
+def _content_is_above_caption(item: Dict[str, Any]) -> bool:
+    final_bbox = item.get("final_bbox") or []
+    caption_bbox = item.get("caption_bbox") or []
+    if len(final_bbox) < 4 or len(caption_bbox) < 4:
+        return False
+    return float(final_bbox[3]) <= float(caption_bbox[1]) + 2.0
+
+
 def _append_asset_section(document, asset_result: Dict[str, Any], out_md: str) -> None:
     if not asset_result.get("items"):
         return
@@ -190,25 +284,47 @@ def _append_asset_section(document, asset_result: Dict[str, Any], out_md: str) -
     from lib.markdown import MarkdownBlock
 
     document.blocks.append(MarkdownBlock(type="heading", text="提取资产", level=2))
-    md_dir = os.path.dirname(os.path.abspath(out_md))
     for item in asset_result["items"]:
-        file_value = item.get("current_file") or item.get("file") or ""
-        if not file_value:
+        image = _make_image_block(item, out_md, asset_result.get("index_json") or "")
+        if image is not None:
+            document.blocks.append(image)
+
+
+def _place_assets_in_document(document, asset_result: Dict[str, Any], out_md: str) -> None:
+    """把可插入资产放到对应题注旁；找不到题注的仍追加到文末。"""
+    items = list(asset_result.get("items") or [])
+    if not items:
+        return
+
+    index_json = asset_result.get("index_json") or ""
+    used_blocks: set = set()
+    placements: List[tuple] = []
+    unmatched: List[Dict[str, Any]] = []
+    for item in items:
+        image = _make_image_block(item, out_md, index_json)
+        if image is None:
             continue
-        asset_abs = os.path.join(os.path.dirname(asset_result["index_json"]), file_value)
-        rel_path = os.path.relpath(asset_abs, md_dir).replace("\\", "/")
-        label = f"{item.get('type', 'asset')} {item.get('id', '')}".strip()
-        caption = item.get("caption") or label
-        document.blocks.append(
-            MarkdownBlock(
-                type="image",
-                text=label,
-                path=rel_path,
-                caption=caption,
-                page=item.get("page"),
-                meta=item,
-            )
-        )
+        match_idx = None
+        for index, block in enumerate(document.blocks):
+            if index in used_blocks:
+                continue
+            if _block_is_caption_for_asset(block, item):
+                match_idx = index
+                break
+        if match_idx is None:
+            unmatched.append(item)
+            continue
+        used_blocks.add(match_idx)
+        placements.append((match_idx, _content_is_above_caption(item), image))
+
+    for match_idx, before, image in sorted(placements, key=lambda row: row[0], reverse=True):
+        insert_at = match_idx if before else match_idx + 1
+        document.blocks.insert(insert_at, image)
+
+    if unmatched:
+        leftover = dict(asset_result)
+        leftover["items"] = unmatched
+        _append_asset_section(document, leftover, out_md)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -227,7 +343,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     document = _paragraphs_to_document(paths["pdf_path"], paths["stem"])
     asset_result = _run_asset_extraction(args, paths)
-    _append_asset_section(document, asset_result, paths["out_md"])
+    _place_assets_in_document(document, asset_result, paths["out_md"])
 
     from lib.markdown import render_markdown
 

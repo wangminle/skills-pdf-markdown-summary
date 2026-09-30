@@ -388,6 +388,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         "name": "中文章节标题识别回归测试",
         "path": TESTS_SCRIPTS_DIR / "test_text_extract_headings.py",
     })
+    # 2026-09-29 并行会话产物：由 PARADISE / SASSI 真实排版缩减得到的布局回归
+    test_suites.append({
+        "name": "真实排版布局回归 (20260929)",
+        "path": TESTS_SCRIPTS_DIR / "test_real_layout_regressions_20260929.py",
+    })
 
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，
     # 就会重演「静默跳过、退出码仍为 0」的假绿。golden 单独处理，故排除。

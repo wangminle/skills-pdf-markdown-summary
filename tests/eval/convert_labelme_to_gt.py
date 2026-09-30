@@ -3,7 +3,7 @@
 """convert_labelme_to_gt.py — LabelMe JSON → tests/annotations/<doc>/gt.json。
 
 LabelMe 在整页渲染图上标注，渲染参数与实验脚本
-docs/3-experiments/20260728-pymupdf4llm-layout-bbox/scripts/01_extract_layout.py
+experiments/20260728-pymupdf4llm-layout-bbox/scripts/01_extract_layout.py
 第 89 行保持一致：fitz.Matrix(1.5, 1.5)，即 zoom=1.5、DPI=108（72×1.5）。
 本脚本据此把像素坐标换算回 PDF 点坐标：pt = px × 72 / DPI = px / 1.5。
 

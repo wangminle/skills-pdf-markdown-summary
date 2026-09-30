@@ -18,7 +18,7 @@ GT 为空是正常状态（标注尚未开始）：打印友好提示并以 0 �
 用法示例：
   python tests/eval/run_eval.py \
       --gt-dir tests/annotations \
-      --pred-root docs/3-experiments/20260728-pymupdf4llm-layout-bbox/legacy \
+      --pred-root experiments/20260728-pymupdf4llm-layout-bbox/legacy \
       --pdf-root tests/basic-benchmark
 """
 from __future__ import annotations

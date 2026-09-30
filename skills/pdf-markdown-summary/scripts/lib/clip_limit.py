@@ -169,10 +169,22 @@ def limit_clip_by_text_blocks(
                 return True
         return False
 
+    def _is_degenerate_ocr_block(item: Any) -> bool:
+        r = _rect(item)
+        text = _text(item)
+        if len(text.split()) != 1:
+            return False
+        if r.width <= 0:
+            return True
+        # 竖线/边框被 OCR 误读成的单字长条（PARADISE p2 的 'l'：10×52pt）
+        # 既不是内容也不是标题，不得作为 baseline 的正文边界。
+        return r.height > 2.5 * r.width and r.height >= 30.0
+
     if direction == "below":
         candidates = [
             item for item in text_block_rects
             if _rect(item).y0 > clip.y0 and _rect(item).y0 < clip.y1 and _shares_caption_column(item)
+            and not _is_degenerate_ocr_block(item)
         ]
         candidates.sort(key=lambda item: _rect(item).y0)
         blocker = None
@@ -195,6 +207,7 @@ def limit_clip_by_text_blocks(
         candidates = [
             item for item in text_block_rects
             if _rect(item).y1 > clip.y0 and _rect(item).y1 < clip.y1 and _shares_caption_column(item)
+            and not _is_degenerate_ocr_block(item)
         ]
         candidates.sort(key=lambda item: _rect(item).y1, reverse=True)
         blocker = None
@@ -298,6 +311,8 @@ def refine_clip_x_range(
     min_width_ratio: float = 0.25,
     debug: bool = False,
     text_lines: Optional[List] = None,
+    infer_columns: bool = True,
+    ink_probe: Optional[Any] = None,
 ) -> Any:
     """
     根据图注所在列和对象边界框缩小裁剪区域的 x 方向范围。
@@ -354,7 +369,8 @@ def refine_clip_x_range(
 
     # 策略1：版式模型双栏检测
     if (
-        layout_model is not None
+        infer_columns
+        and layout_model is not None
         and layout_model.num_columns >= 2
         and _has_trustworthy_column_geometry(layout_model)
     ):
@@ -372,15 +388,52 @@ def refine_clip_x_range(
             x_left = max(x_left, col_left - x_margin)
             x_right = min(x_right, col_right + x_margin)
 
+    def _band_has_native_evidence() -> bool:
+        """裁剪带内是否存在原生对象/文本证据。
+
+        有证据时「题注窄 = 内容与题注同栏」的假设仍有支撑；完全没有
+        证据时该假设只剩题注自身宽度，不足以切掉半个图。
+        """
+        for r in image_rects + vector_rects:
+            inter = r & clip
+            if inter.width > 0 and inter.height >= 0.5 * r.height:
+                return True
+        for rect, _size, text in text_lines or []:
+            if not str(text).strip():
+                continue
+            lr = fitz.Rect(rect)
+            inter = lr & clip
+            if inter.width > 0 and inter.height >= 0.5 * lr.height:
+                return True
+        return False
+
+    def _far_side_has_ink(x0: float, x1: float) -> bool:
+        """待切掉的一侧是否确有可见墨迹（文本行已遮罩）。
+
+        扫描页的图形没有原生对象可作证，只剩像素。墨迹在场说明那一侧
+        是图的一部分，题注短只是排版习惯（图宽于题注），不是栏界。
+        """
+        if ink_probe is None or x1 - x0 <= 1.0 or clip.height <= 1.0:
+            return False
+        try:
+            return bool(ink_probe(fitz.Rect(x0, clip.y0, x1, clip.y1)))
+        except Exception:
+            return False
+
     # 策略2：根据图注 x 位置判断列归属
     caption_width = caption_rect.width
-    if caption_width > 0 and caption_width < page_width * 0.6:
+    if infer_columns and caption_width > 0 and caption_width < page_width * 0.6:
         page_center = page_rect.x0 + page_width / 2
+        column_clamp_trusted = _band_has_native_evidence()
         if caption_rect.x1 < page_center:
-            if x_right > page_center + 20:
+            if x_right > page_center + 20 and not (
+                not column_clamp_trusted and _far_side_has_ink(page_center - 5, x_right)
+            ):
                 x_right = min(x_right, page_center - 5)
         elif caption_rect.x0 > page_center:
-            if x_left < page_center - 20:
+            if x_left < page_center - 20 and not (
+                not column_clamp_trusted and _far_side_has_ink(x_left, page_center + 5)
+            ):
                 x_left = max(x_left, page_center + 5)
 
     # 策略3：用裁剪区域 y 范围内的对象 x 边界缩小范围
@@ -436,6 +489,60 @@ def refine_clip_x_range(
         return clip
 
     return new_clip
+
+def snap_clip_to_contained_text_lines(
+    clip: Any,
+    text_lines: Optional[List],
+    caption_rect: Any,
+    direction: str,
+    *,
+    max_grow: float = 6.0,
+    min_inside_ratio: float = 0.5,
+) -> Any:
+    """把大半在框内、字形框只越出边缘几 pt 的文本行完整收回框内。
+
+    字形/OCR 行框比可见墨迹大（扫描件常见 1-2pt），autocrop 贴墨裁切
+    会切掉这一点尾部并触发 text_crosses_clip_boundary 假性截断告警
+    （PARADISE 扫描件 Figure 6：行底 436.0 对裁剪底 434.7）。只收回
+    ≥min_inside_ratio 高度已在框内的行——大半在框外的是邻居内容，
+    收进来即污染；越出超过 max_grow 的行说明内容真不匹配，同样保持
+    原框。任何一侧都不越过题注边界。
+    """
+    if fitz is None or clip is None or clip.width <= 1 or clip.height <= 1:
+        return clip
+    new_x0, new_y0, new_x1, new_y1 = clip.x0, clip.y0, clip.x1, clip.y1
+    for line_rect, _font_size, text in text_lines or []:
+        if not (text or "").strip():
+            continue
+        r = fitz.Rect(line_rect)
+        if r.width <= 0 or r.height <= 0:
+            continue
+        inter = r & clip
+        if inter.is_empty or inter.width <= 0 or inter.height <= 0:
+            continue
+        if inter.height < min_inside_ratio * r.height:
+            continue
+        if r.x0 < clip.x0 - 0.5 and clip.x0 - r.x0 <= max_grow:
+            new_x0 = min(new_x0, r.x0)
+        if r.x1 > clip.x1 + 0.5 and r.x1 - clip.x1 <= max_grow:
+            new_x1 = max(new_x1, r.x1)
+        if r.y0 < clip.y0 - 0.5 and clip.y0 - r.y0 <= max_grow:
+            new_y0 = min(new_y0, r.y0)
+        if r.y1 > clip.y1 + 0.5 and r.y1 - clip.y1 <= max_grow:
+            new_y1 = max(new_y1, r.y1)
+    # 题注约束只限制外扩，不得反向收窄已有框。
+    # 主链方向语义：above = 内容在题注上方（题注在框下方，限制 y1）；
+    # below = 内容在题注下方（题注在框上方，限制 y0）。
+    if caption_rect is not None:
+        cap = fitz.Rect(caption_rect)
+        if direction == "above":
+            new_y1 = max(clip.y1, min(new_y1, cap.y0))
+        elif direction == "below":
+            new_y0 = min(clip.y0, max(new_y0, cap.y1))
+    if (abs(new_x0 - clip.x0) < 0.01 and abs(new_y0 - clip.y0) < 0.01
+            and abs(new_x1 - clip.x1) < 0.01 and abs(new_y1 - clip.y1) < 0.01):
+        return clip
+    return fitz.Rect(new_x0, new_y0, new_x1, new_y1)
 
 def snap_clip_edges(
     clip: Any,

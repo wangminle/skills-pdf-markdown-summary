@@ -54,12 +54,14 @@ from .clip_limit import (
     limit_clip_by_text_blocks,
     refine_clip_x_range,
     snap_clip_edges,
+    snap_clip_to_contained_text_lines,
 )
 from .far_side import detect_far_side_text_evidence, trim_far_side_text_post_autocrop
 from .figure_post import (
     expand_clip_to_nearby_figure_objects,
     expand_clip_to_nearby_figure_title,
     pad_figure_clip_near_caption,
+    recover_clip_label_columns_without_objects,
     trim_far_side_noise_before_content,
 )
 from .object_refine import merge_rects, refine_clip_by_objects
@@ -70,6 +72,7 @@ from .pixel_detect import (
 )
 from .text_trim import _trim_lingering_body_before_objects, trim_clip_head_by_text_v2
 from .extract_helpers import (
+    collect_image_rects,
     collect_draw_items,
     collect_text_lines,
     estimate_document_line_metrics,
@@ -204,7 +207,7 @@ def extract_figures(
             print(f"\n{'='*60}")
             print(f"SMART CAPTION DETECTION ENABLED")
             print(f"{'='*60}")
-        caption_index = build_caption_index(doc, figure_pattern=FIGURE_LINE_RE, table_pattern=False, debug=debug_captions)
+        caption_index = build_caption_index(doc, figure_pattern=FIGURE_LINE_RE, table_pattern=None, debug=debug_captions)
         if debug_captions and caption_index:
             print(f"[CAPTION_INDEX] Built with {len(caption_index.candidates)} keys for figures")
 
@@ -260,11 +263,7 @@ def extract_figures(
                 vector_rects.append(item.rect)
 
         # 从 dict_data 收集图像
-        for blk in dict_data.get("blocks", []):
-            if blk.get("type") == 1:  # 图像块
-                bbox = blk.get("bbox")
-                if bbox:
-                    image_rects.append(create_rect(*bbox))
+        image_rects = collect_image_rects(dict_data, page_rect)
 
         # 查找 Figure captions
         for blk in dict_data.get("blocks", []):
@@ -379,10 +378,9 @@ def extract_figures(
                     local_evidence=local_evidence,
                 )
                 figure_neighbor_caption_rects = []
+                neighbor_caption_rects = []
                 if caption_index is not None:
                     for key, cands in caption_index.candidates.items():
-                        if not key.startswith("figure_"):
-                            continue
                         for cand in cands:
                             if cand.page != pno or cand.score < 25.0:
                                 continue
@@ -391,7 +389,9 @@ def extract_figures(
                                 and abs(cand.rect.x0 - caption_bbox.x0) < 2.0
                             ):
                                 continue
-                            figure_neighbor_caption_rects.append(cand.rect)
+                            neighbor_caption_rects.append(cand.rect)
+                            if key.startswith("figure_"):
+                                figure_neighbor_caption_rects.append(cand.rect)
                 direction = correct_bare_figure_caption_direction(
                     direction,
                     caption_bbox,
@@ -423,7 +423,7 @@ def extract_figures(
                         base_clip,
                         caption_bbox,
                         direction,
-                        figure_neighbor_caption_rects,
+                        neighbor_caption_rects,
                         gap=caption_gap,
                     )
 
@@ -461,7 +461,7 @@ def extract_figures(
                         image_rects,
                         vector_rects,
                         page_rect,
-                        figure_neighbor_caption_rects,
+                        neighbor_caption_rects,
                         gap=caption_gap,
                     )
                 clip = create_rect(base_clip.x0, base_clip.y0, base_clip.x1, base_clip.y1)
@@ -532,6 +532,7 @@ def extract_figures(
                         min_width_ratio=0.30,
                         debug=debug_captions,
                         text_lines=text_lines,
+                        ink_probe=page_ink_probe,
                     )
 
                 # ================================================================
@@ -618,6 +619,16 @@ def extract_figures(
                             vector_rects,
                             text_lines,
                             pad=max(8.0, object_pad),
+                            # 墨迹否决只在对象模型失效的页面上生效（扫描页
+                            # 的整页位图被当作页面载体过滤，矢量也全无）。
+                            # 原生页的版面装饰横线是 0.4pt 描边路径，对象
+                            # 集合里看不见，却会被像素探针当成「无文字的
+                            # 图形边界」而否决掉页眉裁切，把页眉分隔线框进
+                            # 截图。原生页的对象证据本就可靠，交给它决定。
+                            ink_probe=(
+                                page_ink_probe
+                                if not (image_rects or vector_rects) else None
+                            ),
                         )
 
                         autocrop_h = autocrop_clip.height
@@ -641,7 +652,7 @@ def extract_figures(
                         image_rects,
                         vector_rects,
                         page_rect,
-                        figure_neighbor_caption_rects,
+                        neighbor_caption_rects,
                         gap=caption_gap,
                         max_expand=80.0,
                     )
@@ -664,6 +675,17 @@ def extract_figures(
                     final_clip = expand_clip_to_nearby_figure_title(
                         base_clip, final_clip, text_lines, direction,
                         page_rect=page_rect,
+                    )
+                    # 对象全被过滤的扫描页：标签列只存在于 OCR 文本行里，
+                    # 墨迹 autocrop 切掉的竖排/旁注标签按文本几何收回。
+                    if not (image_rects or vector_rects):
+                        final_clip = recover_clip_label_columns_without_objects(
+                            final_clip, text_lines, caption_bbox, base_clip,
+                        )
+                    # 字形/OCR 行框比可见墨迹大 1-2pt：把大半在框内的行
+                    # 完整收回，避免 text_crosses_clip_boundary 假性截断。
+                    final_clip = snap_clip_to_contained_text_lines(
+                        final_clip, text_lines, caption_bbox, direction,
                     )
 
                 # ================================================================

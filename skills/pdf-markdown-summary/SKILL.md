@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.5**.
+Current package version: **0.6.6**.
 
 ## Core Workflow
 
@@ -56,6 +56,7 @@ See `references/cli-options.md` for details.
 ## Output Rules
 
 - Use relative image links in generated Markdown.
+- Insert accepted Figure/Table screenshots next to matching caption paragraphs; unmatched assets still go to a trailing `## 提取资产` section.
 - Keep table screenshots when structure extraction is unavailable; do not drop tables.
 - For summaries, default to Chinese unless the user asks for another language.
 - Always use both the text file and Figure/Table images when writing a figure-aware summary.

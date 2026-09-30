@@ -19,8 +19,8 @@ import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from .pdf_backend import create_rect, open_pdf
-from .extract_helpers import collect_draw_items
-from .pixel_detect import estimate_ink_ratio
+from .extract_helpers import collect_draw_items, collect_image_rects, collect_text_lines
+from .pixel_detect import estimate_ink_ratio, estimate_region_ink_ratio
 
 if TYPE_CHECKING:
     import fitz
@@ -124,6 +124,56 @@ def score_direction_for_caption(
     return score_above, score_below
 
 
+def score_scan_structure_for_caption(
+    page: "fitz.Page",
+    caption_bbox: "fitz.Rect",
+    page_rect: "fitz.Rect",
+    text_lines: Optional[List[Tuple["fitz.Rect", float, str]]] = None,
+    *,
+    clip_height: float = 400.0,
+    margin_x: float = 20.0,
+    caption_gap: float = 3.0,
+    min_evidence: float = 0.005,
+) -> Tuple[float, float]:
+    """扫描页（无原生对象）方向证据：题注上下区域的结构墨迹。
+
+    扫描页的位图/矢量对象被整页载体过滤后，OCR 文字行是唯一文本证据，
+    但文字墨迹度量的是段落而不是图形，直接用会随段落分布抖动。这里把
+    全部文本行遮罩掉，只比较两侧剩下的结构墨迹（图形边框、连线、箭头），
+    窗口口径与 score_direction_for_caption 一致，但 x 向取题注所在栏
+    （±margin_x），避免邻栏图形污染方向判断。
+
+    两侧结构墨迹都低于 min_evidence 时返回 (0.0, 0.0)，表示「无方向
+    证据」——调用方不得据此直接给出方向。
+    """
+    if page is None:
+        return 0.0, 0.0
+
+    masks = [lb for (lb, _fs, txt) in (text_lines or []) if str(txt).strip()]
+    x_left = max(page_rect.x0, caption_bbox.x0 - margin_x)
+    x_right = min(page_rect.x1, caption_bbox.x1 + margin_x)
+    if x_right - x_left <= 1.0:
+        x_left, x_right = page_rect.x0 + margin_x, page_rect.x1 - margin_x
+
+    y_bottom_above = caption_bbox.y0 - caption_gap
+    y_top_above = max(page_rect.y0, y_bottom_above - clip_height)
+    above_ratio = estimate_region_ink_ratio(
+        page, create_rect(x_left, y_top_above, x_right, y_bottom_above),
+        mask_rects=masks,
+    )
+
+    y_top_below = caption_bbox.y1 + caption_gap
+    y_bottom_below = min(page_rect.y1, y_top_below + clip_height)
+    below_ratio = estimate_region_ink_ratio(
+        page, create_rect(x_left, y_top_below, x_right, y_bottom_below),
+        mask_rects=masks,
+    )
+
+    if max(above_ratio, below_ratio) < min_evidence:
+        return 0.0, 0.0
+    return above_ratio, below_ratio
+
+
 def compute_global_anchor(
     doc: "fitz.Document",
     caption_pattern: "re.Pattern",
@@ -162,6 +212,12 @@ def compute_global_anchor(
     above_total = 0.0
     below_total = 0.0
     caption_count = 0
+    scan_caption_count = 0
+    # 扫描页的结构墨迹比例单独累计：它与原生对象评分的量纲不同（面积加权
+    # vs 像素占比），混入同一总和会让扫描证据被原生证据淹没。只在整篇都
+    # 没有原生题注证据时，才退到这份像素级证据。
+    scan_above_total = 0.0
+    scan_below_total = 0.0
 
     for pno in range(len(doc)):
         page = doc[pno]
@@ -183,11 +239,11 @@ def compute_global_anchor(
             if item.orient in wanted_orients:
                 vector_rects.append(item.rect)
 
-        for blk in dict_data.get("blocks", []):
-            if blk.get("type") == 1:
-                bbox = blk.get("bbox")
-                if bbox:
-                    image_rects.append(create_rect(*bbox))
+        image_rects = collect_image_rects(dict_data, page_rect)
+        scan_only = not image_rects and not vector_rects and any(
+            block.get("type") == 1 for block in dict_data.get("blocks", [])
+        )
+        page_text_lines = collect_text_lines(dict_data) if scan_only else None
 
         # 查找 captions
         for blk in dict_data.get("blocks", []):
@@ -204,6 +260,24 @@ def compute_global_anchor(
 
                 match = caption_pattern.match(text_stripped)
                 if not match:
+                    continue
+                if scan_only:
+                    scan_caption_count += 1
+                    # 无原生对象不等于无方向证据：遮掉 OCR 文本行后比较
+                    # 题注上下两侧的结构墨迹（图形边框/连线）。
+                    caption_bbox = create_rect(*(ln.get("bbox", [0, 0, 0, 0])))
+                    scan_above, scan_below = score_scan_structure_for_caption(
+                        page, caption_bbox, page_rect, page_text_lines,
+                        clip_height=clip_height,
+                        margin_x=margin_x,
+                        caption_gap=caption_gap,
+                    )
+                    if scan_above + scan_below > 0:
+                        scan_above_total += scan_above
+                        scan_below_total += scan_below
+                    if debug:
+                        print(f"[GLOBAL_ANCHOR] Page {pno+1} (scan): "
+                              f"above={scan_above:.4f}, below={scan_below:.4f}")
                     continue
 
                 caption_bbox = create_rect(*(ln.get("bbox", [0, 0, 0, 0])))
@@ -224,6 +298,22 @@ def compute_global_anchor(
                     print(f"[GLOBAL_ANCHOR] Page {pno+1}: above={score_above:.3f}, below={score_below:.3f}")
 
     if caption_count == 0:
+        # 无原生对象/矢量的扫描页：用遮掉 OCR 文本行后的结构墨迹定方向。
+        # 有证据就用证据，证据不足才落到约定值，不得无条件认定 above。
+        scan_total = scan_above_total + scan_below_total
+        if scan_total > 1e-6:
+            scan_dir = "above" if scan_above_total >= scan_below_total else "below"
+            if debug:
+                print(f"[GLOBAL_ANCHOR] Scan structure: above={scan_above_total:.4f}, "
+                      f"below={scan_below_total:.4f} -> {scan_dir}")
+            return scan_dir
+        if scan_caption_count and not is_table:
+            # 有扫描题注但上下两侧都没有可辨结构墨迹（例如纯文字页）：
+            # 此时像素证据为零，保留图题在下的常规约定。
+            if debug:
+                print("[GLOBAL_ANCHOR] Scan captions but no structural ink, "
+                      "falling back to 'above'")
+            return "above"
         if debug:
             print(f"[GLOBAL_ANCHOR] No captions found, returning None")
         return None
@@ -322,6 +412,12 @@ def score_local_direction(
     if is_table and text_lines:
         search_height = min(300.0, max(160.0, clip_height * 0.5))
         page_width = max(1.0, page_rect.width)
+        mid = (page_rect.x0 + page_rect.x1) / 2
+        # Disjoint columns must never form a synthetic multi-cell table row.
+        if caption_bbox.x1 < mid:
+            text_lines = [line for line in text_lines if line[0].x0 < mid]
+        elif caption_bbox.x0 > mid:
+            text_lines = [line for line in text_lines if line[0].x1 > mid]
         # 只让同栏题注参与归属判断（跨栏题注见 captions_share_column 注释）
         neighbors = [
             rect for rect in (neighbor_caption_rects or [])
@@ -440,6 +536,8 @@ def score_local_direction(
                     and line[0].y0 >= page_rect.y1 - max(80.0, page_rect.height * 0.10)
                 )
             ]
+            gaps = [(caption_bbox.y0 - line[0].y1) if side == "above"
+                    else (line[0].y0 - caption_bbox.y1) for line in nearby]
 
             if not nearby:
                 return 0.0, None, 0, (min(caption_like_gaps) if caption_like_gaps else None)
@@ -448,7 +546,11 @@ def score_local_direction(
             row_centers: List[float] = []
             for line in sorted(nearby, key=lambda item: (item[0].y0, item[0].x0)):
                 center = (line[0].y0 + line[0].y1) / 2.0
-                if rows and abs(center - row_centers[-1]) <= 3.0:
+                if rows and any(
+                    min(line[0].y1, item[0].y1) - max(line[0].y0, item[0].y0)
+                    >= 0.30 * min(line[0].height, item[0].height)
+                    for item in rows[-1]
+                ):
                     rows[-1].append(line)
                     row_centers[-1] = sum(
                         (item[0].y0 + item[0].y1) / 2.0 for item in rows[-1]
@@ -459,10 +561,13 @@ def score_local_direction(
 
             structured_gaps: List[float] = []
             for row in rows:
+                row = [line for line in row if _looks_table_line(line[0], line[2])]
+                if not row:
+                    continue
                 row_rect = row[0][0]
                 for line_rect, _font_size, _text in row[1:]:
                     row_rect = row_rect | line_rect
-                if len(row) >= 3 or (len(row) >= 2 and row_rect.width >= page_width * 0.35):
+                if len(row) >= 2 and row_rect.width >= page_width * 0.15:
                     if side == "above":
                         structured_gaps.append(caption_bbox.y0 - row_rect.y1)
                     else:

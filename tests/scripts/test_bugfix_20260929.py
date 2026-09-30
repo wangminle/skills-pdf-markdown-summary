@@ -4,8 +4,8 @@
 1. limit_table_clip_to_caption_column 只统计另一侧页面内的文字行数，
    无法区分「右栏正文」和「通栏表格右侧单元格」，无边框通栏表
    （合成输入 x=30..570）被收成半栏，右侧数据行出框；
-2. 收窄同时作用于 base/search 且收窄不可逆：restore_table_clip_width
-   以收窄后的 base 为恢复上限，阈值形同虚设，无法恢复原始框。
+2. 单栏判断成立后，restore_table_clip_width 不能将其恢复成整页宽。
+   通栏表通过行对齐或连续横线证据保留完整 baseline。
 """
 
 from __future__ import annotations
@@ -124,11 +124,11 @@ def test_aligned_short_prose_still_narrows() -> None:
 
 
 # ---------------------------------------------------------------------------
-# P2#2: 收窄不可逆——原始框显式传参作为恢复依据
+# P2#2 回归：宽度恢复不得越过已确认的栏位
 # ---------------------------------------------------------------------------
 
-def test_narrowed_clip_keeps_original_for_restore() -> None:
-    """restore_table_clip_width 必须以收窄前的原始框为恢复上限。"""
+def test_narrowed_clip_restoration_stays_in_caption_column() -> None:
+    """已确认的单栏边界不可被宽度恢复推翻。"""
     from lib.table_refine import (
         limit_table_clip_to_caption_column,
         restore_table_clip_width,
@@ -148,8 +148,8 @@ def test_narrowed_clip_keeps_original_for_restore() -> None:
     restored = restore_table_clip_width(
         final, base, table_band_changed=True, pre_narrow_clip=clip,
     )
-    assert restored.x0 <= 30 and restored.x1 >= 570, (
-        f"未恢复到收窄前原始框 (restored={restored})"
+    assert restored.x0 == base.x0 and restored.x1 == base.x1, (
+        f"恢复宽度越过已确认的栏边界 (restored={restored})"
     )
 
     # 行带证据不成立时不得恢复（保持原守卫）
@@ -160,10 +160,7 @@ def test_narrowed_clip_keeps_original_for_restore() -> None:
 
 
 def test_restore_works_after_neighbor_caption_rebuild() -> None:
-    """主链路 extract_tables 426→433→706：中间的 limit/expand 会重建矩形，
-    restore 必须靠调用方显式保存的原始框恢复，不能依赖矩形自定义属性
-    （fitz.Rect 拷贝构造会丢属性——旧属性方案在多表页必失效）。
-    """
+    """邻题注重建矩形后，恢复依然必须遵守分栏和邻题注边界。"""
     from lib.clip_limit import limit_clip_by_neighbor_captions
     from lib.table_refine import (
         limit_table_clip_to_caption_column,
@@ -187,13 +184,13 @@ def test_restore_works_after_neighbor_caption_rebuild() -> None:
     )
 
     final = fitz.Rect(base.x0, base.y0, base.x0 + 40, base.y1)
-    # 显式传入收窄前原始框：即使 base 被收窄且重建过，仍能恢复
+    # 旧调用即使仍传整页框，也不能越过已经确认的分栏边界
     restored = restore_table_clip_width(
         final, base, table_band_changed=True, pre_narrow_clip=clip,
     )
-    assert restored.x0 <= 30 and restored.x1 >= 570, (
+    assert restored.x0 == base.x0 and restored.x1 == base.x1, (
         f"主链路恢复失效 (restored={restored})"
     )
-    # 对照：不传原始框时只能以收窄后的 base 为上限，无法恢复（旧行为）
+    # 不传原始框同样恢复到已经确认的单栏边界
     fallback = restore_table_clip_width(final, base, table_band_changed=True)
-    assert fallback.x1 < 570
+    assert fallback == restored

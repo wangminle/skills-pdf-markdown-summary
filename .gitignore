@@ -45,7 +45,8 @@ coverage.xml
 .cursorignore
 .cursorindexingignore
 .pypirc
-.claude/
+# Claude Code：本地个人配置不入库；settings.json 与 hooks/（任务台账同步提醒）随仓库共享
+.claude/settings.local.json
 .agents/
 node_modules/
 **/.DS_Store
@@ -65,7 +66,7 @@ desktop.ini
 .env.*
 
 # Project specific
-docs/_build/
+design/_build/
 __pypackages__/
 cython_debug/
 
@@ -81,4 +82,4 @@ tests/annotations/
 tests/holdout/
 
 # 实验目录（含大量 PNG/debug/Layout 产物，本地保留，不上传 GitHub）
-docs/4-experiments/
+experiments/

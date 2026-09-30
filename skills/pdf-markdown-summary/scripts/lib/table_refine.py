@@ -12,7 +12,7 @@ try:
 except ImportError:
     fitz = None  # type: ignore
 
-from .acceptance import looks_like_table_text
+from .acceptance import looks_like_table_text, looks_like_questionnaire_rows
 
 
 def table_remainder_is_open(final_clip: Any, baseline: Any, text_lines: List, direction: str) -> bool:
@@ -22,6 +22,23 @@ def table_remainder_is_open(final_clip: Any, baseline: Any, text_lines: List, di
     elif direction == "above" and final_clip.y0 > baseline.y0 + 36.0:
         remainder = fitz.Rect(final_clip.x0, baseline.y0, final_clip.x1, final_clip.y0)
     else:
+        return False
+    outside = [(rect, size, text) for rect, size, text in text_lines
+               if text.strip() and (rect & remainder).width > 0
+               and (rect & remainder).height >= rect.height * 0.5]
+    if not outside:
+        return False
+    nearest = min(outside, key=lambda line: (
+        line[0].y0 - final_clip.y1 if direction == "below"
+        else final_clip.y0 - line[0].y1))
+    rect, size, text = nearest
+    gap = rect.y0 - final_clip.y1 if direction == "below" else final_clip.y0 - rect.y1
+    if gap > max(18.0, size * 2.25):
+        return False
+    # A prose line between the crop and distant short equation lines is a
+    # boundary, not evidence that this table continues through the paragraph.
+    if (len(text.split()) >= 6 and text.strip().endswith(".")
+            and not looks_like_questionnaire_rows(remainder, outside)):
         return False
     # 余量窗口常与同页矢量图的散点标签重叠（Kimi K3 Table 5 下方 Figure 13
     # 的轴刻度/图例全是 4-6pt 短行，短行占比判据把它们当表格行误报
@@ -352,6 +369,36 @@ def refine_clip_to_table_band(
 
     return new_clip, new_clip != clip
 
+def _wraps_from_previous_line(
+    line_rect: Any,
+    text: str,
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    *,
+    max_x_offset: float = 3.0,
+    max_gap_ratio: float = 0.35,
+) -> bool:
+    """本行是否只是同栏上一行的折行续行，而不是独立单元格。
+
+    折行续行与上一行左边界对齐、行距只剩字间空隙（远小于一个行高），
+    且以小写字母接续。表格行之间至少留一个行高，据此与表内行区分。
+    图题注常跨两行（"Fig. 2. ... from" / "source audio dataset."），
+    末行又短又窄，只靠文本长度会把它当成单元格。
+    """
+    head = (text or "").lstrip()
+    if not head or not head[0].islower():
+        return False
+    for prev, _size, _prev_text in text_lines or []:
+        if prev is None or prev is line_rect:
+            continue
+        if prev.y1 > line_rect.y0:
+            continue
+        if abs(prev.x0 - line_rect.x0) > max_x_offset:
+            continue
+        if line_rect.y0 - prev.y1 <= max_gap_ratio * max(1.0, line_rect.height):
+            return True
+    return False
+
+
 def _other_side_line_continues_table(
     line_rect: Any,
     text: str,
@@ -360,6 +407,7 @@ def _other_side_line_continues_table(
     side: str,
     caption_rect: Any,
     clip: Any,
+    max_cell_text_len: int = 40,
 ) -> bool:
     """判断另一侧的短文字行是否为通栏表格的延续单元格。
 
@@ -393,6 +441,14 @@ def _other_side_line_continues_table(
     )
     if sentence_like:
         return False
+    # 单元格文本短。整栏宽的长句即使不带谓语也是相邻栏的正文或题注，
+    # 例如 "Fig. 2. Pipeline for generating an arbitration scenario from"
+    # ——它恰好与右栏表格某行同高，会被误判成跨栏延续单元格，让右栏表格
+    # 永远确认不了栏界。
+    if len(txt) > max_cell_text_len and line_rect.width >= 0.35 * max(1.0, clip.width):
+        return False
+    if _wraps_from_previous_line(line_rect, txt, text_lines):
+        return False
     for partner, _fs, partner_text in text_lines or []:
         if partner is None or partner is line_rect:
             continue
@@ -417,6 +473,101 @@ def _other_side_line_continues_table(
     return False
 
 
+def _detect_column_boundary(
+    text_lines: Optional[List[Tuple[Any, float, str]]],
+    clip: Any,
+    page_rect: Any,
+    *,
+    min_gap: float = 6.0,
+    max_offset_ratio: float = 0.15,
+) -> Optional[float]:
+    """从行框的 x 投影估计栏界，比页中线更贴近真实的栏间空白。
+
+    窄栏排版里页中线可能落在栏内：PARADISE 第 9 页页中线 306 落在右栏
+    (301.7..523.7) 内，按页中线 ±8 判「另一栏」会把右栏正文整片漏掉，
+    于是误判成通栏表、表框横贯两栏。这里取裁剪带内相邻行段之间、最靠
+    页中线的空白间隙中心；偏移超过页面宽度 max_offset_ratio 的间隙不
+    采信（宁可用页中线，也不把页边距之类的空白当栏界）。
+    """
+    if clip is None or page_rect is None or page_rect.width <= 1:
+        return None
+    spans: List[Tuple[float, float]] = []
+    for rect, _fs, text in text_lines or []:
+        if rect is None or not str(text).strip():
+            continue
+        if min(rect.y1, clip.y1) - max(rect.y0, clip.y0) < 4:
+            continue
+        if rect.x1 - rect.x0 <= 0:
+            continue
+        spans.append((rect.x0, rect.x1))
+    if len(spans) < 2:
+        return None
+    spans.sort()
+    merged: List[List[float]] = []
+    for x0, x1 in spans:
+        if merged and x0 <= merged[-1][1] + 1.0:
+            merged[-1][1] = max(merged[-1][1], x1)
+        else:
+            merged.append([x0, x1])
+    page_mid = (page_rect.x0 + page_rect.x1) / 2.0
+    best_gap = 0.0
+    best_center: Optional[float] = None
+    for (_a0, a1), (b0, _b1) in zip(merged, merged[1:]):
+        gap = b0 - a1
+        if gap < min_gap:
+            continue
+        center = (a1 + b0) / 2.0
+        if abs(center - page_mid) > page_rect.width * max_offset_ratio:
+            continue
+        if best_center is None or gap > best_gap:
+            best_gap, best_center = gap, center
+    return best_center
+
+
+def table_spans_both_columns(
+    clip: Any,
+    caption_rect: Any,
+    page_rect: Any,
+    text_lines: Optional[List[Tuple[Any, float, str]]] = None,
+    *,
+    min_cells: int = 2,
+) -> bool:
+    """题注侧的表是否跨过栏界（另一栏只是本表延续的单元格）。
+
+    通栏表在另一栏的行与题注侧表内行同行对齐（见
+    _other_side_line_continues_table）。此时"题注窄 ⇒ 内容与题注同栏"
+    的通用启发式会把半张表当成邻栏正文切掉，必须让位。
+    """
+    if fitz is None or clip is None or page_rect is None or page_rect.width <= 1:
+        return False
+    if clip.width < page_rect.width * 0.75:
+        return False
+    mid = (page_rect.x0 + page_rect.x1) / 2.0
+    cap_cx = (caption_rect.x0 + caption_rect.x1) / 2.0
+    if abs(cap_cx - mid) < page_rect.width * 0.08:
+        return False
+    side = "left" if cap_cx < mid else "right"
+    boundary = _detect_column_boundary(text_lines, clip, page_rect)
+    if boundary is None:
+        boundary = mid
+    cells = 0
+    for line_rect, _fs, text in text_lines or []:
+        if line_rect is None:
+            continue
+        if min(line_rect.y1, clip.y1) - max(line_rect.y0, clip.y0) < 4:
+            continue
+        if side == "left":
+            if line_rect.x0 <= boundary - 8:
+                continue
+        elif line_rect.x1 >= boundary + 8:
+            continue
+        if _other_side_line_continues_table(
+            line_rect, text, text_lines, boundary, side, caption_rect, clip,
+        ):
+            cells += 1
+    return cells >= min_cells
+
+
 def limit_table_clip_to_caption_column(
     clip: Any,
     caption_rect: Any,
@@ -429,9 +580,7 @@ def limit_table_clip_to_caption_column(
     通栏横线仍然保留整页宽度。另一栏没有独立文字时也不收窄，
     避免把单栏论文里左对齐的通栏表裁掉。另一栏的文字行须先确认
     不是通栏表的跨栏延续行（见 _other_side_line_continues_table）
-    才计入收窄证据。收窄前的原始框由调用方显式保存并传给
-    restore_table_clip_width 作为恢复上限（否则收窄不可逆）——
-    不要挂在返回矩形上：fitz.Rect 链上任何重建都会丢自定义属性。
+    才计入收窄证据。分栏判断得到的范围是后续宽度恢复的上限。
     """
     if fitz is None or clip is None or page_rect is None or page_rect.width <= 1:
         return clip
@@ -442,39 +591,78 @@ def limit_table_clip_to_caption_column(
     if abs(cap_cx - mid) < page_rect.width * 0.08:
         return clip
     side = "left" if cap_cx < mid else "right"
+    # 栏界取实测的栏间空白（见 _detect_column_boundary）：页中线只是回退。
+    boundary = _detect_column_boundary(text_lines, clip, page_rect)
+    if boundary is None:
+        boundary = mid
+    rules = []
     for drawing in drawings or []:
         raw = drawing.get("rect") if isinstance(drawing, dict) else None
         if raw is None:
             continue
         rect = fitz.Rect(raw)
-        if rect.height > 2.5 or rect.width < page_rect.width * 0.65:
+        if rect.height > 2.5 or rect.width <= 0:
             continue
-        if min(rect.y1, clip.y1) - max(rect.y0, clip.y0) > 0:
+        if rect.y1 < clip.y0 or rect.y0 > clip.y1:
+            continue
+        rules.append(rect)
+    # Word 等导出的横线可按单元格拆成多个 drawing；只连接同高且
+    # 间隙极小的线段，不跨越双栏之间的留白。
+    merged_rules = []
+    for rect in sorted(rules, key=lambda r: (r.y0, r.x0)):
+        for i, merged in enumerate(merged_rules):
+            if (abs((rect.y0 + rect.y1 - merged.y0 - merged.y1) / 2) <= 1.0
+                    and rect.x0 <= merged.x1 + 2.0 and rect.x1 >= merged.x0 - 2.0):
+                merged_rules[i] = merged | rect
+                break
+        else:
+            merged_rules.append(rect)
+    for rect in merged_rules:
+        if rect.width >= page_rect.width * 0.65:
             return clip
     other = 0
+    continuation_cells = 0
     for line_rect, _fs, text in text_lines or []:
         if line_rect is None:
             continue
         if min(line_rect.y1, clip.y1) - max(line_rect.y0, clip.y0) < 4:
             continue
-        if side == "left" and line_rect.x0 > mid + 8:
+        if side == "left" and line_rect.x0 > boundary - 8:
             pass
-        elif side == "right" and line_rect.x1 < mid - 8:
+        elif side == "right" and line_rect.x1 < boundary + 8:
             pass
         else:
             continue
         if _other_side_line_continues_table(
-            line_rect, text, text_lines, mid, side, caption_rect, clip,
+            line_rect, text, text_lines, boundary, side, caption_rect, clip,
         ):
+            continuation_cells += 1
             continue
         other += 1
-    if other < 2:
+    # Repeated column-local rules also establish a column when the other
+    # column contains a figure rather than body text.
+    local_rules = [
+        rect for rect in merged_rules
+        if rect.width >= caption_rect.width * 0.65
+        and ((side == "left" and rect.x1 < boundary)
+             or (side == "right" and rect.x0 > boundary))
+    ]
+    crosses_gutter = any(rect.x0 < boundary - 8 and rect.x1 > boundary + 8
+                         for rect in merged_rules)
+    # 跨栏延续单元格是通栏表自身的证据：此时的左右分组横线只是同一张表
+    # 的列组边框，不是邻栏表格的栏界，不得据此收窄把右半表切掉。
+    ruled_column = (
+        len(local_rules) >= 2
+        and not crosses_gutter
+        and continuation_cells == 0
+    )
+    if other < 2 and not ruled_column:
         return clip
     gutter = 8.0
     if side == "left":
-        narrowed = fitz.Rect(clip.x0, clip.y0, min(clip.x1, mid - gutter), clip.y1)
+        narrowed = fitz.Rect(clip.x0, clip.y0, min(clip.x1, boundary - gutter), clip.y1)
     else:
-        narrowed = fitz.Rect(max(clip.x0, mid + gutter), clip.y0, clip.x1, clip.y1)
+        narrowed = fitz.Rect(max(clip.x0, boundary + gutter), clip.y0, clip.x1, clip.y1)
     return narrowed
 
 
@@ -485,20 +673,43 @@ def restore_table_clip_width(
     table_band_changed: bool,
     min_width_ratio: float = 0.40,
     pre_narrow_clip: Any = None,
+    text_lines: Optional[List[Tuple[Any, float, str]]] = None,
+    max_cell_text_len: int = 40,
 ) -> Any:
     """可靠表格行带成立时，恢复被对象裁切误缩成局部列的 X 范围。
 
-    pre_narrow_clip 是 limit_table_clip_to_caption_column 收窄前的
-    原始框（由调用方显式保存并传入），有则以它为恢复上限；否则以
-    base_clip 为上限——若 base 本身已被收窄，40% 阈值会形同虚设，
-    通栏表被误收窄后永远无法恢复。不要用矩形自定义属性传递原始框：
-    fitz.Rect 拷贝构造会丢属性，主调用链上的任何重建都让属性失效。
+    恢复不得越过 base_clip 已确认的栏位或相邻题注边界。
+    pre_narrow_clip 仅保留旧调用兼容；它也必须受 base_clip 约束。
+    text_lines 提供时按「框外仍有单元格文本」判断，只认 max_cell_text_len
+    以内的短文本；未提供时退回 min_width_ratio 比例阈值。
     """
     if fitz is None or not table_band_changed or base_clip.width <= 1:
         return clip
     original = pre_narrow_clip
     if original is None or original.width <= 1:
         original = base_clip
+    original = fitz.Rect(max(original.x0, base_clip.x0), clip.y0,
+                         min(original.x1, base_clip.x1), clip.y1)
+    if original.width <= 1:
+        return clip
+    if text_lines is not None:
+        # 只有「短单元格文本」才算被误裁的表格内容。整行宽的长句是相邻栏
+        # 的正文段落或图题注：把它们当作丢失的单元格，等于把邻栏吞进表格
+        # 截图（Alexa Table 1 曾因此从右栏扩到整页宽）。
+        lost_cells = [rect for rect, _size, text in text_lines
+                      if text.strip() and len(text.strip()) <= max_cell_text_len
+                      and rect.height > 0
+                      and (rect & original).height >= 0.5 * rect.height
+                      and (rect & original).width > 0
+                      and (rect.x0 < clip.x0 - 1 or rect.x1 > clip.x1 + 1)]
+        if not lost_cells:
+            return clip
+        return fitz.Rect(
+            max(original.x0, min(clip.x0, min(r.x0 for r in lost_cells) - 4)),
+            clip.y0,
+            min(original.x1, max(clip.x1, max(r.x1 for r in lost_cells) + 4)),
+            clip.y1,
+        )
     if clip.width >= original.width * min_width_ratio:
         return clip
     return fitz.Rect(original.x0, clip.y0, original.x1, clip.y1)
@@ -1437,11 +1648,14 @@ def trim_table_clip_far_side_body(
         return clip
 
     note_rects = _table_note_rects(clip, text_lines)
+    questionnaire = looks_like_questionnaire_rows(clip, text_lines)
 
     def _is_body(text: str, rect: Any) -> bool:
         if any((rect & note).get_area() >= 0.9 * rect.get_area() for note in note_rects):
             return False
         txt = (text or "").strip()
+        if questionnaire and txt.endswith(("?", "？")):
+            return False
         if not txt or re.match(r"^\s*(?:Table|Figure|Tab\.?|Fig\.?)\s+\S+", txt, re.I):
             return False
         words = txt.split()

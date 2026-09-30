@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """keys.py — 资产键、BBox 几何、一对一配对（A0-3 口径修正核心）。
 
-相对实验脚本（docs/3-experiments/.../scripts/03_build_gt_and_eval.py）
+相对实验脚本（experiments/.../scripts/03_build_gt_and_eval.py）
 的三处修正：
 
 1. 资产键 = document_id + kind + ident + caption_page + occurrence + group_id。

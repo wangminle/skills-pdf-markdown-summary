@@ -49,6 +49,7 @@ text/
 - Treat OCR flags as reserved roadmap options; current production extraction relies on the PDF text layer.
 - Do not drop tables if structure extraction fails; use image fallback.
 - Keep Markdown paths relative to the Markdown file location.
+- Insert accepted Figure/Table screenshots next to the matching caption paragraph. If the crop sits above the caption, place the image immediately before that paragraph; otherwise place it immediately after. Assets without a matching caption still go to a trailing `## 提取资产` section.
 - Use `--debug-visual` through `scripts/extract_pdf_assets.py` when figure/table crop quality needs diagnosis.
 
 ## Quality Checks

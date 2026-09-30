@@ -223,6 +223,7 @@ def pre_validate_pdf(pdf_path: str) -> "PDFValidationResult":
                 warnings.append(f"PDF is encrypted; extraction may be incomplete. detail={e}")
 
         pages_with_text = 0
+        scan_text_pages = []
         sample_pages = min(10, page_count)
 
         for pno in range(sample_pages):
@@ -231,6 +232,10 @@ def pre_validate_pdf(pdf_path: str) -> "PDFValidationResult":
                 text = page.get_text("text").strip()
                 if len(text) > 50:
                     pages_with_text += 1
+                    from .extract_helpers import is_page_background_image
+                    if any(is_page_background_image(create_rect(*image["bbox"]), page.rect)
+                           for image in page.raw.get_image_info()):
+                        scan_text_pages.append(pno + 1)
             except Exception as e:
                 logger.warning(
                     f"Failed to read text layer on page {pno + 1}: {e}",
@@ -242,6 +247,12 @@ def pre_validate_pdf(pdf_path: str) -> "PDFValidationResult":
 
         if not has_text_layer:
             warnings.append("PDF may be scanned/image-only (limited text layer detected)")
+        if scan_text_pages:
+            warnings.append(
+                "Possible scanned pages with OCR text layer (sample pages: "
+                + ", ".join(map(str, scan_text_pages))
+                + "); text presence does not guarantee OCR accuracy"
+            )
 
         if page_count > 100:
             warnings.append(f"Large document ({page_count} pages), extraction may be slow")
