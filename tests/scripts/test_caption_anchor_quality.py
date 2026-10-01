@@ -52,6 +52,58 @@ from lib.refine import (
 )
 
 
+def _insert_superscript_label(page, label, number, y):
+    """生成文本层融合为无空格编号的上角标脚注。"""
+    page.insert_text((100, y), label, fontsize=10)
+    x = 100 + fitz.get_text_length(label, fontsize=10)
+    page.insert_text((x, y - 3), number, fontsize=6)
+
+
+@pytest.mark.parametrize("kind,number", [("table", "2"), ("figure", "5")])
+def test_superscript_footnote_is_not_caption_candidate(kind, number):
+    """脚注编号不能成为候选；普通无空格编号及题注内脚注仍保留。"""
+    from lib.caption_detection import find_all_caption_candidates
+    from lib.idents import FIGURE_LINE_RE, TABLE_LINE_RE
+
+    pattern = TABLE_LINE_RE if kind == "table" else FIGURE_LINE_RE
+    label = kind.title()
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        _insert_superscript_label(page, label, number, 100)
+        caption = f"{label}{number}: Results"
+        _insert_superscript_label(page, caption, "1", 200)
+        lines = [line for block in page.get_text("dict")["blocks"]
+                 for line in block.get("lines", [])]
+        assert "".join(span["text"] for span in lines[0]["spans"]) == label + number
+        assert lines[0]["spans"][-1]["flags"] & 1
+        candidates = find_all_caption_candidates(page, 0, pattern, kind)
+        assert len(candidates) == 1
+        assert candidates[0].number == number
+        assert candidates[0].text == caption + "1"
+
+
+@pytest.mark.parametrize("kind,number", [("table", "2"), ("figure", "5")])
+@pytest.mark.parametrize("smart", [False, True])
+def test_superscript_footnote_does_not_consume_real_caption_id(tmp_path, kind, number, smart):
+    """两条正式提取路径均不能让前页脚注抢占后页真题注编号。"""
+    from lib.extract_figures import extract_figures
+    from lib.extract_tables import extract_tables
+
+    pdf = tmp_path / "superscript.pdf"
+    with fitz.open() as doc:
+        fake = doc.new_page(width=600, height=800)
+        _insert_superscript_label(fake, kind.title(), number, 250)
+        fake.draw_rect(fitz.Rect(100, 100, 500, 220))
+        real = doc.new_page(width=600, height=800)
+        real.insert_text((100, 250), f"{kind.title()}{number}: Results", fontsize=10)
+        real.draw_rect(fitz.Rect(100, 100, 500, 220))
+        doc.save(pdf)
+    run = extract_tables if kind == "table" else extract_figures
+    records = run(str(pdf), str(tmp_path), dpi=72, allow_continued=False,
+                  autocrop=False, text_trim=False, smart_caption_detection=smart)
+    assert [(record.ident, record.page) for record in records] == [(number, 2)]
+
+
 def _make_text_block(
     rect: "fitz.Rect",
     text: str,

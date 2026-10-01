@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.6**.
+Current package version: **0.6.7**.
 
 ## Core Workflow
 
@@ -56,6 +56,7 @@ See `references/cli-options.md` for details.
 ## Output Rules
 
 - Use relative image links in generated Markdown.
+- Insert accepted figure/table screenshots next to their matching caption paragraph; unmatched assets go to a trailing asset section.
 - Insert accepted Figure/Table screenshots next to matching caption paragraphs; unmatched assets still go to a trailing `## 提取资产` section.
 - Keep table screenshots when structure extraction is unavailable; do not drop tables.
 - For summaries, default to Chinese unless the user asks for another language.
@@ -71,7 +72,7 @@ The asset extractor includes:
 - Direction detection using local evidence, global anchor fallback, page-position heuristics, and explicit overrides.
 - Baseline limiting by neighboring captions and layout text blocks.
 - Figure refinement for text trimming, object alignment, column-aware X clipping, layout adjustment, autocrop, and figure-title recovery.
-- Table refinement for multiline header recovery, rendered horizontal-rule compensation, table-band detection, width restoration, text-bbox padding, wrapped-tail preservation, far-side section-heading trimming, explicit table-note recovery below the bottom rule, and border-rule inclusion.
+- Table refinement for multiline header recovery, rendered horizontal-rule compensation, table-band detection, width restoration, text-bbox padding, wrapped-tail preservation, far-side section-heading trimming, explicit table-note recovery below the bottom rule (including superscript digit notes with sequential-marker checks), and border-rule inclusion.
 - Captionless table continuation recovery on adjacent pages when continuation markers, repeated headers, and horizontal rules agree. This runs automatically; `--allow-continued` controls repeated-caption items. Recovered fragments receive boundary checks and may require review.
 - Optional semantic-layout evidence, full-page one-to-one pairing, multi-frame grouping, conservative refinement, and four-state quality reporting.
 - Debug overlays showing `baseline`, `phase_a`, `phase_b`, `phase_d` (post-autocrop), and `final` regions.

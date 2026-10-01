@@ -29,7 +29,7 @@ from .pdf_backend import PDFDocument, create_rect, managed_pdf_document
 
 # 导入本地模块
 from .models import AttachmentRecord, CaptionBlock, CaptionIndex, DocumentLayoutModel
-from .idents import TABLE_LINE_RE, build_output_basename, extract_table_ident, stable_debug_number
+from .idents import TABLE_LINE_RE, build_output_basename, extract_table_ident, line_text_skip_superscript, stable_debug_number
 from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
     merge_caption_lines, is_caption_reference, is_likely_reference_context,
@@ -286,7 +286,7 @@ def extract_tables(
                 if not spans:
                     continue
 
-                text = "".join(sp.get("text", "") for sp in spans)
+                text = line_text_skip_superscript(spans)
                 text_stripped = text.strip()
 
                 match = TABLE_LINE_RE.match(text_stripped)

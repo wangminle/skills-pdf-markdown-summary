@@ -45,9 +45,11 @@ from typing import Dict, List, Match, Optional, Set, Tuple
 FIGURE_LINE_RE = re.compile(
     r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Figures?|Figs?\.?|图表|附图|图)\s*)"
     r"(?:"
-    r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6})"  # S前缀 + 数字/罗马
+    r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6}(?![A-Za-z]))"  # S前缀 + 数字/罗马
     r"|"
-    r"(?P<roman>[IVX]{1,6})"                        # 纯罗马数字
+    r"(?P<letter_id>[A-Z]\d+)"                     # 附录图（如 A1, B2）
+    r"|"
+    r"(?P<roman>[IVX]{1,6})(?![A-Za-z])"           # 纯罗马数字（守卫防 "Figures in"→I）
     r"|"
     r"(?P<num>\d+)"                                 # 普通数字
     r")"
@@ -73,11 +75,11 @@ FIGURE_CN_RE = re.compile(
 TABLE_LINE_RE = re.compile(
     r"(?P<label>(?:Extended\s+Data\s+)?(?:Supplementary\s+)?(?:Tables?|Tabs?\.?|表)\s*)"
     r"(?:"
-    r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6})"  # S前缀 + 数字/罗马
+    r"(?P<s_prefix>S\s*)(?P<s_id>\d+|[IVX]{1,6}(?![A-Za-z]))"  # S前缀 + 数字/罗马
     r"|"
     r"(?P<letter_id>[A-Z]\d+)"                     # 附录表（如 A1, B2）
     r"|"
-    r"(?P<roman>[IVX]{1,6})"                       # 纯罗马数字
+    r"(?P<roman>[IVX]{1,6})(?![A-Za-z])"           # 纯罗马数字（守卫防 "Tables in"→I）
     r"|"
     r"(?P<num>\d+)"                                # 普通数字
     r")"
@@ -89,6 +91,18 @@ TABLE_LINE_RE = re.compile(
 TABLE_CN_RE = re.compile(
     r"表\s*(?P<num>\d+)",
 )
+
+
+def line_text_skip_superscript(spans) -> str:
+    """拼接行文本，剔除上角标 span（PyMuPDF flags bit0）。
+
+    表体行的上角标脚注编号（如 "Table²"）在文本层与标签词融合成
+    "Table2"，会被题注正则当成真实题注。题注编号本身不会是上角标，
+    剔除不影响真实题注。
+    """
+    return "".join(
+        sp.get("text", "") for sp in spans if not (sp.get("flags", 0) & 1)
+    )
 
 
 def stable_debug_number(ident: str, modulo: int = 1000) -> int:
@@ -241,12 +255,15 @@ def extract_figure_ident(match: Match) -> str:
 
         s_prefix = (gd.get("s_prefix") or "").strip()
         s_id = (gd.get("s_id") or "").strip()
+        letter_id = (gd.get("letter_id") or "").strip()
         roman = (gd.get("roman") or "").strip()
         number = (gd.get("num") or "").strip()
 
         ident = ""
         if s_prefix and s_id:
             ident = f"S{s_id}".strip().upper()
+        elif letter_id:
+            ident = letter_id.strip().upper()
         elif roman:
             ident = roman.upper()
         elif number:

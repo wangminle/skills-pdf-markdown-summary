@@ -23,7 +23,7 @@ QA-01 统一测试入口
   一律失败，仅用户显式授权的排除模式可跳过），
   通过/失败数从 pytest 输出解析，解析不到标记"数量未知"。
 
-测试套件（共 20 个）：
+测试套件（共 24 个）：
 1. P0 环境变量优先级测试 (test_p0_env_priority.py)
 2. P1 标识符解析测试 (test_p1_ident_parsing.py)
 3. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
@@ -44,6 +44,10 @@ QA-01 统一测试入口
 18. 审查缺陷修复回归测试 (test_bugfix_20260929.py)
 19. 中文章节标题识别回归测试 (test_text_extract_headings.py)
 20. debug 批次分析器测试 (test_analyze_debug_batch.py)
+21. 真实排版布局回归测试 (test_real_layout_regressions_20260929.py)
+22. 题注识别修复回归测试 (test_bugfix_20260930.py)
+23. table_refine 边界测试 (test_table_refine_boundaries_20260930.py)
+24. 零 BUG 功能覆盖抽查 (test_zero_bug_coverage_20260930.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -392,6 +396,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     test_suites.append({
         "name": "真实排版布局回归 (20260929)",
         "path": TESTS_SCRIPTS_DIR / "test_real_layout_regressions_20260929.py",
+    })
+
+    # 2026-09-30 题注识别五修复回归（上角标假题注/字母编号/罗马守卫/复数区间/数字尾注）
+    test_suites.append({
+        "name": "题注识别修复回归 (20260930)",
+        "path": TESTS_SCRIPTS_DIR / "test_bugfix_20260930.py",
+    })
+    # 2026-09-30 table_refine 高频函数边界测试（BUG 频次榜首文件的对称反例）
+    test_suites.append({
+        "name": "table_refine 边界测试 (20260930)",
+        "path": TESTS_SCRIPTS_DIR / "test_table_refine_boundaries_20260930.py",
+    })
+    # 2026-09-30 零 BUG 功能覆盖抽查（特征化测试）
+    test_suites.append({
+        "name": "零 BUG 功能覆盖抽查 (20260930)",
+        "path": TESTS_SCRIPTS_DIR / "test_zero_bug_coverage_20260930.py",
     })
 
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，

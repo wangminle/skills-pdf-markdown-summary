@@ -39,14 +39,37 @@ logger = logging.getLogger(__name__)
 STAGE_COLORS = {
     'baseline': (0, 102, 255),      # 蓝色 - 锚点选择阶段的原始窗口
     'phase_a': (0, 200, 0),         # 绿色 - 文本裁切后
-    'phase_b': (255, 165, 0),       # 橙色 - 对象对齐后
-    'phase_d': (255, 102, 102),     # 浅红 - Autocrop 后的窗口
+    'phase_b': (255, 165, 0),       # 橙色 - 对象边界对齐后
+    'phase_d': (165, 82, 20),       # 烧橙棕 - Autocrop 后的窗口。暖轴上处于
+                                    # 橙与红之间（色相阶梯 39°→25°→0° 单调），以亮度差
+                                    # （L≈33% 对 final 亮红 50%）与正红分离，同色系不与
+                                    # 题注紫 285° 冲突——靛蓝曾反向破坏冷暖叙事且撞题注色相
     'final': (255, 0, 0),           # 纯红 - 最终采用窗口
     'fallback': (255, 255, 0),      # 黄色 - 验收失败回退
     'rejected': (255, 0, 255),      # 洋红 - 最终拒绝窗口
     'caption': (148, 0, 211),       # 紫色 - 图注位置
     'title': (255, 105, 180),       # 粉红 - 章节标题
     'paragraph': (255, 105, 180),   # 粉红 - 正文段落
+}
+
+# 线型体系按「确定性」分桶，与颜色正交：
+# - solid + 4pt：接近最终结果的窗口（phase_d/final）与终态判定
+#   （fallback/rejected），红系终态在嵌套框中一眼可辨；4pt 在 2x 渲染
+#   下 8px，与 2pt 虚线（4px）层级分明且少遮边缘内容（小资产边缘
+#   覆盖 24% 对 5pt 的 29%，边缘恰是截断诊断的关键区域）；
+# - dashed + 2pt：早期、依赖后续阶段校准的窗口（baseline/phase_a/
+#   phase_b），虚线细线表达"中间估计"；
+# - solid + 2pt：解析器直接导出的事实（题注/表注矩形、layout 标题块）。
+# 颜色用于区分阶段身份，线型/宽度用于区分确定性等级；未知阶段名按
+# 终态权重渲染，避免漏配时被画成细虚线而失焦。
+STAGE_LINE_STYLES = {
+    'baseline': ('dashed', 2),
+    'phase_a': ('dashed', 2),
+    'phase_b': ('dashed', 2),
+    'phase_d': ('solid', 4),
+    'final': ('solid', 4),
+    'fallback': ('solid', 4),
+    'rejected': ('solid', 4),
 }
 
 STAGE_DESCRIPTIONS = {
@@ -250,12 +273,16 @@ def save_debug_visualization(
 
         shape = temp_page.new_shape()
 
-        # 绘制所有阶段的边界框
+        # 绘制所有阶段的边界框：颜色区分阶段身份，线型/宽度区分确定性
         for stage in sorted_stages:
             r = stage.bbox
             color_normalized = tuple(c / 255.0 for c in stage.color)
+            style, width = STAGE_LINE_STYLES.get(stage.name, ('solid', 4))
             shape.draw_rect(r)
-            shape.finish(color=color_normalized, width=3)
+            if style == 'dashed':
+                shape.finish(color=color_normalized, width=width, dashes=[4, 3])
+            else:
+                shape.finish(color=color_normalized, width=width)
 
         # 绘制文本区块（如果提供了 layout_model）
         text_blocks_drawn = []
@@ -276,11 +303,11 @@ def save_debug_visualization(
                     shape.finish(color=pink_color, width=2)
                     text_blocks_drawn.append(block)
 
-        # 绘制 caption（紫色）
+        # 绘制 caption（紫色，解析器直接导出的事实 → 实线 2pt）
         caption_color = (148/255.0, 0, 211/255.0)
         if caption_rect is not None:
             shape.draw_rect(caption_rect)
-        shape.finish(color=caption_color, width=3)
+        shape.finish(color=caption_color, width=2)
 
         shape.commit()
 
@@ -352,7 +379,8 @@ def _write_legend_file(
             f.write("Caption: none (captionless continuation page)\n\n")
         else:
             f.write(f"Caption: {caption_rect.x0:.1f},{caption_rect.y0:.1f} -> {caption_rect.x1:.1f},{caption_rect.y1:.1f} "
-                    f"({caption_rect.width:.1f}×{caption_rect.height:.1f}pt)\n\n")
+                    f"({caption_rect.width:.1f}×{caption_rect.height:.1f}pt)\n")
+            f.write("Caption style: Solid line, 2pt, RGB(148, 0, 211) - parser-exported fact\n\n")
 
         # 写入文本区块信息（如果有）
         if text_blocks_drawn:
@@ -379,12 +407,22 @@ def _write_legend_file(
             f.write("=" * 70 + "\n\n")
 
         # 写入阶段信息
+        f.write("=" * 70 + "\n")
+        f.write("LINE STYLE TAXONOMY\n")
+        f.write("=" * 70 + "\n")
+        f.write("Solid + 4pt : near-final windows (phase_d/final) and terminal verdicts (fallback/rejected)\n")
+        f.write("Dashed + 2pt: early windows awaiting later-stage calibration (baseline/phase_a/phase_b)\n")
+        f.write("Solid + 2pt : parser-exported facts (caption rect, layout title blocks)\n\n")
+
         for stage in stages:
             r = stage.bbox
+            style, width = STAGE_LINE_STYLES.get(stage.name, ('solid', 4))
+            style_name = "Solid" if style == 'solid' else "Dashed"
             f.write(f"{stage.name}:\n")
             f.write(f"  Position: {r.x0:.1f},{r.y0:.1f} -> {r.x1:.1f},{r.y1:.1f}\n")
             f.write(f"  Size: {r.width:.1f}×{r.height:.1f}pt ({r.width * r.height / 72.0 / 72.0:.2f} sq.in)\n")
             f.write(f"  Color: RGB{stage.color}\n")
+            f.write(f"  Style: {style_name} line, {width}pt\n")
             f.write(f"  Description: {stage.description}\n\n")
 
 

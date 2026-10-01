@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from .pdf_backend import create_rect, open_pdf
 from .extract_helpers import collect_draw_items, collect_image_rects, collect_text_lines
+from .idents import line_text_skip_superscript
 from .pixel_detect import estimate_ink_ratio, estimate_region_ink_ratio
 
 if TYPE_CHECKING:
@@ -255,7 +256,7 @@ def compute_global_anchor(
                 if not spans:
                     continue
 
-                text = "".join(sp.get("text", "") for sp in spans)
+                text = line_text_skip_superscript(spans)
                 text_stripped = text.strip()
 
                 match = caption_pattern.match(text_stripped)

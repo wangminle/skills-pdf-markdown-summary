@@ -69,7 +69,7 @@
 - 修改 Python 脚本后，至少运行一次 `compileall` 或同等语法检查。
 - 测试数据、测试输出放入 `tests/`，不要写入 `design/2-ref/`。
 - 完成开发后如需进行实际 PDF 文档测试，优先使用 `tests/basic-benchmark/`（Basic Benchmark）中的 8 份 PDF（扁平存放于 `tests/basic-benchmark/*.pdf`）：1706.03762v7、Qwen3-Omni、2607.24653v2-Kimi-K3、FunAudio-ASR、gemini_v2_5、gpt-5-system-card、KearnsNevmyvakaHFTRiskBooks、DeepSeek_V41_Tech_Report。
-- **`tests/basic-benchmark/` 是只读目录**：只从中读取 PDF，**不要往里面写入任何测试结果、临时文件或调试产物**。测试输出统一写入 `tests/results/<yyyymmdd-xxx>/`。
+- **`tests/basic-benchmark/` 是只读目录**：只从中读取 PDF，**不要往里面写入任何测试结果、临时文件或调试产物**。测试输出统一写入 `tests/results/<yyyymmdd-xxx>/`。注意：`extract_pdf_assets.py` 在未传 `--out-text` 时默认回退写到 PDF 所在目录的 `text/`——跑 benchmark PDF 时**必须显式传 `--out-text`**，否则会违反只读约束（此默认回退已多次造成 `tests/basic-benchmark/text/` 违规产物）。
 - 实际测试输出统一写入 `tests/results/<yyyymmdd-xxx>/`，格式为日期加序号，如 `20260605-001`、`20260605-002`。
 - `tests/results/<yyyymmdd-xxx>/` 下按每个 PDF 名称建立独立结果目录，例如 `tests/results/20260605-001/<pdf-name>/`。
 - 每个 PDF 结果目录下应按输出类型分层保存：`markdown/` 存 Markdown，`assets/` 存通用资源，`images/` 存图片，`txt/` 存文本。
@@ -77,6 +77,7 @@
 - golden 基准（`tests/results/**/images/golden_index.json`）是变更检测器而非正确性基准；基准不纳入版本控制（tests/results/ 已 gitignore），clone 后需运行 `--update-golden` 本地生成；基准更新后在 `task-list.md` 逐条说明差异原因。
 - `tests/eval/` 是版本化评测器（非 pytest 套件），可复用指标计算放这里；一次性探索脚本与大体积产物放 `experiments/`。
 - `tests/annotations/` 存放人工 bbox 真值与标注规范（SCHEMA），标注产物不进 `design/2-ref/`。
+- debug 叠图做跨版本/跨批次对比前，必须先用机器判据标注产物代际：`grep -l "LINE STYLE TAXONOMY" <批次>/*/images/debug/*_stages_legend.txt | wc -l`（0 命中=旧体系 ≤V0.6.6，全命中=新三桶线型体系）；不要用 `"Style: Solid"` 判别（旧图例天然含该字样）。体系规范、新旧对照与判据详见 `design/4-analysis/debug视觉标注体系说明-20260930.md`；改动标线颜色/线型须同步该文档与功能编号 F23.008/011/012。
 
 ## 9. 功能模块全集与编号的持续维护
 

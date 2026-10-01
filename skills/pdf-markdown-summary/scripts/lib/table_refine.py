@@ -1377,6 +1377,36 @@ def expand_table_clip_to_text_bounds(
 # Qwen3-Omni Table 6/17 实测首行 size 5.5、紧贴表底。要求单个小写字母后
 # 跟标点或空白再接内容，避免 "a.k.a." 这类无空格缩写误匹配。
 _LETTER_NOTE_START_RE = re.compile(r"^[a-z][).]?\s+\S")
+# 数字脚注起始（"2 Grouped with table caption..."）：Uni-Parser Table 1
+# 实测尾注标记是独立小字号 span 但行 max-span 仍为 9pt，靠字号判不出来，
+# 只能靠数字标记 + 顺序性（1→2→3）识别。限 1-2 位数字防误吞年份开头的正文。
+# BUG-126：该正则同样命中 "7 Experimental details" 这类编号小节标题，
+# 因此识别时必须再施加起始与递增约束（见 _table_note_rects）。
+_DIGIT_NOTE_START_RE = re.compile(r"^(\d{1,2})[).]?\s+\S")
+
+
+def _note_marker_key(text: str):
+    """尾注标记的顺序键：字母取 ord、数字取 int；非标记返回 None。"""
+    if _LETTER_NOTE_START_RE.match(text):
+        return ord(text[0].lower())
+    m = _DIGIT_NOTE_START_RE.match(text)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _note_marker_kind(text: str):
+    """尾注标记的命名空间：'letter' / 'digit' / None。
+
+    BUG-128：字母正则 `^[a-z]` 会命中续行开头的英文冠词（"a random
+    subset…"），数字正则也会命中字母块里的数字起始行；两个命名空间
+    互不通用，异类起始行必须按普通续行处理，否则递增检查会误截断。
+    """
+    if _LETTER_NOTE_START_RE.match(text):
+        return "letter"
+    if _DIGIT_NOTE_START_RE.match(text):
+        return "digit"
+    return None
 
 
 def _table_note_rects(clip: Any, text_lines: List) -> List[Any]:
@@ -1390,14 +1420,17 @@ def _table_note_rects(clip: Any, text_lines: List) -> List[Any]:
     notes = []
     note_size = None
     start_y = None
-    last_letter_marker = None
+    last_marker_key = None
+    block_kind = None
+    marker_count = 0
+    aborted = False
     for rect, size, text in ordered:
         text = (text or "").strip()
         if not text or rect.x0 < clip.x0 - 8 or rect.x1 > clip.x1 + 8:
             continue
         if not notes:
             if not (re.match(r"^(?:Notes?[.:]|注[：:])", text, re.I)
-                    or _LETTER_NOTE_START_RE.match(text)):
+                    or _note_marker_key(text) is not None):
                 continue
             # 首行窗口须覆盖「尾注块已整体在框内」的二次调用：trim/far_side
             # 用扩边后的 clip 重新推导豁免时，首行距框底可达 尾注块高 64pt
@@ -1405,30 +1438,70 @@ def _table_note_rects(clip: Any, text_lines: List) -> List[Any]:
             # 尾注被反过来当正文裁掉（final y1 停在 741.2 的成因）。
             if not (clip.y1 - 84 <= rect.y0 <= clip.y1 + 12) or size > 10:
                 continue
+            # BUG-126：标记尾注块必须从 1 / a 开始，否则 "7 Experimental
+            # details" 这类编号小节标题会被当成尾注首行并把正文吞进表框。
+            first_key = _note_marker_key(text)
+            if first_key is not None and first_key not in (1, ord("a")):
+                continue
             notes.append(rect)
             note_size, start_y = size, rect.y0
-            if _LETTER_NOTE_START_RE.match(text):
-                last_letter_marker = text[0].lower()
+            last_marker_key = first_key
+            block_kind = _note_marker_kind(text)
+            marker_count = 1 if first_key is not None else 0
         else:
+            marker_key = _note_marker_key(text)
+            # BUG-129：首行不是标记（"Note:" / "注："开头）的块，续行里的
+            # "a random…" / "95 percent…" 只是折行文字，不能计作标记，否则
+            # 单标记续行限额会把整块判空。
+            if first_key is None:
+                marker_key = None
+            # BUG-128：数字/字母标记是两个命名空间，异类起始行按普通续行
+            # 处理——"a random subset…" 的冠词 a 不是数字块的新标记。
+            elif (marker_key is not None and block_kind is not None
+                    and _note_marker_kind(text) != block_kind):
+                marker_key = None
+            # BUG-129：字母块里非递增的 "a" 是冠词续行（单字母小写词只有 a），
+            # 不是重复编号；a→c 之类的真跳号不受影响，仍按断序处理。
+            elif (marker_key == ord("a") and block_kind == "letter"
+                    and last_marker_key is not None
+                    and marker_key != last_marker_key + 1):
+                marker_key = None
+            # BUG-126：续行若自带标记，必须严格递增（不再只在行框重叠时
+            # 检查），否则正常间距的 1→8 跳号也会被接成尾注。
+            if (marker_key is not None and last_marker_key is not None
+                    and marker_key != last_marker_key + 1):
+                aborted = True
+                break
             # 轻微重叠通常是同行外来文字，不能跨过去继续桥接正文。
-            # 仅 a→b→c 等明确连续的字母脚注允许这种重叠；Qwen T6/T17
-            # 的 c 行与 b 行 bbox 实测重叠 1.8pt。
+            # 仅 a→b→c / 1→2→3 等明确连续的脚注标记允许这种重叠；
+            # Qwen T6/T17 的 c 行与 b 行 bbox 实测重叠 1.8pt。
             if rect.y0 < notes[-1].y1 - 1:
                 overlap = notes[-1].y1 - rect.y0
-                letter_marker = text[0].lower() if _LETTER_NOTE_START_RE.match(text) else None
                 sequential_marker = (
-                    letter_marker is not None
-                    and last_letter_marker is not None
-                    and ord(letter_marker) == ord(last_letter_marker) + 1
+                    marker_key is not None
+                    and last_marker_key is not None
+                    and marker_key == last_marker_key + 1
                 )
                 if not sequential_marker or overlap > 0.5 * min(rect.height, notes[-1].height):
                     break
             if (rect.y0 - notes[-1].y1 > 4 or abs(size - note_size) > 1.5
                     or rect.y1 - start_y > 64 or text.startswith(("•", "Table ", "Figure "))):
                 break
+            # BUG-127：单标记块只允许 1 条续行（脚注折行），更多续行说明
+            # 是编号小节带正文（BUG-126），但合法的单条 ¹ 脚注必须保留。
+            if marker_key is None and marker_count == 1 and len(notes) >= 2:
+                aborted = True
+                break
             notes.append(rect)
-            if _LETTER_NOTE_START_RE.match(text):
-                last_letter_marker = text[0].lower()
+            if marker_key is not None:
+                last_marker_key = marker_key
+                marker_count += 1
+                if block_kind is None:
+                    block_kind = _note_marker_kind(text)
+    # BUG-126/127：单标记块只有在自然结束（行尽、间距/字号/高度守卫）时
+    # 才成立；被跳号或续行限额截断的，说明后面跟着正文或另一组编号。
+    if marker_count == 1 and aborted:
+        return []
     return notes
 
 

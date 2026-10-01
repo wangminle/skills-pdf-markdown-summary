@@ -31,6 +31,7 @@ from .idents import (
     TABLE_LINE_RE as DEFAULT_TABLE_LINE_RE,
     extract_figure_ident,
     extract_table_ident,
+    line_text_skip_superscript,
 )
 
 # 正文引用句式开头（"Table 8 shows that ..."）：段首恰好以编号对象开头、
@@ -280,9 +281,10 @@ def is_likely_reference_context(text: str) -> bool:
         # 与 _PERIOD_BODY_OPENER_ALT 同一口径：this/the 不算正文证据
         # （"Figure 1. The proposed architecture" 是题注），只有真正的接续词才算。
         rf'^(?:table|figure|fig\.?)\s+[A-Z]?\d+\s*\.\s*(?:{_PERIOD_BODY_OPENER_ALT})\b',
-        # 复数标签 + 编号并列（"Figures 3 and 4"）是正文引用的强信号，
-        # 真实 caption 极少以复数列举开头。
-        r'^(?:tables|tabs\.?|figures|figs\.?)\s+[a-z]?\d+\s+(?:and|,|;|–|-|to)\s+[a-z]?\d+\b',
+        # 复数标签 + 编号并列（"Figures 3 and 4" / "Figures A9-A11"）是正文
+        # 引用的强信号，真实 caption 极少以复数列举开头；连字符两侧允许零
+        # 空格（"A9-A11" 是最常见的区间写法）。
+        r'^(?:tables|tabs\.?|figures|figs\.?)\s+[a-z]?\d+\s*(?:and|,|;|–|-|to)\s*[a-z]?\d+\b',
         # 「标签 + 编号 + 描述动词 + that/how 从句」是正文句；限定 that/how
         # 是为了不误伤 "Figure 3 shows the architecture" 这类句式 caption。
         r'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s*[a-z]?\d+\s+(?:shows?|demonstrates?|illustrates?|compares?|presents?|summarizes?|reports?)\s+(?:that|how)\b',
@@ -367,7 +369,7 @@ def find_all_caption_candidates(
                 if not spans:
                     continue
 
-                text = "".join(sp.get("text", "") for sp in spans)
+                text = line_text_skip_superscript(spans)
                 text_stripped = text.strip()
 
                 match = pattern.match(text_stripped)

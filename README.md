@@ -3,7 +3,7 @@
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
 >
-> 当前版本 / Current version: **0.6.6**
+> 当前版本 / Current version: **0.6.7**
 
 ---
 
@@ -167,7 +167,7 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - Markdown block JSON 与 conversion report 输出。
 - 智能 caption 检测（位置/格式/结构/上下文评分）与 Figure/Table 分流精裁。
 - 图表截图支持 baseline 限制、文本裁切、对象对齐、列感知 X 收窄、版式驱动、autocrop、final 安全补边和 debug visual。
-- Table 专用多行表头回收、渲染横线补偿、强结构表格行带识别、宽度恢复、末行/换行尾行保护、远端章节标题裁除、底线外显式尾注恢复与外框线并入。
+- Table 专用多行表头回收、渲染横线补偿、强结构表格行带识别、宽度恢复、末行/换行尾行保护、远端章节标题裁除、底线外显式尾注恢复（含上角标数字脚注 ¹-N 及其顺序性校验）与外框线并入。
 - 双栏版式感知与伪双栏几何防护。
 - 完整流程复用首次提取产物，避免重复解析 PDF。
 - 可选 PyMuPDF4LLM Layout 后端，支持语义区域证据、全页一对一配对、多框合并与保守边界精修。
@@ -175,16 +175,16 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 四态质量评估（`lib/assess.py`）：截断与完整性质疑基于可见墨迹探测而非矢量路径外框，`review_required` / `rejected` 资产不进入 Markdown。
 - 跨页无题注续表自动恢复：续页标记、重复表头与横线三重证据一致时回收相邻页表格片段，未通过边界检查的片段标记待复核。
 - 题注对账（caption inventory）：显式题注与裸 `Figure N` / `Table N` 标签自动对账导出资产，缺口补裁后写入索引。
+- Markdown 图表就近插入：accepted 截图插到对应题注段落旁（内容在题注上方则图在题注前，否则在后），无匹配题注的资产追加到文末「提取资产」节。
 - `--prune-images` 安全化：仅清理运行前已存在且未被修改、未被当前索引引用的 PNG。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；当前回归基线为 371 passed、0 failed、0 skipped（2026-09-29 复验）。
+- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；当前回归基线为 522 passed、0 failed、0 skipped（2026-10-01 复验）。
 - Basic Benchmark 已完成多轮逐图 debug 排查，图表选取策略记录见 `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
 - 当前图表提取代码流程说明见 `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
 
 继续改进方向：
 
-- 图片按 caption 位置插入 Markdown。
 - pdfplumber 表格结构化输出。
 - OCR fallback（当前 CLI 保留 `--ocr` 参数，但生产流程仍依赖 PDF 文本层）。
 - 完成独立 holdout PDF 与人工 GT 标注，执行 A4 正式 KPI 评估。
@@ -345,7 +345,7 @@ Implemented:
 - Markdown block JSON and conversion report.
 - Smart caption detection (position/format/structure/context scoring) and separate Figure/Table crop refinement.
 - Figure/Table screenshots support baseline limiting, text trimming, object alignment, column-aware X clipping, layout-driven trimming, autocrop, final padding, and debug overlays.
-- Table-specific multiline header recovery, rendered-rule compensation, strong table-band detection, width restoration, tail-row protection, wrapped-tail preservation, far-side section-heading trimming, explicit table-note recovery below the bottom rule, and border-rule inclusion.
+- Table-specific multiline header recovery, rendered-rule compensation, strong table-band detection, width restoration, tail-row protection, wrapped-tail preservation, far-side section-heading trimming, explicit table-note recovery below the bottom rule (including superscript digit notes ¹-N with sequential-marker checks), and border-rule inclusion.
 - Double-column layout awareness and false-double-column geometry guards.
 - Full pipeline reuses the first extraction to avoid re-parsing the PDF.
 - Optional PyMuPDF4LLM Layout backend for semantic-region evidence, full-page one-to-one pairing, multi-frame grouping, and conservative boundary refinement.
@@ -353,16 +353,16 @@ Implemented:
 - Four-state quality assessment (`lib/assess.py`): truncation and completeness signals use visible-ink probes instead of raw vector path bounds; `review_required` / `rejected` assets stay out of Markdown.
 - Captionless cross-page table continuation recovery when continuation markers, repeated headers, and horizontal rules agree; fragments failing boundary checks are flagged for review.
 - Caption inventory reconciliation: explicit captions and bare `Figure N` / `Table N` labels are reconciled against exported assets; gaps get recovery crops and are indexed.
+- In-place asset placement: accepted Figure/Table screenshots are inserted next to their matching caption paragraph (before it when the crop sits above the caption, otherwise after); unmatched assets go to a trailing asset section.
 - Safe `--prune-images`: only PNGs that existed before the run, are unchanged, and are unreferenced by the current index are removed.
 - Complete CLI options reference (`references/cli-options.md`).
-- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; the current regression baseline is 371 passed, 0 failed, 0 skipped (reverified on 2026-09-29).
+- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; the current regression baseline is 522 passed, 0 failed, 0 skipped (reverified on 2026-10-01).
 - Multi-round Basic Benchmark visual review is recorded in `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
 - Current extraction flow diagrams are documented in `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.
 
 Planned:
 
-- Better asset placement in Markdown.
 - Structured table extraction.
 - OCR fallback (`--ocr` is reserved; production extraction currently relies on the PDF text layer).
 - An independently annotated holdout set and the formal A4 KPI evaluation.
