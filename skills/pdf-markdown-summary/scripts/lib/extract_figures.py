@@ -33,6 +33,7 @@ from .idents import FIGURE_LINE_RE, build_output_basename, extract_figure_ident,
 from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
     merge_caption_lines, is_caption_reference, is_likely_reference_context,
+    collect_caption_word_forms,
 )
 from .assess import (
     AssessmentInput,
@@ -66,6 +67,7 @@ from .figure_post import (
 )
 from .object_refine import merge_rects, refine_clip_by_objects
 from .pixel_detect import (
+    autocrop_x_range_with_object_support,
     build_text_masks_px,
     detect_content_bbox_pixels,
     make_ink_probe,
@@ -190,6 +192,7 @@ def extract_figures(
     pdf_name = os.path.basename(pdf_path)
     assert _doc is not None
     doc = _doc
+    caption_word_forms = collect_caption_word_forms(doc)
     os.makedirs(out_dir, exist_ok=True)
 
     records: List[AttachmentRecord] = []
@@ -207,7 +210,7 @@ def extract_figures(
             print(f"\n{'='*60}")
             print(f"SMART CAPTION DETECTION ENABLED")
             print(f"{'='*60}")
-        caption_index = build_caption_index(doc, figure_pattern=FIGURE_LINE_RE, table_pattern=None, debug=debug_captions)
+        caption_index = build_caption_index(doc, figure_pattern=FIGURE_LINE_RE, table_pattern=None, debug=debug_captions, word_forms=caption_word_forms)
         if debug_captions and caption_index:
             print(f"[CAPTION_INDEX] Built with {len(caption_index.candidates)} keys for figures")
 
@@ -266,7 +269,8 @@ def extract_figures(
         image_rects = collect_image_rects(dict_data, page_rect)
 
         # 查找 Figure captions
-        for blk in dict_data.get("blocks", []):
+        page_blocks = dict_data.get("blocks", [])
+        for blk_idx, blk in enumerate(page_blocks):
             if blk.get("type", 0) != 0:
                 continue
 
@@ -334,6 +338,8 @@ def extract_figures(
                 caption_block = merge_caption_lines(
                     blk, ln_idx, FIGURE_LINE_RE,
                     typical_line_h=typical_line_h,
+                    following_blocks=page_blocks[blk_idx + 1:],
+                    word_forms=caption_word_forms,
                 )
                 if caption_block is not None:
                     caption_bbox = caption_block.rect
@@ -638,7 +644,20 @@ def extract_figures(
                         if autocrop_h >= min_h_px and autocrop_h >= base_h * autocrop_shrink_limit:
                             final_clip = autocrop_clip
                         else:
-                            logger.debug(f"Figure {ident}: autocrop rejected (h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})")
+                            # 高度守卫否决的是 y 收缩；x 收窄若有原生对象
+                            # 支撑仍保留——栏位几何只能夹栏的内侧缘，外侧
+                            # 页边距留白只有像素证据能去掉（BUG-138）。
+                            x_only_clip = autocrop_x_range_with_object_support(
+                                clip, autocrop_clip, image_rects + vector_rects,
+                                text_lines=text_lines,
+                            )
+                            if x_only_clip is not None:
+                                final_clip = x_only_clip
+                            logger.debug(
+                                f"Figure {ident}: autocrop rejected "
+                                f"(h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})"
+                                + (", x range adopted" if x_only_clip is not None else "")
+                            )
                     except Exception as e:
                         logger.warning(f"Figure {ident}: autocrop failed: {e}")
 

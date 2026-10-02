@@ -21,7 +21,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | --- | --- | --- | --- |
 | `--pdf` | str | required | Source PDF path |
 | `--out` | str | `<stem>.md` | Output Markdown path |
-| `--asset-dir` | str | `images` | Image asset directory (relative to the Markdown output dir) |
+| `--asset-dir` | str | `images` | Image asset directory; relative paths resolve next to the Markdown output file (`--out out/paper.md --asset-dir assets` → `out/assets/`), absolute paths used as-is; the console prints the resolved absolute `Asset dir:` each run |
 | `--report-json` | str | none | Conversion report JSON output path |
 | `--blocks-json` | str | none | Markdown blocks JSON output path |
 | `--tables` | enum | `off` | Table handling: `off` / `auto` / `screenshot` / `structure` — `auto`, `screenshot`, and `structure` currently behave identically (screenshot export); `structure` is a roadmap placeholder, not yet implemented |
@@ -47,7 +47,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | --- | --- | --- | --- |
 | `--pdf` | str | required | Source PDF path |
 | `--out` | str | `<stem>.md` | Output Markdown path |
-| `--asset-dir` | str | `images` | Image asset directory |
+| `--asset-dir` | str | `images` | Image asset directory (relative paths resolve next to the Markdown output file, same convention as `pdf_to_markdown`) |
 | `--preset` | enum | `robust` | Parameter preset |
 | `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
 | `--ocr` | enum | `off` | OCR mode (same as above: currently a pure no-op) |

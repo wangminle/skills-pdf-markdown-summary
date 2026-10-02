@@ -50,6 +50,8 @@ text/
 - Do not drop tables if structure extraction fails; use image fallback.
 - Keep Markdown paths relative to the Markdown file location.
 - Insert accepted Figure/Table screenshots next to the matching caption paragraph. If the crop sits above the caption, place the image immediately before that paragraph; otherwise place it immediately after. Assets without a matching caption still go to a trailing `## 提取资产` section.
+- When a screenshot is inserted, body text lines fully covered by the asset bbox are suppressed from the Markdown; explicit captions and out-of-frame text are kept. Each asset's embed status (`referenced_in_markdown` / `embed_mode` / `suppressed_text_blocks`) is written back to `images/index.json`.
+- Image destinations are URL-encoded on demand and caption alt text escapes backslashes and brackets, so directories with spaces and half-open-interval captions (e.g. `(0, 1]`) still form valid image syntax; file names stay untouched.
 - Use `--debug-visual` through `scripts/extract_pdf_assets.py` when figure/table crop quality needs diagnosis.
 
 ## Quality Checks
@@ -61,3 +63,4 @@ Check:
 - `conversion_report.json` is valid JSON.
 - `assets.exit_code` is `0` when asset extraction was enabled and completed successfully; it is `null` when assets were disabled. A non-zero value must be paired with top-level `status: failed`. With a zero exit code, top-level `status` is `review` when `assets.omitted` is non-empty (review/rejected assets kept out of the Markdown) and `ready` otherwise.
 - Every `images/...` link points to an existing file.
+- Every exported asset's embed status in `images/index.json` matches the Markdown: inserted assets report `referenced_in_markdown: true` with an `embed_mode`, and the console prints the extracted/embedded/omitted summary.

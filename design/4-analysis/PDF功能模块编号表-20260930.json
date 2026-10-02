@@ -78,7 +78,7 @@
   {
    "id": "F12",
    "name": "对象与像素精裁",
-   "count": 11
+   "count": 12
   },
   {
    "id": "F13",
@@ -123,7 +123,7 @@
   {
    "id": "F21",
    "name": "Markdown 构建与渲染",
-   "count": 18
+   "count": 20
   },
   {
    "id": "F22",
@@ -153,18 +153,18 @@
  ],
  "stats": {
   "runtime_files": 54,
-  "testing_files": 34,
-  "runtime_features": 334,
+  "testing_files": 35,
+  "runtime_features": 337,
   "testing_features": 60,
-  "definitions": 1236,
-  "definition_coverage": 1236
+  "definitions": 1316,
+  "definition_coverage": 1316
  },
  "source_sha256": {
-  "skills/pdf-markdown-summary/scripts/__init__.py": "b3728c440e40835d2154004f1ea1c0ef9e6747ef4c94fbacf8c84b15430c501b",
+  "skills/pdf-markdown-summary/scripts/__init__.py": "c976c888af8a390fecb3920359b39b2e62a595377ea66822bd6387eafe1ba071",
   "skills/pdf-markdown-summary/scripts/core/__init__.py": "873a743bfba2d72093fb14483ed6edff8d3c4cfac0139f1e0174fa13510538b5",
   "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py": "89eea2080918b56c3a34d555c1017d5bba72bc202447b05201f73fdc1e807172",
-  "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py": "ed317882130b04bc1aa48f84f1193a4e7d265f043bf378787b6c35954c3dfb88",
-  "skills/pdf-markdown-summary/scripts/core/process_pdf.py": "1e06a27d61b51da5f2090889dd8af824a977fca7238cdcb84fcd60798cdf26c2",
+  "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py": "d4363fb5bd71b74d4d6406da2caeb76c3c12e87197a4791b90c68c4fc6541a68",
+  "skills/pdf-markdown-summary/scripts/core/process_pdf.py": "c7a6f7a24580d966eb9b65b6555fbf2b0773e5d9178a4690a3fc7db58208ee07",
   "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py": "7f73abe315840d1859480c9d9c62e1d60534a0f737648c7012ea28f1616913ae",
   "skills/pdf-markdown-summary/scripts/extract_pdf_assets.py": "cf9b9b9178944e5bf9649a96ed36850be07703839d896cea06b6af161b0dd5ad",
   "skills/pdf-markdown-summary/scripts/lib/__init__.py": "a901f7e177f5dbb289f71d5d725f8c2c858c47117751ffab5ea27089817f9588",
@@ -174,14 +174,14 @@
   "skills/pdf-markdown-summary/scripts/lib/backends/__init__.py": "cff6450e9003d8a1596988e451334fe9ab9876cea0267b24f8bf17be7c3c42fe",
   "skills/pdf-markdown-summary/scripts/lib/backends/base.py": "8fedf1dbc64c35521ede91999118d86dfd2f73cc28d020f47bb8875d311a876f",
   "skills/pdf-markdown-summary/scripts/lib/backends/pymupdf_layout.py": "36274d65adda9fe31891e4f346e2a51c4069a9abb28e957ebed6b42c53f9716a",
-  "skills/pdf-markdown-summary/scripts/lib/caption_detection.py": "ff377f703942bf9ff9d74389b720032a9cb084c739eb6bf214b8764d3ede50e4",
+  "skills/pdf-markdown-summary/scripts/lib/caption_detection.py": "c0183986b5cfdcb17d75513bf2f53189be6a8e7e9a36237ead7aad52603e1a63",
   "skills/pdf-markdown-summary/scripts/lib/clip_limit.py": "9a023d4e1bfaaab907fadc6ca6df78b892a06692b5fa54757cfdb000f83592d8",
   "skills/pdf-markdown-summary/scripts/lib/debug_visual.py": "eb36a3f2eaf653cd5d30d3454a64f90b5a88bb283ac6032374d9588ea16f3e57",
   "skills/pdf-markdown-summary/scripts/lib/direction.py": "0a2d6b27c7209aaab8b8bae0caa8219617e4b4109d1a65552a03686e89c1afc1",
   "skills/pdf-markdown-summary/scripts/lib/env_priority.py": "563a7bf493027261877397b2a9107d6cba135c38e53f9a36a74de396d5ef2b17",
-  "skills/pdf-markdown-summary/scripts/lib/extract_figures.py": "8f788cdcb66bf901d0210c8876ca9627f1f8065c532af360f43fcce56878c667",
+  "skills/pdf-markdown-summary/scripts/lib/extract_figures.py": "b58f5380c5adf6266c1544158abe8fdc36a04ff397fe1814e72ca853f4628934",
   "skills/pdf-markdown-summary/scripts/lib/extract_helpers.py": "59178b4f92f4352639642c9c80884ddc7f4ea51e6bf50fc68760d14437f26835",
-  "skills/pdf-markdown-summary/scripts/lib/extract_tables.py": "8158f234d018785c4085f2996f34f757d28fb6820a23ecede606edc65863c602",
+  "skills/pdf-markdown-summary/scripts/lib/extract_tables.py": "3873e55bc7f59b3c2bf2fde84ad539a3443c2c5162bd7098d35e085cebac5422",
   "skills/pdf-markdown-summary/scripts/lib/extraction_logger.py": "ee90ad0fdc27930b12526fd7f6fbe9c7953ced6276183e0b19f8852986a4fde8",
   "skills/pdf-markdown-summary/scripts/lib/far_side.py": "61c159562d7ab5416f3d19e02602c8b55798c7b37a39191858fcc6958cce903b",
   "skills/pdf-markdown-summary/scripts/lib/figure_contexts.py": "91bcdc00ede72a260569894c8990f565dc8acae21fea82a460e5daead4aebcb8",
@@ -189,7 +189,7 @@
   "skills/pdf-markdown-summary/scripts/lib/idents.py": "f86e0be791dda34749ce2766c19d83695fcf5c87c4ad1e94cf8aa78b5b6e65f2",
   "skills/pdf-markdown-summary/scripts/lib/layout_integration.py": "6151370c7de69a2f4ca7eae1e7b31fcfa1709cb31b4dbb0b2ea53f408fb4ac13",
   "skills/pdf-markdown-summary/scripts/lib/layout_model.py": "048ef07723e08b94a9b3d5f1d992538e28cd61ca6b692ddea3511ed6bcd2ebc7",
-  "skills/pdf-markdown-summary/scripts/lib/markdown.py": "edf05eb3461655058f0d8646addd745929a1fd64bb304f39f97104ccd5848dcb",
+  "skills/pdf-markdown-summary/scripts/lib/markdown.py": "5039d2805890243f9199c7ce2226958ffe53a0f62bce279b3981d67679334b67",
   "skills/pdf-markdown-summary/scripts/lib/markdown_models.py": "badeabae85a9562103ab960bb1af6fe6f755730aa2ddc17fb1020021a8e3ea56",
   "skills/pdf-markdown-summary/scripts/lib/markdown_render.py": "9399ecdbba0a7cd1d7fa23e8d01fb341537d883fbd3a33370c183dbd9f0ef720",
   "skills/pdf-markdown-summary/scripts/lib/models.py": "35fdf86ec42e27b9e8ae8153f111f540fa02ad15de38bb434bd1a6e75bee44a1",
@@ -199,7 +199,7 @@
   "skills/pdf-markdown-summary/scripts/lib/pairing.py": "238a8c552068e2dce4e57f666285f63110fbef4ae4b29ca53ee590ad4dcb67e6",
   "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py": "d32b3a771502f95ed8462506cdcef5577ea2158b0d371da955de3230195e7470",
   "skills/pdf-markdown-summary/scripts/lib/pipeline.py": "69c02b5ac98418f20d8582d7e3db3499b68988695b2d06bdd8c60de82c1cfc78",
-  "skills/pdf-markdown-summary/scripts/lib/pixel_detect.py": "63e79b53b8b161143b2ce4d5e4df5e1bd0e54ab45ae01cf516fad140917c6dc6",
+  "skills/pdf-markdown-summary/scripts/lib/pixel_detect.py": "06934111607e6bf6152a1bdaacb81fa228e22fd0cf9c7f3a9c8a359a7bda90ca",
   "skills/pdf-markdown-summary/scripts/lib/quality.py": "9e394f7de212d59ed921f854c91fcf107587284a5964484cd863b8cfbd6b32e6",
   "skills/pdf-markdown-summary/scripts/lib/refine.py": "f1ac36f8c3efc75bcc57f08762ab5e0b8f277d47eaf128515be122b1bf816880",
   "skills/pdf-markdown-summary/scripts/lib/refiners/__init__.py": "ade83af47d63490980540d851ac3b92c9b3253e0b3a1400c838ca33f97ce0aee",
@@ -216,7 +216,7 @@
   "skills/pdf-markdown-summary/scripts/summarize_pdf.py": "60f545934dfe142c2b4b41314d5033b2ab7001d16ffa945bf635a3e884884379",
   "tests/scripts/analyze_debug_batch.py": "546bfcc8c63171416d19af387597e0c89af2554d4ff1c5295062263eb3cdb255",
   "tests/scripts/conftest.py": "258a041d92fea78cb0243ed48b55c7abf29c3c80a32af252a59aafd460db13dd",
-  "tests/scripts/run_all.py": "c1fe328d77056dc72e9f3be0d8867eb2f0ab6536aa7a662ebac3097492a816d2",
+  "tests/scripts/run_all.py": "c97c0475fdab5101bb1c4c1cacdc349f981ae78745fff07ae9f7c536e15aeedd",
   "tests/scripts/test_a2_a3_fixes.py": "26c4910aac42549da5aeefb1977fb38b67f4408897151b2415b0e45a0ee3a325",
   "tests/scripts/test_analyze_debug_batch.py": "53246d0b21e6902ebb8e590d97a2c5440f121883ee34f9191674524180ffcd62",
   "tests/scripts/test_bugfix_20260928.py": "c321dd9fdb87df982a47e9782c9b9bbe3293d7c30020cb93f41fa29c56941de8",
@@ -227,7 +227,7 @@
   "tests/scripts/test_maintenance_fixes.py": "3e6f4ceb5bf47529dc32e2e117f6913a8a9205a9943e256d5c5928f19ae91c94",
   "tests/scripts/test_p0_env_priority.py": "7eaf492e4635f1c29b4a91ff19e27b44ab4eb7f14ca1a194b75278a119b6f00f",
   "tests/scripts/test_p1_ident_parsing.py": "4b945a88e13f1cf14f181b1fade88c5f94a8f2112688e28c95df6cfaec406dab",
-  "tests/scripts/test_pdf_to_markdown_cli.py": "7bfc1a3076c3f6ad2a65bdf7e464b7ba41a823fc978979e024e2f486ca67f7b4",
+  "tests/scripts/test_pdf_to_markdown_cli.py": "45aef87f92880263e2ef22c403c8c42875473f9ee510990c5960e7807bd3f8f5",
   "tests/scripts/test_qa03_debug_artifacts.py": "0b823dff88998bb1f797fb610559c205a1d8e19837499886250d88e18859ea3f",
   "tests/scripts/test_qa04_structured_log.py": "82a2f204541e5c833f61af114c0aaf6610993b3b9d147746f567a60cff0f4084",
   "tests/scripts/test_real_layout_regressions_20260929.py": "e7c6410d5a9adb113a25c9e805627938282d3d4f1f3e4a397435cd957766b3bf",
@@ -247,7 +247,8 @@
   "tests/eval/selfcheck.py": "39237a85d749cc12cf261eb7710018d712d611decd1f06d9e9bcafa268afab6e",
   "tests/scripts/test_bugfix_20260930.py": "a8ba1a9e72a18a085ce8fe5f9d911b1229ca89555e38484c01ac592894599c9f",
   "tests/scripts/test_table_refine_boundaries_20260930.py": "9bbf4fd91bc874b3e747c8c9264abae6ae219fb70ac288eaf68990efbd97b8f9",
-  "tests/scripts/test_zero_bug_coverage_20260930.py": "497ad2197e8be90824b2d321225c3bbac83d6edf3cefe13b83c2049b1eadb4ed"
+  "tests/scripts/test_zero_bug_coverage_20260930.py": "497ad2197e8be90824b2d321225c3bbac83d6edf3cefe13b83c2049b1eadb4ed",
+  "tests/scripts/test_bugfix_20261001.py": "817a7ffe31432b4cb850bcfdeb3129c1342da894b047707d62090e4e113bbc62"
  },
  "features": [
   {
@@ -497,13 +498,13 @@
      "file": "skills/pdf-markdown-summary/scripts/core/process_pdf.py",
      "symbol": "parse_args",
      "line": 20,
-     "end": 28
+     "end": 29
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/core/process_pdf.py",
      "symbol": "main",
-     "line": 31,
-     "end": 82
+     "line": 32,
+     "end": 83
     }
    ],
    "inputs": "PDF、输出参数",
@@ -522,8 +523,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/process_pdf.py",
      "symbol": "_load_sibling_main",
-     "line": 85,
-     "end": 92
+     "line": 86,
+     "end": 93
     }
    ],
    "inputs": "文件名、模块名",
@@ -2512,26 +2513,26 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "_unwrap_page",
-     "line": 55,
-     "end": 56
+     "line": 124,
+     "end": 125
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "_unwrap_doc",
-     "line": 59,
-     "end": 60
+     "line": 128,
+     "end": 129
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "get_page_images",
-     "line": 63,
-     "end": 85
+     "line": 132,
+     "end": 154
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "get_page_drawings",
-     "line": 88,
-     "end": 111
+     "line": 157,
+     "end": 180
     }
    ],
    "inputs": "页面/文档适配对象",
@@ -2550,26 +2551,26 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "_period_tail_reads_as_body",
-     "line": 217,
-     "end": 223
+     "line": 286,
+     "end": 292
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "is_explicit_caption_format",
-     "line": 226,
-     "end": 244
+     "line": 295,
+     "end": 313
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "is_bare_caption_label",
-     "line": 247,
-     "end": 253
+     "line": 316,
+     "end": 322
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "is_caption_anchor_candidate",
-     "line": 256,
-     "end": 258
+     "line": 325,
+     "end": 327
     }
    ],
    "inputs": "单行文字",
@@ -2583,25 +2584,25 @@
   {
    "group": "07",
    "name": "题注与正文引用语义区分",
-   "description": "规则识别 as shown、see、并列图号、that/how 从句、中文引用等；显式题注优先，描述类动词提供题注语义信号。",
+   "description": "规则识别 as shown、see、并列图号、that/how 从句、中文引用等；显式题注优先，描述类动词提供题注语义信号。 描述动词集合与合并守卫共享，含 describes/indicates/suggests 等；that/how 从句或句点后续句判为正文引用。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "is_likely_reference_context",
-     "line": 261,
-     "end": 303
+     "line": 330,
+     "end": 372
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "is_likely_caption_context",
-     "line": 306,
-     "end": 331
+     "line": 375,
+     "end": 400
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "is_caption_reference",
-     "line": 831,
-     "end": 885
+     "line": 983,
+     "end": 1037
     }
    ],
    "inputs": "文本、block、pattern",
@@ -2615,13 +2616,13 @@
   {
    "group": "07",
    "name": "逐页题注候选定位与多行聚合",
-   "description": "扫描文本行行首模式，解析 kind 专用编号，定位 block/line/spans；成功合并多行时采用合并区域，否则保留首行。",
+   "description": "扫描文本行行首模式，解析 kind 专用编号，定位 block/line/spans；成功合并多行时采用合并区域，否则保留首行。 题注合并共享全文完整词形证据，与提取层拼写一致。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "find_all_caption_candidates",
-     "line": 338,
-     "end": 409
+     "line": 407,
+     "end": 487
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/idents.py",
@@ -2646,14 +2647,14 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "min_distance_to_rects",
-     "line": 165,
-     "end": 186
+     "line": 234,
+     "end": 255
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "score_caption_candidate",
-     "line": 416,
-     "end": 572
+     "line": 494,
+     "end": 650
     }
    ],
    "inputs": "candidate、图形区域",
@@ -2672,26 +2673,26 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "is_bold_text",
-     "line": 150,
-     "end": 162
+     "line": 219,
+     "end": 231
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "get_next_line_text",
-     "line": 114,
-     "end": 130
+     "line": 183,
+     "end": 199
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "get_paragraph_length",
-     "line": 133,
-     "end": 147
+     "line": 202,
+     "end": 216
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "score_caption_candidate",
-     "line": 416,
-     "end": 572
+     "line": 494,
+     "end": 650
     }
    ],
    "inputs": "candidate spans/block/text",
@@ -2710,8 +2711,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "score_caption_candidate",
-     "line": 416,
-     "end": 572
+     "line": 494,
+     "end": 650
     }
    ],
    "inputs": "candidate、图像/绘图证据",
@@ -2730,8 +2731,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "select_best_caption",
-     "line": 579,
-     "end": 641
+     "line": 657,
+     "end": 719
     }
    ],
    "inputs": "候选列表、当前页、可选 doc、min_score",
@@ -2745,13 +2746,13 @@
   {
    "group": "07",
    "name": "全文图表题注索引预建",
-   "description": "遍历全文分别定位并评分 Figure/Table 候选，按 kind_number 归组；默认模式和显式 False 跳过类型检测分开。",
+   "description": "遍历全文分别定位并评分 Figure/Table 候选，按 kind_number 归组；默认模式和显式 False 跳过类型检测分开。 全文未跨行词形只收集一次并复用于候选合并，可由调用者传入现有词形集。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "build_caption_index",
-     "line": 648,
-     "end": 713
+     "line": 726,
+     "end": 795
     }
    ],
    "inputs": "文档、图/表模式或关闭标记",
@@ -2765,19 +2766,33 @@
   {
    "group": "07",
    "name": "题注续行合并与停止规则",
-   "description": "同块续行按 y 间距、字号、x 重叠、最大续行数合并；遇新图/表题注停止，保留首行框。",
+   "description": "同块续行按 y 间距、字号、x 重叠、最大续行数合并；块内行耗尽且文本以未完信号结尾时可跨紧邻同栏文本块续行（同守卫、每跨一整块需再现信号；未完功能词带词边界，ImageNet/data 等完整词尾不误判）；遇新图/表题注停止，保留首行框。 描述动词开头的真题注保留续行，正文拒绝复用共享引用语境判据。 跨行断词优先比较全文未跨行的完整带/不带连字符词形（ProgramBench、reasoning-intensive）；两者都有证据时保留连字符，无证据时沿用复合前缀启发式。索引与图/表提取复用该规则。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
+     "symbol": "collect_caption_word_forms",
+     "line": 79,
+     "end": 87
+    },
+    {
+     "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
+     "symbol": "_join_caption_text",
+     "line": 90,
+     "end": 114
+    },
+    {
+     "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "merge_caption_lines",
-     "line": 720,
-     "end": 824
+     "line": 802,
+     "end": 976
     }
    ],
    "inputs": "block、首行、pattern、限值",
    "outputs": "CaptionBlock 或 None",
    "mode": "默认",
-   "depends": [],
+   "depends": [
+    "F07.010"
+   ],
    "key": "07/题注续行合并与停止规则",
    "scope": "runtime",
    "id": "F07.017"
@@ -2785,19 +2800,21 @@
   {
    "group": "07",
    "name": "正文引用假题注大块拒绝",
-   "description": "对 Table/Figure 编号后 shows/demonstrates 等正文句式不返回多行题注块，避免假题注成为方向邻居；调用者回退首行。",
+   "description": "描述动词开头且共享引用语境判据确认的 that/how 从句或多句正文不返回多行题注块，避免成为方向邻居，调用者回退首行；shows the architecture 等真题注正常合并。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
      "symbol": "merge_caption_lines",
-     "line": 720,
-     "end": 824
+     "line": 802,
+     "end": 976
     }
    ],
    "inputs": "首行文字及候选多行块",
    "outputs": "None 或真实题注块",
    "mode": "默认",
-   "depends": [],
+   "depends": [
+    "F07.010"
+   ],
    "key": "07/正文引用假题注大块拒绝",
    "scope": "runtime",
    "id": "F07.018"
@@ -3065,13 +3082,13 @@
   {
    "group": "09",
    "name": "Figure参数与预扫描准备",
-   "description": "整理显式方向和no-refine集，按开关建立题注索引、典型行高自适应阈值及全局锚点。",
+   "description": "整理显式方向和no-refine集，按开关建立题注索引、典型行高自适应阈值及全局锚点。 收集全文词形用于索引与题注合并，关闭智能题注检测时仍使用词形证据。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3090,8 +3107,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3110,8 +3127,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3130,8 +3147,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3150,8 +3167,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3170,8 +3187,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3185,13 +3202,13 @@
   {
    "group": "09",
    "name": "Figure掩码autocrop与最终后处理",
-   "description": "按条件遮文字后像素收边，结合远端正文、类型补全、文字/规则线约束生成final；不保证无条件最小框。",
+   "description": "按条件遮文字后像素收边，结合远端正文、类型补全、文字/规则线约束生成 final；不保证无条件最小框。高度守卫否决时仅在对象面积支撑且原框内文字保全通过后单独采用 x 收窄（F12.012）。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3210,8 +3227,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3230,8 +3247,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3250,8 +3267,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3270,8 +3287,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3290,8 +3307,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3310,8 +3327,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3330,8 +3347,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
      "symbol": "extract_figures",
-     "line": 101,
-     "end": 901
+     "line": 103,
+     "end": 920
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3345,13 +3362,13 @@
   {
    "group": "10",
    "name": "Table参数与预扫描准备",
-   "description": "整理显式方向和no-refine集，按开关建立题注索引、典型行高自适应阈值及全局锚点。",
+   "description": "整理显式方向和no-refine集，按开关建立题注索引、典型行高自适应阈值及全局锚点。 收集全文词形用于索引与题注合并，关闭智能题注检测时仍使用词形证据。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3370,8 +3387,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3390,8 +3407,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3410,8 +3427,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3430,8 +3447,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3450,8 +3467,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3470,8 +3487,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3490,8 +3507,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3510,8 +3527,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3530,8 +3547,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3550,8 +3567,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3570,8 +3587,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3590,8 +3607,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3610,8 +3627,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3630,8 +3647,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -3650,8 +3667,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
      "symbol": "extract_tables",
-     "line": 106,
-     "end": 1047
+     "line": 107,
+     "end": 1053
     }
    ],
    "mode": "默认（按参数或证据条件触发）",
@@ -4283,6 +4300,28 @@
    "key": "12/文字到局部像素遮罩",
    "scope": "runtime",
    "id": "F12.011"
+  },
+  {
+   "group": "12",
+   "name": "autocrop否决时X收窄对象支撑采用",
+   "description": "autocrop 被高度守卫否决时，仅在像素横向收窄带获原生对象面积支撑（≥50%）且不会丢失原框内文字时单独采用 x、保留原 y；收窄不足10pt、带宽低于30%或无原生对象时保持原行为。文字守卫覆盖图内及图旁上下邻近标签，完全或部分移出新框均拒绝；原框外正文不参与。",
+   "refs": [
+    {
+     "file": "skills/pdf-markdown-summary/scripts/lib/pixel_detect.py",
+     "symbol": "autocrop_x_range_with_object_support",
+     "line": 475,
+     "end": 521
+    }
+   ],
+   "mode": "默认（按参数或证据条件触发）",
+   "inputs": "原框、autocrop框、原生对象、原生文字行及宽度/面积阈值",
+   "outputs": "原框文字完整保留的横向收窄框，或 None",
+   "depends": [
+    "F12.010"
+   ],
+   "key": "12/autocrop否决时X收窄对象支撑采用",
+   "scope": "runtime",
+   "id": "F12.012"
   },
   {
    "group": "13",
@@ -6937,13 +6976,13 @@
   {
    "group": "21",
    "name": "Markdown转换参数契约",
-   "description": "声明PDF/MD/asset/report/blocks路径、图模式、表off/auto/screenshot/structure、OCR和robust预设；结构/OCR声明不能视为已实现能力。",
+   "description": "声明PDF/MD/asset/report/blocks路径、图模式、表off/auto/screenshot/structure、OCR和robust预设；--asset-dir 相对路径以 Markdown 输出目录为基准并在帮助与控制台说明；结构/OCR声明不能视为已实现能力。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "parse_args",
      "line": 25,
-     "end": 39
+     "end": 40
     }
    ],
    "inputs": "CLI",
@@ -6962,8 +7001,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_resolve_outputs",
-     "line": 42,
-     "end": 64
+     "line": 43,
+     "end": 65
     }
    ],
    "inputs": "参数",
@@ -6977,13 +7016,13 @@
   {
    "group": "21",
    "name": "结构化段落转文档块",
-   "description": "预验证并获取正式结构化文本，按页插page_break，heading标h2否则paragraph，跳过空文本；记录文本层和验证告警。",
+   "description": "预验证并获取正式结构化文本，按页插page_break，heading标h2否则paragraph，跳过空文本；段落 bbox 写入块 meta 供资产覆盖抑制；记录文本层和验证告警。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_paragraphs_to_document",
-     "line": 67,
-     "end": 100
+     "line": 68,
+     "end": 103
     }
    ],
    "inputs": "PDF、title",
@@ -7002,14 +7041,14 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_filter_assets_by_mode",
-     "line": 103,
-     "end": 109
+     "line": 106,
+     "end": 112
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_split_assets_for_markdown",
-     "line": 112,
-     "end": 146
+     "line": 115,
+     "end": 149
     }
    ],
    "inputs": "items、参数",
@@ -7028,8 +7067,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_run_asset_extraction",
-     "line": 149,
-     "end": 184
+     "line": 152,
+     "end": 187
     }
    ],
    "inputs": "PDF、asset/text路径",
@@ -7048,14 +7087,14 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_caption_ident_for_kind",
-     "line": 187,
-     "end": 208
+     "line": 190,
+     "end": 211
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_asset_kind_matches_text",
-     "line": 232,
-     "end": 241
+     "line": 238,
+     "end": 247
     }
    ],
    "inputs": "kind、题注文本",
@@ -7074,8 +7113,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_block_is_caption_for_asset",
-     "line": 244,
-     "end": 269
+     "line": 250,
+     "end": 275
     }
    ],
    "inputs": "Markdown块、资产",
@@ -7089,13 +7128,13 @@
   {
    "group": "21",
    "name": "相对资源链接与图片块构造",
-   "description": "优先current_file再file，index目录解析绝对图片再计算相对MD路径，存caption/page和完整asset元数据；无文件跳过。",
+   "description": "按 index.json 相对路径解析资源并生成 image 块，链接相对于 Markdown 目录；file 字段缺失或 PNG 不存在时返回 None，不产死链图片块。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_make_image_block",
-     "line": 211,
-     "end": 229
+     "line": 214,
+     "end": 235
     }
    ],
    "inputs": "asset、MD/index位置",
@@ -7109,19 +7148,25 @@
   {
    "group": "21",
    "name": "题注附近图表插入与排序稳定",
-   "description": "每条题注块最多匹配一个资产；final框底边不低于caption顶边+2pt时插在题注前，否则插后，缺有效框也插后。逆序修改避免索引偏移，未匹配转文末。",
+   "description": "每条题注块最多匹配一个资产；final框底边不低于caption顶边+2pt时插在题注前，否则插后，缺有效框也插后。逆序修改避免索引偏移，未匹配转文末；插入时触发框内正文抑制并返回 inline/appendix/suppressed 放置摘要；index 引用 PNG 缺失的资产按 missing_file 移入 omitted，不插死链、不参与抑制、不计入已嵌入。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_content_is_above_caption",
-     "line": 272,
-     "end": 277
+     "line": 278,
+     "end": 283
+    },
+    {
+     "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+     "symbol": "_blocks_covered_by_assets",
+     "line": 299,
+     "end": 339
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_place_assets_in_document",
-     "line": 293,
-     "end": 327
+     "line": 342,
+     "end": 430
     }
    ],
    "inputs": "文档、资产",
@@ -7140,8 +7185,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_append_asset_section",
-     "line": 280,
-     "end": 290
+     "line": 286,
+     "end": 296
     }
    ],
    "inputs": "无法锚定资产",
@@ -7160,8 +7205,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "main",
-     "line": 330,
-     "end": 403
+     "line": 541,
+     "end": 636
     }
    ],
    "inputs": "PDF、转换参数",
@@ -7175,13 +7220,13 @@
   {
    "group": "21",
    "name": "转换报告质量和失败传播",
-   "description": "提取失败=failed、有omitted=review、其余ready；报告含实际提取/插入数、遗漏和索引；即使资产失败已写MD/报告，仍返回其非0码。",
+   "description": "提取失败=failed、有omitted=review、其余ready；报告含实际提取/插入数、embedded/inline/appendix 与 omitted_reasons 汇总；即使资产失败已写MD/报告，仍返回其非0码。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "main",
-     "line": 330,
-     "end": 403
+     "line": 541,
+     "end": 636
     }
    ],
    "inputs": "转换过程结果",
@@ -7200,8 +7245,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "main",
-     "line": 330,
-     "end": 403
+     "line": 541,
+     "end": 636
     }
    ],
    "inputs": "OCR参数",
@@ -7221,13 +7266,13 @@
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "parse_args",
      "line": 25,
-     "end": 39
+     "end": 40
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
      "symbol": "_run_asset_extraction",
-     "line": 149,
-     "end": 184
+     "line": 152,
+     "end": 187
     }
    ],
    "inputs": "tables模式",
@@ -7246,26 +7291,26 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "MarkdownBlock",
-     "line": 12,
-     "end": 32
+     "line": 13,
+     "end": 33
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "MarkdownBlock.to_dict",
-     "line": 23,
-     "end": 32
+     "line": 24,
+     "end": 33
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "MarkdownDocument",
-     "line": 36,
-     "end": 50
+     "line": 37,
+     "end": 51
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "MarkdownDocument.to_dict",
-     "line": 44,
-     "end": 50
+     "line": 45,
+     "end": 51
     }
    ],
    "inputs": "段落和资产信息",
@@ -7284,8 +7329,8 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "render_block",
-     "line": 53,
-     "end": 69
+     "line": 54,
+     "end": 74
     }
    ],
    "inputs": "MarkdownBlock",
@@ -7299,13 +7344,13 @@
   {
    "group": "21",
    "name": "图片与既有表格文本渲染",
-   "description": "image使用caption/text兜底alt加path生成图片语法；table仅返回已提供text，不在此解析PDF表格。",
+   "description": "image使用caption/text兜底alt，转义反斜杠及方括号；原始文件path做URL编码并保留斜杠，空格、百分号、URI保留字符和括号不破坏图片地址；资源文件名与块数据保持原值。table仅返回已提供text，不在此解析PDF表格。",
    "refs": [
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "render_block",
-     "line": 53,
-     "end": 69
+     "line": 54,
+     "end": 74
     }
    ],
    "inputs": "image/table块",
@@ -7324,20 +7369,20 @@
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "render_block",
-     "line": 53,
-     "end": 69
+     "line": 54,
+     "end": 74
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "render_markdown",
-     "line": 72,
-     "end": 79
+     "line": 77,
+     "end": 84
     },
     {
      "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
      "symbol": "render_blocks",
-     "line": 82,
-     "end": 84
+     "line": 87,
+     "end": 89
     }
    ],
    "inputs": "文档或块集合",
@@ -7347,6 +7392,68 @@
    "key": "21/分页注释、文档和块集合渲染",
    "scope": "runtime",
    "id": "F21.018"
+  },
+  {
+   "group": "21",
+   "name": "资产框覆盖正文抑制",
+   "description": "段落 bbox 随块 meta 记录；final_bbox 完整覆盖（2pt 容差）的同页 paragraph/heading 散行在插图时抑制，显式题注行始终保留，部分重叠保守保留；逐资产记录 suppressed_text_blocks。",
+   "refs": [
+    {
+     "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+     "symbol": "_blocks_covered_by_assets",
+     "line": 299,
+     "end": 339
+    }
+   ],
+   "inputs": "文档块、插入资产 final_bbox",
+   "outputs": "覆盖抑制集合与每资产计数",
+   "mode": "默认",
+   "depends": [
+    "F21.003"
+   ],
+   "key": "21/资产框覆盖正文抑制",
+   "scope": "runtime",
+   "id": "F21.019"
+  },
+  {
+   "group": "21",
+   "name": "逐资产嵌入状态回写与汇总",
+   "description": "放置后逐项写 referenced_in_markdown/embed_mode/suppressed_text_blocks 并回写 index.json 三视图（兼容新旧格式，omitted 补 False）；汇总 extracted/embedded/inline/appendix/omitted 及原因，进入报告 assets 段与控制台输出。",
+   "refs": [
+    {
+     "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+     "symbol": "_annotate_and_persist_embed_status",
+     "line": 433,
+     "end": 459
+    },
+    {
+     "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+     "symbol": "_persist_embed_status_to_index",
+     "line": 462,
+     "end": 516
+    },
+    {
+     "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+     "symbol": "_persist_embed_status_to_index.key_of",
+     "line": 473,
+     "end": 479
+    },
+    {
+     "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+     "symbol": "_summarize_embed_status",
+     "line": 519,
+     "end": 538
+    }
+   ],
+   "inputs": "放置摘要、资产结果、index.json",
+   "outputs": "逐资产嵌入状态、汇总计数",
+   "mode": "默认",
+   "depends": [
+    "F21.009"
+   ],
+   "key": "21/逐资产嵌入状态回写与汇总",
+   "scope": "runtime",
+   "id": "F21.020"
   },
   {
    "group": "22",
@@ -8816,20 +8923,20 @@
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "run_command",
-     "line": 105,
-     "end": 122
+     "line": 106,
+     "end": 123
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "run_pytest_suite",
-     "line": 157,
-     "end": 206
+     "line": 158,
+     "end": 207
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "run_script_suite",
-     "line": 209,
-     "end": 236
+     "line": 210,
+     "end": 237
     }
    ],
    "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -8848,50 +8955,50 @@
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "TestSuiteResult",
-     "line": 78,
-     "end": 102
+     "line": 79,
+     "end": 103
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "TestSuiteResult.total",
-     "line": 91,
-     "end": 92
+     "line": 92,
+     "end": 93
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "TestSuiteResult.success",
-     "line": 95,
-     "end": 97
+     "line": 96,
+     "end": 98
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "TestSuiteResult.counts_str",
-     "line": 99,
-     "end": 102
+     "line": 100,
+     "end": 103
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "parse_pytest_output",
-     "line": 125,
-     "end": 137
+     "line": 126,
+     "end": 138
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "parse_legacy_output",
-     "line": 140,
-     "end": 145
+     "line": 141,
+     "end": 146
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "_fill_counts",
-     "line": 148,
-     "end": 154
+     "line": 149,
+     "end": 155
     },
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "_print_suite_result",
-     "line": 575,
-     "end": 584
+     "line": 583,
+     "end": 592
     }
    ],
    "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -8910,8 +9017,8 @@
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "find_unregistered_suites",
-     "line": 557,
-     "end": 572
+     "line": 565,
+     "end": 580
     }
    ],
    "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -8930,8 +9037,8 @@
     {
      "file": "tests/scripts/run_all.py",
      "symbol": "main",
-     "line": 239,
-     "end": 551
+     "line": 240,
+     "end": 559
     }
    ],
    "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9627,7 +9734,7 @@
   {
    "group": "26",
    "name": "题注候选与正文引用回归保障",
-   "description": "验证候选评分、真实题注优先、多行合并与正文引用过滤。",
+   "description": "验证候选评分、真实题注优先、多行合并与正文引用过滤；覆盖描述动词真题注与共享完整动词集合的正文负例。 覆盖题注跨行断词合并与复合词连字符保留。 覆盖跨页全文词形优先、双拼写保守选择、不跨行生成证据及智能检测开关下题注/文件名一致。",
    "refs": [
     {
      "file": "tests/scripts/test_bugfix_20260930.py",
@@ -9724,6 +9831,174 @@
      "symbol": "TestPluralRangeReference.test_real_letter_caption_not_reference",
      "line": 164,
      "end": 167
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge",
+     "line": 57,
+     "end": 145
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_paradise_fig6_continuation_merges",
+     "line": 60,
+     "end": 70
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_body_block_not_swallowed_after_continuation",
+     "line": 72,
+     "end": 79
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_no_trailing_signal_does_not_cross",
+     "line": 81,
+     "end": 90
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_indented_next_block_does_not_cross",
+     "line": 92,
+     "end": 101
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_new_caption_block_does_not_cross",
+     "line": 103,
+     "end": 112
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_non_text_block_between_does_not_cross",
+     "line": 114,
+     "end": 125
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_chain_across_two_following_blocks",
+     "line": 127,
+     "end": 139
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCrossBlockCaptionMerge.test_without_following_blocks_behavior_unchanged",
+     "line": 141,
+     "end": 145
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestContinuationSignalWordBoundary",
+     "line": 420,
+     "end": 459
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestContinuationSignalWordBoundary.test_regex_rejects_complete_word_endings",
+     "line": 424,
+     "end": 429
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestContinuationSignalWordBoundary.test_regex_keeps_real_continuation_signals",
+     "line": 431,
+     "end": 435
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestContinuationSignalWordBoundary.test_imagenet_caption_does_not_swallow_body",
+     "line": 437,
+     "end": 447
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestContinuationSignalWordBoundary.test_data_caption_does_not_swallow_body",
+     "line": 449,
+     "end": 459
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestVerbCaptionMerge",
+     "line": 592,
+     "end": 629
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestVerbCaptionMerge.test_genuine_verb_caption_keeps_second_line",
+     "line": 599,
+     "end": 611
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestVerbCaptionMerge.test_body_reference_still_rejected",
+     "line": 621,
+     "end": 629
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionDehyphenation",
+     "line": 632,
+     "end": 682
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionDehyphenation.test_broken_word_joined_without_hyphen",
+     "line": 636,
+     "end": 644
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionDehyphenation.test_scenario_style_broken_word",
+     "line": 646,
+     "end": 655
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionDehyphenation.test_end_to_end_compound_keeps_hyphen",
+     "line": 657,
+     "end": 664
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionDehyphenation.test_well_known_compound_keeps_hyphen",
+     "line": 666,
+     "end": 673
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionDehyphenation.test_uppercase_next_line_keeps_space",
+     "line": 675,
+     "end": 682
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionWordEvidence",
+     "line": 846,
+     "end": 919
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionWordEvidence.test_uses_complete_word_form",
+     "line": 857,
+     "end": 864
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionWordEvidence.test_index_uses_evidence_from_another_page",
+     "line": 866,
+     "end": 879
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionWordEvidence.test_extracted_caption_and_filename_use_document_spelling",
+     "line": 882,
+     "end": 906
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestCaptionWordEvidence.test_word_collection_does_not_turn_broken_lines_into_evidence",
+     "line": 908,
+     "end": 919
     },
     {
      "file": "tests/scripts/test_caption_anchor_quality.py",
@@ -10727,8 +11002,74 @@
   {
    "group": "26",
    "name": "对象与扫描墨迹回归保障",
-   "description": "验证对象截断、渲染墨迹、扫描整页背景和像素/图形边界。",
+   "description": "验证对象截断、渲染墨迹、扫描整页背景和像素/图形边界。 覆盖 autocrop 否决时 x 收窄对象支撑采用及无对象、支撑不足、收窄量过小反例。 覆盖横向裁切的完全/部分文字丢失、对象上下邻近标签、原框外正文、正式 CLI 标签完整性。",
    "refs": [
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropXRangeAdoption",
+     "line": 685,
+     "end": 774
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropXRangeAdoption.test_adopts_x_when_object_supported",
+     "line": 690,
+     "end": 701
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropXRangeAdoption.test_rejects_without_objects",
+     "line": 703,
+     "end": 708
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropXRangeAdoption.test_rejects_when_outside_objects_dominate",
+     "line": 710,
+     "end": 716
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropXRangeAdoption.test_rejects_trivial_narrowing",
+     "line": 718,
+     "end": 724
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropXRangeAdoption.test_never_widens_beyond_clip",
+     "line": 726,
+     "end": 732
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropXRangeAdoption.test_right_column_figure_x_narrowed_when_autocrop_height_rejected",
+     "line": 734,
+     "end": 774
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropTextSafety",
+     "line": 777,
+     "end": 843
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropTextSafety.test_native_image_side_label_survives_extraction",
+     "line": 781,
+     "end": 808
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropTextSafety.test_rejects_lost_labels",
+     "line": 818,
+     "end": 826
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAutocropTextSafety.test_keeps_safe_narrowing",
+     "line": 833,
+     "end": 843
+    },
     {
      "file": "tests/scripts/test_caption_anchor_quality.py",
      "symbol": "test_figure_baseline_recovers_connected_far_side_objects",
@@ -11845,7 +12186,7 @@
   {
    "group": "26",
    "name": "Markdown 与摘要复用回归保障",
-   "description": "验证输出路径、标题分类、模式开关、题注插图、失败传播和源 PDF 复用身份。",
+   "description": "验证输出路径、标题分类、模式开关、题注插图、失败传播和源PDF复用身份；用CommonMark解析核验图片地址编码、alt字面转义以及实际插入图片与嵌入计数一致。",
    "refs": [
     {
      "file": "tests/scripts/test_bugfix_20260928.py",
@@ -11870,6 +12211,168 @@
      "symbol": "test_short_bold_fragments_are_not_markdown_headings",
      "line": 754,
      "end": 765
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression",
+     "line": 200,
+     "end": 278
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression.test_inserted_table_suppresses_covered_text",
+     "line": 203,
+     "end": 210
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression.test_caption_and_outside_text_kept",
+     "line": 212,
+     "end": 218
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression.test_unmatched_inserted_asset_also_suppresses",
+     "line": 220,
+     "end": 227
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression.test_no_inserted_items_keeps_document",
+     "line": 229,
+     "end": 233
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression.test_figure_covered_text_suppressed",
+     "line": 235,
+     "end": 260
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression.test_explicit_caption_line_inside_bbox_kept",
+     "line": 262,
+     "end": 269
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestTableBodyTextSuppression.test_partial_overlap_kept",
+     "line": 271,
+     "end": 278
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary",
+     "line": 281,
+     "end": 379
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary._asset_result",
+     "line": 284,
+     "end": 294
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_place_returns_placement_summary",
+     "line": 296,
+     "end": 308
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_per_asset_fields_and_index_writeback",
+     "line": 310,
+     "end": 325
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_summary_counts",
+     "line": 327,
+     "end": 344
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_writeback_updates_index_json_file",
+     "line": 346,
+     "end": 379
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAssetDirDocsAndHints",
+     "line": 382,
+     "end": 417
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAssetDirDocsAndHints.test_help_explains_markdown_dir_base",
+     "line": 385,
+     "end": 394
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAssetDirDocsAndHints.test_console_prints_resolved_asset_dir",
+     "line": 396,
+     "end": 411
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestAssetDirDocsAndHints.test_skill_md_documents_asset_dir_base",
+     "line": 413,
+     "end": 417
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMissingAssetFile",
+     "line": 462,
+     "end": 516
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMissingAssetFile._result",
+     "line": 466,
+     "end": 473
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMissingAssetFile.test_missing_png_not_inserted_and_text_kept",
+     "line": 475,
+     "end": 485
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMissingAssetFile.test_missing_png_not_marked_embedded",
+     "line": 487,
+     "end": 504
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMissingAssetFile.test_existing_png_still_placed_inline",
+     "line": 506,
+     "end": 516
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMarkdownImageSerialization",
+     "line": 519,
+     "end": 589
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMarkdownImageSerialization.test_image_address_resolves_to_original_filename",
+     "line": 531,
+     "end": 543
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMarkdownImageSerialization.test_alt_preserves_literal_delimiters",
+     "line": 551,
+     "end": 565
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestMarkdownImageSerialization.test_inserted_screenshot_renders_with_space_path_and_interval_alt",
+     "line": 567,
+     "end": 589
     },
     {
      "file": "tests/scripts/test_caption_anchor_quality.py",
@@ -11929,67 +12432,67 @@
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_images_off_tables_on_does_not_insert_figures",
      "line": 166,
-     "end": 237
+     "end": 240
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_assets_disabled_returns_zero",
-     "line": 240,
-     "end": 258
+     "line": 243,
+     "end": 261
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_images_extracted_by_default",
-     "line": 261,
-     "end": 324
+     "line": 264,
+     "end": 328
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_omitted_assets_are_reported_instead_of_silent_ready",
-     "line": 327,
-     "end": 387
+     "line": 331,
+     "end": 393
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_filter_skips_review_and_rejected_assets",
-     "line": 390,
-     "end": 400
+     "line": 396,
+     "end": 406
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_assets_insert_after_matching_caption_not_in_appendix",
-     "line": 438,
-     "end": 474
+     "line": 448,
+     "end": 484
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_body_citation_does_not_steal_in_body_slot",
-     "line": 477,
-     "end": 506
+     "line": 487,
+     "end": 516
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_table_above_caption_inserts_image_before_caption",
-     "line": 509,
-     "end": 549
+     "line": 519,
+     "end": 559
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_chinese_no_space_caption_keeps_image_in_body",
-     "line": 580,
-     "end": 585
+     "line": 594,
+     "end": 599
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_subfigure_caption_matches_parent_ident",
-     "line": 588,
-     "end": 592
+     "line": 602,
+     "end": 606
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "test_caption_ident_mismatch_still_goes_to_appendix",
-     "line": 595,
-     "end": 600
+     "line": 609,
+     "end": 614
     },
     {
      "file": "tests/scripts/test_text_extract_headings.py",
@@ -12106,6 +12609,42 @@
      "symbol": "test_exported_attention_and_kimi_visual_boundaries",
      "line": 909,
      "end": 934
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary",
+     "line": 281,
+     "end": 379
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary._asset_result",
+     "line": 284,
+     "end": 294
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_place_returns_placement_summary",
+     "line": 296,
+     "end": 308
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_per_asset_fields_and_index_writeback",
+     "line": 310,
+     "end": 325
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_summary_counts",
+     "line": 327,
+     "end": 344
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "TestEmbedStatusAndSummary.test_writeback_updates_index_json_file",
+     "line": 346,
+     "end": 379
     },
     {
      "file": "tests/scripts/test_remaining_review_20260923.py",
@@ -12640,6 +13179,42 @@
      "end": 34
     },
     {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "_line",
+     "line": 24,
+     "end": 28
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "_block",
+     "line": 31,
+     "end": 36
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "_paradise_fig6_blocks",
+     "line": 39,
+     "end": 54
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "_md_doc_with_sassi_p35",
+     "line": 148,
+     "end": 167
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "_sassi_table4_item",
+     "line": 170,
+     "end": 182
+    },
+    {
+     "file": "tests/scripts/test_bugfix_20261001.py",
+     "symbol": "_place",
+     "line": 185,
+     "end": 197
+    },
+    {
      "file": "tests/scripts/test_caption_anchor_quality.py",
      "symbol": "_insert_superscript_label",
      "line": 55,
@@ -12708,26 +13283,26 @@
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "_make_captioned_pdf",
-     "line": 403,
-     "end": 409
+     "line": 409,
+     "end": 415
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "_run_markdown_with_fake_assets",
-     "line": 412,
-     "end": 435
+     "line": 418,
+     "end": 445
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "_place_single_asset_blocks",
-     "line": 552,
-     "end": 577
+     "line": 562,
+     "end": 591
     },
     {
      "file": "tests/scripts/test_pdf_to_markdown_cli.py",
      "symbol": "main_test",
-     "line": 603,
-     "end": 634
+     "line": 617,
+     "end": 648
     },
     {
      "file": "tests/scripts/test_qa03_debug_artifacts.py",
@@ -13165,7 +13740,7 @@
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 407,
+   "end": 640,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -13190,7 +13765,7 @@
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "parse_args",
    "line": 25,
-   "end": 39,
+   "end": 40,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13202,8 +13777,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_resolve_outputs",
-   "line": 42,
-   "end": 64,
+   "line": 43,
+   "end": 65,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13214,8 +13789,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_paragraphs_to_document",
-   "line": 67,
-   "end": 100,
+   "line": 68,
+   "end": 103,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13226,8 +13801,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_filter_assets_by_mode",
-   "line": 103,
-   "end": 109,
+   "line": 106,
+   "end": 112,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13238,8 +13813,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_split_assets_for_markdown",
-   "line": 112,
-   "end": 146,
+   "line": 115,
+   "end": 149,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13250,8 +13825,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_run_asset_extraction",
-   "line": 149,
-   "end": 184,
+   "line": 152,
+   "end": 187,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13263,8 +13838,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_caption_ident_for_kind",
-   "line": 187,
-   "end": 208,
+   "line": 190,
+   "end": 211,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13275,8 +13850,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_make_image_block",
-   "line": 211,
-   "end": 229,
+   "line": 214,
+   "end": 235,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13287,8 +13862,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_asset_kind_matches_text",
-   "line": 232,
-   "end": 241,
+   "line": 238,
+   "end": 247,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13299,8 +13874,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_block_is_caption_for_asset",
-   "line": 244,
-   "end": 269,
+   "line": 250,
+   "end": 275,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13311,8 +13886,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_content_is_above_caption",
-   "line": 272,
-   "end": 277,
+   "line": 278,
+   "end": 283,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13323,8 +13898,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_append_asset_section",
-   "line": 280,
-   "end": 290,
+   "line": 286,
+   "end": 296,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13335,8 +13910,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "_place_assets_in_document",
-   "line": 293,
-   "end": 327,
+   "line": 342,
+   "end": 430,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13347,8 +13922,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
    "symbol": "main",
-   "line": 330,
-   "end": 403,
+   "line": 541,
+   "end": 636,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13362,7 +13937,7 @@
    "file": "skills/pdf-markdown-summary/scripts/core/process_pdf.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 96,
+   "end": 97,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -13375,7 +13950,7 @@
    "file": "skills/pdf-markdown-summary/scripts/core/process_pdf.py",
    "symbol": "parse_args",
    "line": 20,
-   "end": 28,
+   "end": 29,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13386,8 +13961,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/process_pdf.py",
    "symbol": "main",
-   "line": 31,
-   "end": 82,
+   "line": 32,
+   "end": 83,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -13398,8 +13973,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/core/process_pdf.py",
    "symbol": "_load_sibling_main",
-   "line": 85,
-   "end": 92,
+   "line": 86,
+   "end": 93,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14366,7 +14941,7 @@
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 893,
+   "end": 1045,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -14387,8 +14962,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "_unwrap_page",
-   "line": 55,
-   "end": 56,
+   "line": 124,
+   "end": 125,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14399,8 +14974,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "_unwrap_doc",
-   "line": 59,
-   "end": 60,
+   "line": 128,
+   "end": 129,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14411,8 +14986,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "get_page_images",
-   "line": 63,
-   "end": 85,
+   "line": 132,
+   "end": 154,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14423,8 +14998,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "get_page_drawings",
-   "line": 88,
-   "end": 111,
+   "line": 157,
+   "end": 180,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14435,8 +15010,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "get_next_line_text",
-   "line": 114,
-   "end": 130,
+   "line": 183,
+   "end": 199,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14447,8 +15022,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "get_paragraph_length",
-   "line": 133,
-   "end": 147,
+   "line": 202,
+   "end": 216,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14459,8 +15034,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "is_bold_text",
-   "line": 150,
-   "end": 162,
+   "line": 219,
+   "end": 231,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14471,8 +15046,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "min_distance_to_rects",
-   "line": 165,
-   "end": 186,
+   "line": 234,
+   "end": 255,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14483,8 +15058,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "_period_tail_reads_as_body",
-   "line": 217,
-   "end": 223,
+   "line": 286,
+   "end": 292,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14495,8 +15070,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "is_explicit_caption_format",
-   "line": 226,
-   "end": 244,
+   "line": 295,
+   "end": 313,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14507,8 +15082,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "is_bare_caption_label",
-   "line": 247,
-   "end": 253,
+   "line": 316,
+   "end": 322,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14519,8 +15094,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "is_caption_anchor_candidate",
-   "line": 256,
-   "end": 258,
+   "line": 325,
+   "end": 327,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14531,8 +15106,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "is_likely_reference_context",
-   "line": 261,
-   "end": 303,
+   "line": 330,
+   "end": 372,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14543,8 +15118,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "is_likely_caption_context",
-   "line": 306,
-   "end": 331,
+   "line": 375,
+   "end": 400,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14555,8 +15130,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "find_all_caption_candidates",
-   "line": 338,
-   "end": 409,
+   "line": 407,
+   "end": 487,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14567,8 +15142,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "score_caption_candidate",
-   "line": 416,
-   "end": 572,
+   "line": 494,
+   "end": 650,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14581,8 +15156,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "select_best_caption",
-   "line": 579,
-   "end": 641,
+   "line": 657,
+   "end": 719,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14593,8 +15168,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "build_caption_index",
-   "line": 648,
-   "end": 713,
+   "line": 726,
+   "end": 795,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14605,8 +15180,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "merge_caption_lines",
-   "line": 720,
-   "end": 824,
+   "line": 802,
+   "end": 976,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -14618,8 +15193,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
    "symbol": "is_caption_reference",
-   "line": 831,
-   "end": 885,
+   "line": 983,
+   "end": 1037,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -15389,7 +15964,7 @@
    "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 909,
+   "end": 928,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -15413,8 +15988,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
    "symbol": "extract_figures",
-   "line": 101,
-   "end": 901,
+   "line": 103,
+   "end": 920,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -15579,7 +16154,7 @@
    "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 1055,
+   "end": 1061,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -15605,8 +16180,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
    "symbol": "extract_tables",
-   "line": 106,
-   "end": 1047,
+   "line": 107,
+   "end": 1053,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -15632,8 +16207,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/extract_tables.py",
    "symbol": "extract_tables.save_current_debug",
-   "line": 781,
-   "end": 814,
+   "line": 787,
+   "end": 820,
    "kind": "function",
    "ancestors": [
     "extract_tables"
@@ -16707,7 +17282,7 @@
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 93,
+   "end": 98,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -16721,8 +17296,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "MarkdownBlock",
-   "line": 12,
-   "end": 32,
+   "line": 13,
+   "end": 33,
    "kind": "class",
    "ancestors": [],
    "ids": [
@@ -16733,8 +17308,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "MarkdownBlock.to_dict",
-   "line": 23,
-   "end": 32,
+   "line": 24,
+   "end": 33,
    "kind": "function",
    "ancestors": [
     "MarkdownBlock"
@@ -16747,8 +17322,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "MarkdownDocument",
-   "line": 36,
-   "end": 50,
+   "line": 37,
+   "end": 51,
    "kind": "class",
    "ancestors": [],
    "ids": [
@@ -16759,8 +17334,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "MarkdownDocument.to_dict",
-   "line": 44,
-   "end": 50,
+   "line": 45,
+   "end": 51,
    "kind": "function",
    "ancestors": [
     "MarkdownDocument"
@@ -16773,8 +17348,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "render_block",
-   "line": 53,
-   "end": 69,
+   "line": 54,
+   "end": 74,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -16787,8 +17362,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "render_markdown",
-   "line": 72,
-   "end": 79,
+   "line": 77,
+   "end": 84,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -16799,8 +17374,8 @@
   {
    "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
    "symbol": "render_blocks",
-   "line": 82,
-   "end": 84,
+   "line": 87,
+   "end": 89,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -18393,7 +18968,7 @@
    "file": "skills/pdf-markdown-summary/scripts/lib/pixel_detect.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 472,
+   "end": 521,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -20932,7 +21507,7 @@
    "file": "tests/scripts/run_all.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 588,
+   "end": 596,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -20946,8 +21521,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "TestSuiteResult",
-   "line": 78,
-   "end": 102,
+   "line": 79,
+   "end": 103,
    "kind": "class",
    "ancestors": [],
    "ids": [
@@ -20958,8 +21533,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "TestSuiteResult.total",
-   "line": 91,
-   "end": 92,
+   "line": 92,
+   "end": 93,
    "kind": "function",
    "ancestors": [
     "TestSuiteResult"
@@ -20972,8 +21547,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "TestSuiteResult.success",
-   "line": 95,
-   "end": 97,
+   "line": 96,
+   "end": 98,
    "kind": "function",
    "ancestors": [
     "TestSuiteResult"
@@ -20986,8 +21561,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "TestSuiteResult.counts_str",
-   "line": 99,
-   "end": 102,
+   "line": 100,
+   "end": 103,
    "kind": "function",
    "ancestors": [
     "TestSuiteResult"
@@ -21000,8 +21575,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "run_command",
-   "line": 105,
-   "end": 122,
+   "line": 106,
+   "end": 123,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21012,8 +21587,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "parse_pytest_output",
-   "line": 125,
-   "end": 137,
+   "line": 126,
+   "end": 138,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21024,8 +21599,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "parse_legacy_output",
-   "line": 140,
-   "end": 145,
+   "line": 141,
+   "end": 146,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21036,8 +21611,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "_fill_counts",
-   "line": 148,
-   "end": 154,
+   "line": 149,
+   "end": 155,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21048,8 +21623,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "run_pytest_suite",
-   "line": 157,
-   "end": 206,
+   "line": 158,
+   "end": 207,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21060,8 +21635,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "run_script_suite",
-   "line": 209,
-   "end": 236,
+   "line": 210,
+   "end": 237,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21072,8 +21647,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "main",
-   "line": 239,
-   "end": 551,
+   "line": 240,
+   "end": 559,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21084,8 +21659,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "find_unregistered_suites",
-   "line": 557,
-   "end": 572,
+   "line": 565,
+   "end": 580,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -21096,8 +21671,8 @@
   {
    "file": "tests/scripts/run_all.py",
    "symbol": "_print_suite_result",
-   "line": 575,
-   "end": 584,
+   "line": 583,
+   "end": 592,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25074,7 +25649,7 @@
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "<module>",
    "line": 1,
-   "end": 638,
+   "end": 652,
    "kind": "module",
    "ancestors": [],
    "ids": [
@@ -25187,7 +25762,7 @@
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_images_off_tables_on_does_not_insert_figures",
    "line": 166,
-   "end": 237,
+   "end": 240,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25199,7 +25774,7 @@
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_images_off_tables_on_does_not_insert_figures.fake_extract_main",
    "line": 182,
-   "end": 207,
+   "end": 210,
    "kind": "function",
    "ancestors": [
     "test_images_off_tables_on_does_not_insert_figures"
@@ -25212,8 +25787,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_assets_disabled_returns_zero",
-   "line": 240,
-   "end": 258,
+   "line": 243,
+   "end": 261,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25224,8 +25799,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_assets_disabled_returns_zero.fake_extract_main",
-   "line": 247,
-   "end": 248,
+   "line": 250,
+   "end": 251,
    "kind": "function",
    "ancestors": [
     "test_assets_disabled_returns_zero"
@@ -25238,8 +25813,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_images_extracted_by_default",
-   "line": 261,
-   "end": 324,
+   "line": 264,
+   "end": 328,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25250,8 +25825,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_images_extracted_by_default.fake_extract_main",
-   "line": 278,
-   "end": 297,
+   "line": 281,
+   "end": 301,
    "kind": "function",
    "ancestors": [
     "test_images_extracted_by_default"
@@ -25264,8 +25839,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_omitted_assets_are_reported_instead_of_silent_ready",
-   "line": 327,
-   "end": 387,
+   "line": 331,
+   "end": 393,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25276,8 +25851,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_omitted_assets_are_reported_instead_of_silent_ready.fake_extract_main",
-   "line": 337,
-   "end": 364,
+   "line": 341,
+   "end": 370,
    "kind": "function",
    "ancestors": [
     "test_omitted_assets_are_reported_instead_of_silent_ready"
@@ -25290,8 +25865,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_filter_skips_review_and_rejected_assets",
-   "line": 390,
-   "end": 400,
+   "line": 396,
+   "end": 406,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25302,8 +25877,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "_make_captioned_pdf",
-   "line": 403,
-   "end": 409,
+   "line": 409,
+   "end": 415,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25314,8 +25889,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "_run_markdown_with_fake_assets",
-   "line": 412,
-   "end": 435,
+   "line": 418,
+   "end": 445,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25326,8 +25901,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "_run_markdown_with_fake_assets.fake_extract_main",
-   "line": 417,
-   "end": 423,
+   "line": 423,
+   "end": 433,
    "kind": "function",
    "ancestors": [
     "_run_markdown_with_fake_assets"
@@ -25340,8 +25915,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_assets_insert_after_matching_caption_not_in_appendix",
-   "line": 438,
-   "end": 474,
+   "line": 448,
+   "end": 484,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25352,8 +25927,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_body_citation_does_not_steal_in_body_slot",
-   "line": 477,
-   "end": 506,
+   "line": 487,
+   "end": 516,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25364,8 +25939,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_table_above_caption_inserts_image_before_caption",
-   "line": 509,
-   "end": 549,
+   "line": 519,
+   "end": 559,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25376,8 +25951,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "_place_single_asset_blocks",
-   "line": 552,
-   "end": 577,
+   "line": 562,
+   "end": 591,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25388,8 +25963,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_chinese_no_space_caption_keeps_image_in_body",
-   "line": 580,
-   "end": 585,
+   "line": 594,
+   "end": 599,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25400,8 +25975,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_subfigure_caption_matches_parent_ident",
-   "line": 588,
-   "end": 592,
+   "line": 602,
+   "end": 606,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25412,8 +25987,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "test_caption_ident_mismatch_still_goes_to_appendix",
-   "line": 595,
-   "end": 600,
+   "line": 609,
+   "end": 614,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -25424,8 +25999,8 @@
   {
    "file": "tests/scripts/test_pdf_to_markdown_cli.py",
    "symbol": "main_test",
-   "line": 603,
-   "end": 634,
+   "line": 617,
+   "end": 648,
    "kind": "function",
    "ancestors": [],
    "ids": [
@@ -30225,6 +30800,1098 @@
    ],
    "ids": [
     "F26.025"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+   "symbol": "_blocks_covered_by_assets",
+   "line": 299,
+   "end": 339,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F21.019",
+    "F21.009"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+   "symbol": "_annotate_and_persist_embed_status",
+   "line": 433,
+   "end": 459,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F21.020"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+   "symbol": "_persist_embed_status_to_index",
+   "line": 462,
+   "end": 516,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F21.020"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+   "symbol": "_persist_embed_status_to_index.key_of",
+   "line": 473,
+   "end": 479,
+   "kind": "function",
+   "ancestors": [
+    "_persist_embed_status_to_index"
+   ],
+   "ids": [
+    "F21.020"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+   "symbol": "_summarize_embed_status",
+   "line": 519,
+   "end": 538,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F21.020"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "<module>",
+   "line": 1,
+   "end": 919,
+   "kind": "module",
+   "ancestors": [],
+   "ids": [
+    "F26.019",
+    "F26.030",
+    "F26.031",
+    "F26.036"
+   ],
+   "mapping": "所在文件的功能归属（不是独立功能）"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "_line",
+   "line": 24,
+   "end": 28,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F26.036"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "_block",
+   "line": 31,
+   "end": 36,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F26.036"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "_paradise_fig6_blocks",
+   "line": 39,
+   "end": 54,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F26.036"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge",
+   "line": 57,
+   "end": 145,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_paradise_fig6_continuation_merges",
+   "line": 60,
+   "end": 70,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_body_block_not_swallowed_after_continuation",
+   "line": 72,
+   "end": 79,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_no_trailing_signal_does_not_cross",
+   "line": 81,
+   "end": 90,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_indented_next_block_does_not_cross",
+   "line": 92,
+   "end": 101,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_new_caption_block_does_not_cross",
+   "line": 103,
+   "end": 112,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_non_text_block_between_does_not_cross",
+   "line": 114,
+   "end": 125,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_chain_across_two_following_blocks",
+   "line": 127,
+   "end": 139,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCrossBlockCaptionMerge.test_without_following_blocks_behavior_unchanged",
+   "line": 141,
+   "end": 145,
+   "kind": "function",
+   "ancestors": [
+    "TestCrossBlockCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "_md_doc_with_sassi_p35",
+   "line": 148,
+   "end": 167,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F26.036"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "_sassi_table4_item",
+   "line": 170,
+   "end": 182,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F26.036"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "_place",
+   "line": 185,
+   "end": 197,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F26.036"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression",
+   "line": 200,
+   "end": 278,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression.test_inserted_table_suppresses_covered_text",
+   "line": 203,
+   "end": 210,
+   "kind": "function",
+   "ancestors": [
+    "TestTableBodyTextSuppression"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression.test_caption_and_outside_text_kept",
+   "line": 212,
+   "end": 218,
+   "kind": "function",
+   "ancestors": [
+    "TestTableBodyTextSuppression"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression.test_unmatched_inserted_asset_also_suppresses",
+   "line": 220,
+   "end": 227,
+   "kind": "function",
+   "ancestors": [
+    "TestTableBodyTextSuppression"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression.test_no_inserted_items_keeps_document",
+   "line": 229,
+   "end": 233,
+   "kind": "function",
+   "ancestors": [
+    "TestTableBodyTextSuppression"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression.test_figure_covered_text_suppressed",
+   "line": 235,
+   "end": 260,
+   "kind": "function",
+   "ancestors": [
+    "TestTableBodyTextSuppression"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression.test_explicit_caption_line_inside_bbox_kept",
+   "line": 262,
+   "end": 269,
+   "kind": "function",
+   "ancestors": [
+    "TestTableBodyTextSuppression"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestTableBodyTextSuppression.test_partial_overlap_kept",
+   "line": 271,
+   "end": 278,
+   "kind": "function",
+   "ancestors": [
+    "TestTableBodyTextSuppression"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestEmbedStatusAndSummary",
+   "line": 281,
+   "end": 379,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.030",
+    "F26.031"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestEmbedStatusAndSummary._asset_result",
+   "line": 284,
+   "end": 294,
+   "kind": "function",
+   "ancestors": [
+    "TestEmbedStatusAndSummary"
+   ],
+   "ids": [
+    "F26.030",
+    "F26.031"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestEmbedStatusAndSummary.test_place_returns_placement_summary",
+   "line": 296,
+   "end": 308,
+   "kind": "function",
+   "ancestors": [
+    "TestEmbedStatusAndSummary"
+   ],
+   "ids": [
+    "F26.030",
+    "F26.031"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestEmbedStatusAndSummary.test_per_asset_fields_and_index_writeback",
+   "line": 310,
+   "end": 325,
+   "kind": "function",
+   "ancestors": [
+    "TestEmbedStatusAndSummary"
+   ],
+   "ids": [
+    "F26.030",
+    "F26.031"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestEmbedStatusAndSummary.test_summary_counts",
+   "line": 327,
+   "end": 344,
+   "kind": "function",
+   "ancestors": [
+    "TestEmbedStatusAndSummary"
+   ],
+   "ids": [
+    "F26.030",
+    "F26.031"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestEmbedStatusAndSummary.test_writeback_updates_index_json_file",
+   "line": 346,
+   "end": 379,
+   "kind": "function",
+   "ancestors": [
+    "TestEmbedStatusAndSummary"
+   ],
+   "ids": [
+    "F26.030",
+    "F26.031"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAssetDirDocsAndHints",
+   "line": 382,
+   "end": 417,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAssetDirDocsAndHints.test_help_explains_markdown_dir_base",
+   "line": 385,
+   "end": 394,
+   "kind": "function",
+   "ancestors": [
+    "TestAssetDirDocsAndHints"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAssetDirDocsAndHints.test_console_prints_resolved_asset_dir",
+   "line": 396,
+   "end": 411,
+   "kind": "function",
+   "ancestors": [
+    "TestAssetDirDocsAndHints"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAssetDirDocsAndHints.test_skill_md_documents_asset_dir_base",
+   "line": 413,
+   "end": 417,
+   "kind": "function",
+   "ancestors": [
+    "TestAssetDirDocsAndHints"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestContinuationSignalWordBoundary",
+   "line": 420,
+   "end": 459,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestContinuationSignalWordBoundary.test_regex_rejects_complete_word_endings",
+   "line": 424,
+   "end": 429,
+   "kind": "function",
+   "ancestors": [
+    "TestContinuationSignalWordBoundary"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestContinuationSignalWordBoundary.test_regex_keeps_real_continuation_signals",
+   "line": 431,
+   "end": 435,
+   "kind": "function",
+   "ancestors": [
+    "TestContinuationSignalWordBoundary"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestContinuationSignalWordBoundary.test_imagenet_caption_does_not_swallow_body",
+   "line": 437,
+   "end": 447,
+   "kind": "function",
+   "ancestors": [
+    "TestContinuationSignalWordBoundary"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestContinuationSignalWordBoundary.test_data_caption_does_not_swallow_body",
+   "line": 449,
+   "end": 459,
+   "kind": "function",
+   "ancestors": [
+    "TestContinuationSignalWordBoundary"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMissingAssetFile",
+   "line": 462,
+   "end": 516,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMissingAssetFile._result",
+   "line": 466,
+   "end": 473,
+   "kind": "function",
+   "ancestors": [
+    "TestMissingAssetFile"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMissingAssetFile.test_missing_png_not_inserted_and_text_kept",
+   "line": 475,
+   "end": 485,
+   "kind": "function",
+   "ancestors": [
+    "TestMissingAssetFile"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMissingAssetFile.test_missing_png_not_marked_embedded",
+   "line": 487,
+   "end": 504,
+   "kind": "function",
+   "ancestors": [
+    "TestMissingAssetFile"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMissingAssetFile.test_existing_png_still_placed_inline",
+   "line": 506,
+   "end": 516,
+   "kind": "function",
+   "ancestors": [
+    "TestMissingAssetFile"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMarkdownImageSerialization",
+   "line": 519,
+   "end": 589,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMarkdownImageSerialization.test_image_address_resolves_to_original_filename",
+   "line": 531,
+   "end": 543,
+   "kind": "function",
+   "ancestors": [
+    "TestMarkdownImageSerialization"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMarkdownImageSerialization.test_alt_preserves_literal_delimiters",
+   "line": 551,
+   "end": 565,
+   "kind": "function",
+   "ancestors": [
+    "TestMarkdownImageSerialization"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestMarkdownImageSerialization.test_inserted_screenshot_renders_with_space_path_and_interval_alt",
+   "line": 567,
+   "end": 589,
+   "kind": "function",
+   "ancestors": [
+    "TestMarkdownImageSerialization"
+   ],
+   "ids": [
+    "F26.030"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestVerbCaptionMerge",
+   "line": 592,
+   "end": 629,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestVerbCaptionMerge.test_genuine_verb_caption_keeps_second_line",
+   "line": 599,
+   "end": 611,
+   "kind": "function",
+   "ancestors": [
+    "TestVerbCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestVerbCaptionMerge.test_body_reference_still_rejected",
+   "line": 621,
+   "end": 629,
+   "kind": "function",
+   "ancestors": [
+    "TestVerbCaptionMerge"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/lib/pixel_detect.py",
+   "symbol": "autocrop_x_range_with_object_support",
+   "line": 475,
+   "end": 521,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F12.012"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
+   "symbol": "_join_caption_text",
+   "line": 90,
+   "end": 114,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F07.017"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionDehyphenation",
+   "line": 632,
+   "end": 682,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionDehyphenation.test_broken_word_joined_without_hyphen",
+   "line": 636,
+   "end": 644,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionDehyphenation"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionDehyphenation.test_scenario_style_broken_word",
+   "line": 646,
+   "end": 655,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionDehyphenation"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionDehyphenation.test_end_to_end_compound_keeps_hyphen",
+   "line": 657,
+   "end": 664,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionDehyphenation"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionDehyphenation.test_well_known_compound_keeps_hyphen",
+   "line": 666,
+   "end": 673,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionDehyphenation"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionDehyphenation.test_uppercase_next_line_keeps_space",
+   "line": 675,
+   "end": 682,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionDehyphenation"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropXRangeAdoption",
+   "line": 685,
+   "end": 774,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropXRangeAdoption.test_adopts_x_when_object_supported",
+   "line": 690,
+   "end": 701,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropXRangeAdoption"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropXRangeAdoption.test_rejects_without_objects",
+   "line": 703,
+   "end": 708,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropXRangeAdoption"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropXRangeAdoption.test_rejects_when_outside_objects_dominate",
+   "line": 710,
+   "end": 716,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropXRangeAdoption"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropXRangeAdoption.test_rejects_trivial_narrowing",
+   "line": 718,
+   "end": 724,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropXRangeAdoption"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropXRangeAdoption.test_never_widens_beyond_clip",
+   "line": 726,
+   "end": 732,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropXRangeAdoption"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropXRangeAdoption.test_right_column_figure_x_narrowed_when_autocrop_height_rejected",
+   "line": 734,
+   "end": 774,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropXRangeAdoption"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "skills/pdf-markdown-summary/scripts/lib/caption_detection.py",
+   "symbol": "collect_caption_word_forms",
+   "line": 79,
+   "end": 87,
+   "kind": "function",
+   "ancestors": [],
+   "ids": [
+    "F07.017"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropTextSafety",
+   "line": 777,
+   "end": 843,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropTextSafety.test_native_image_side_label_survives_extraction",
+   "line": 781,
+   "end": 808,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropTextSafety"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropTextSafety.test_rejects_lost_labels",
+   "line": 818,
+   "end": 826,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropTextSafety"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestAutocropTextSafety.test_keeps_safe_narrowing",
+   "line": 833,
+   "end": 843,
+   "kind": "function",
+   "ancestors": [
+    "TestAutocropTextSafety"
+   ],
+   "ids": [
+    "F26.023"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionWordEvidence",
+   "line": 846,
+   "end": 919,
+   "kind": "class",
+   "ancestors": [],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionWordEvidence.test_uses_complete_word_form",
+   "line": 857,
+   "end": 864,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionWordEvidence"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionWordEvidence.test_index_uses_evidence_from_another_page",
+   "line": 866,
+   "end": 879,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionWordEvidence"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionWordEvidence.test_extracted_caption_and_filename_use_document_spelling",
+   "line": 882,
+   "end": 906,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionWordEvidence"
+   ],
+   "ids": [
+    "F26.019"
+   ],
+   "mapping": "直接引用"
+  },
+  {
+   "file": "tests/scripts/test_bugfix_20261001.py",
+   "symbol": "TestCaptionWordEvidence.test_word_collection_does_not_turn_broken_lines_into_evidence",
+   "line": 908,
+   "end": 919,
+   "kind": "function",
+   "ancestors": [
+    "TestCaptionWordEvidence"
+   ],
+   "ids": [
+    "F26.019"
    ],
    "mapping": "直接引用"
   }

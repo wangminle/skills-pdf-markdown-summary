@@ -1,0 +1,4 @@
+# 业务依赖与可复跑的测试依赖；Markdown 解析器仅用于验证输出语法。
+-r ../skills/pdf-markdown-summary/scripts/requirements.txt
+pytest
+markdown-it-py

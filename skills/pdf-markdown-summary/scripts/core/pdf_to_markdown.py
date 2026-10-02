@@ -28,7 +28,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--pdf", required=True, help="Path to the source PDF")
     parser.add_argument("--out", default=None, help="Output Markdown path")
-    parser.add_argument("--asset-dir", default="images", help="Image asset directory")
+    parser.add_argument("--asset-dir", default="images",
+                        help="Image asset directory; relative paths resolve next to the Markdown output file (--out out/paper.md --asset-dir assets -> out/assets/), absolute paths are used as-is")
     parser.add_argument("--report-json", default=None, help="Output conversion report JSON")
     parser.add_argument("--blocks-json", default=None, help="Output Markdown blocks JSON")
     parser.add_argument("--tables", choices=["off", "auto", "screenshot", "structure"], default="off")
@@ -83,9 +84,11 @@ def _paragraphs_to_document(pdf_path: str, title: str):
             continue
 
         if getattr(paragraph, "is_heading", False):
-            blocks.append(MarkdownBlock(type="heading", text=text, level=2, page=paragraph.page))
+            blocks.append(MarkdownBlock(type="heading", text=text, level=2, page=paragraph.page,
+                                        meta={"bbox": list(paragraph.bbox)}))
         else:
-            blocks.append(MarkdownBlock(type="paragraph", text=text, page=paragraph.page))
+            blocks.append(MarkdownBlock(type="paragraph", text=text, page=paragraph.page,
+                                        meta={"bbox": list(paragraph.bbox)}))
 
     return MarkdownDocument(
         title=title,
@@ -216,6 +219,9 @@ def _make_image_block(item: Dict[str, Any], out_md: str, index_json: str):
         return None
     md_dir = os.path.dirname(os.path.abspath(out_md))
     asset_abs = os.path.join(os.path.dirname(index_json), file_value)
+    if not os.path.isfile(asset_abs):
+        # BUG-133：index 引用的 PNG 缺失时不得生成死链图片块
+        return None
     rel_path = os.path.relpath(asset_abs, md_dir).replace("\\", "/")
     label = f"{item.get('type', 'asset')} {item.get('id', '')}".strip()
     caption = item.get("caption") or label
@@ -290,16 +296,90 @@ def _append_asset_section(document, asset_result: Dict[str, Any], out_md: str) -
             document.blocks.append(image)
 
 
+def _blocks_covered_by_assets(document, items, protected_idx: set):
+    """找出被已插入资产 final_bbox 完整覆盖的正文块（BUG-131）。
+
+    只抑制同页、bbox 完整落入 final_bbox（2pt 容差）的 paragraph/heading
+    块；明确是题注格式的行始终保留（避免吃掉下一张表/图的题注），
+    部分重叠的段落保守保留。调用方需保证 items 只含实际插入文档的资产，
+    review/rejected 或 tables off 的资产不进入，其原文自然保留。
+
+    Returns:
+        (covered, per_item_counts)：covered 为块索引集合，
+        per_item_counts 以 id(item) 为键记录每项资产抑制的块数。
+    """
+    from lib.caption_detection import is_explicit_caption_format
+
+    covered: set = set()
+    per_item_counts: Dict[int, int] = {}
+    for item in items:
+        final_bbox = item.get("final_bbox") or []
+        if len(final_bbox) < 4:
+            continue
+        fx0, fy0, fx1, fy1 = (float(v) for v in final_bbox[:4])
+        page = item.get("page")
+        for idx, block in enumerate(document.blocks):
+            if idx in protected_idx or idx in covered:
+                continue
+            if getattr(block, "type", "") not in ("paragraph", "heading"):
+                continue
+            block_page = getattr(block, "page", None)
+            if page is not None and block_page is not None and int(block_page) != int(page):
+                continue
+            bbox = (getattr(block, "meta", None) or {}).get("bbox")
+            if not bbox or len(bbox) < 4:
+                continue
+            text = (getattr(block, "text", "") or "").strip()
+            if text and is_explicit_caption_format(text):
+                continue
+            x0, y0, x1, y1 = (float(v) for v in bbox[:4])
+            if x0 >= fx0 - 2 and y0 >= fy0 - 2 and x1 <= fx1 + 2 and y1 <= fy1 + 2:
+                covered.add(idx)
+                per_item_counts[id(item)] = per_item_counts.get(id(item), 0) + 1
+    return covered, per_item_counts
+
+
 def _place_assets_in_document(document, asset_result: Dict[str, Any], out_md: str) -> None:
-    """把可插入资产放到对应题注旁；找不到题注的仍追加到文末。"""
+    """把可插入资产放到对应题注旁；找不到题注的仍追加到文末。
+
+    插入成功后，按 final_bbox 抑制被截图完整覆盖的正文散行（BUG-131），
+    避免表体文字与截图双重呈现；题注锚点块与框外正文保留。
+
+    index 引用的 PNG 缺失时（BUG-133），对应资产按 missing_file 移入
+    omitted：不插入死链、不参与正文抑制、不计入已嵌入，报告状态
+    因此进入 review。无 file 字段的条目保持既有静默跳过。
+    """
     items = list(asset_result.get("items") or [])
     if not items:
         return
 
     index_json = asset_result.get("index_json") or ""
+    present_items: List[Dict[str, Any]] = []
+    missing_items: List[Dict[str, Any]] = []
+    for item in items:
+        file_value = item.get("current_file") or item.get("file") or ""
+        if file_value and not os.path.isfile(
+            os.path.join(os.path.dirname(index_json), file_value)
+        ):
+            missing_items.append(item)
+        else:
+            present_items.append(item)
+    if missing_items:
+        omitted = asset_result.setdefault("omitted", [])
+        for item in missing_items:
+            if "status" in item:
+                item["extraction_status"] = item["status"]
+            item["status"] = "missing_file"
+            omitted.append(item)
+        asset_result["items"] = present_items
+        items = present_items
+    if not items:
+        return {"inline": [], "appendix": [], "suppressed": {}}
+
     used_blocks: set = set()
     placements: List[tuple] = []
     unmatched: List[Dict[str, Any]] = []
+    placed_items: List[Dict[str, Any]] = []
     for item in items:
         image = _make_image_block(item, out_md, index_json)
         if image is None:
@@ -315,16 +395,147 @@ def _place_assets_in_document(document, asset_result: Dict[str, Any], out_md: st
             unmatched.append(item)
             continue
         used_blocks.add(match_idx)
+        placed_items.append(item)
         placements.append((match_idx, _content_is_above_caption(item), image))
 
-    for match_idx, before, image in sorted(placements, key=lambda row: row[0], reverse=True):
-        insert_at = match_idx if before else match_idx + 1
-        document.blocks.insert(insert_at, image)
+    suppress, per_item_counts = _blocks_covered_by_assets(
+        document, placed_items + unmatched, used_blocks,
+    )
+
+    placements_by_idx = {idx: (before, image) for idx, before, image in placements}
+    new_blocks: List = []
+    for index, block in enumerate(document.blocks):
+        if index in suppress:
+            continue
+        entry = placements_by_idx.get(index)
+        if entry is None:
+            new_blocks.append(block)
+        else:
+            before, image = entry
+            if before:
+                new_blocks.extend([image, block])
+            else:
+                new_blocks.extend([block, image])
+    document.blocks[:] = new_blocks
 
     if unmatched:
         leftover = dict(asset_result)
         leftover["items"] = unmatched
         _append_asset_section(document, leftover, out_md)
+
+    return {
+        "inline": placed_items,
+        "appendix": unmatched,
+        "suppressed": per_item_counts,
+    }
+
+
+def _annotate_and_persist_embed_status(asset_result: Dict[str, Any],
+                                       placement: Optional[Dict[str, Any]]) -> None:
+    """把 Markdown 放置结果回写为逐资产嵌入字段（ADJ-015）。
+
+    inline=题注旁内联、appendix=文末资产区；未插入（被质量门拦住或没有
+    图片文件）的资产 referenced_in_markdown=False。只有 pdf_to_markdown
+    在完成放置后调用；extract_pdf_assets 独立入口不写这些字段，
+    避免虚构嵌入状态。
+    """
+    inline_ids = {id(i) for i in (placement or {}).get("inline", [])}
+    appendix_ids = {id(i) for i in (placement or {}).get("appendix", [])}
+    suppressed = (placement or {}).get("suppressed", {})
+    for item in asset_result.get("items") or []:
+        if id(item) in inline_ids:
+            item["referenced_in_markdown"] = True
+            item["embed_mode"] = "inline"
+        elif id(item) in appendix_ids:
+            item["referenced_in_markdown"] = True
+            item["embed_mode"] = "appendix"
+        else:
+            item["referenced_in_markdown"] = False
+            item["embed_mode"] = None
+        item["suppressed_text_blocks"] = int(suppressed.get(id(item), 0))
+    for item in asset_result.get("omitted") or []:
+        item["referenced_in_markdown"] = False
+        item["embed_mode"] = None
+    _persist_embed_status_to_index(asset_result)
+
+
+def _persist_embed_status_to_index(asset_result: Dict[str, Any]) -> None:
+    """把逐资产嵌入字段回写进 index.json（ADJ-015，best-effort）。
+
+    新格式 index.json 的 items/figures/tables 三处视图同步更新；
+    旧格式（纯 list）就地更新。文件缺失或结构不符时静默跳过，
+    不影响 Markdown 主产物。
+    """
+    index_json = asset_result.get("index_json") or ""
+    if not index_json or not os.path.exists(index_json):
+        return
+
+    def key_of(entry: Dict[str, Any]):
+        return (
+            str(entry.get("type") or ""),
+            str(entry.get("id") or ""),
+            entry.get("page"),
+            str(entry.get("file") or entry.get("current_file") or ""),
+        )
+
+    status_by_key = {}
+    for entry in asset_result.get("items") or []:
+        if "referenced_in_markdown" in entry:
+            status_by_key[key_of(entry)] = {
+                "referenced_in_markdown": bool(entry.get("referenced_in_markdown")),
+                "embed_mode": entry.get("embed_mode"),
+                "suppressed_text_blocks": int(entry.get("suppressed_text_blocks") or 0),
+            }
+    for entry in asset_result.get("omitted") or []:
+        # 被质量门拦住的资产必然未嵌入；即使未经过 annotate 也按 False 回写
+        status_by_key.setdefault(key_of(entry), {
+            "referenced_in_markdown": bool(entry.get("referenced_in_markdown", False)),
+            "embed_mode": entry.get("embed_mode"),
+            "suppressed_text_blocks": int(entry.get("suppressed_text_blocks") or 0),
+        })
+    if not status_by_key:
+        return
+    try:
+        with open(index_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        targets = []
+        if isinstance(data, list):
+            targets = [data]
+        elif isinstance(data, dict):
+            targets = [data[k] for k in ("items", "figures", "tables")
+                       if isinstance(data.get(k), list)]
+        for lst in targets:
+            for entry in lst:
+                status = status_by_key.get(key_of(entry))
+                if status:
+                    entry.update(status)
+        with open(index_json, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"WARNING: 回写嵌入状态到 index.json 失败（不影响主产物）: {exc}",
+              file=sys.stderr)
+
+
+def _summarize_embed_status(asset_result: Dict[str, Any]) -> Dict[str, Any]:
+    """控制台/报告用的嵌入汇总（ADJ-015）。"""
+    items = asset_result.get("items") or []
+    omitted = asset_result.get("omitted") or []
+    inline = sum(1 for i in items
+                 if i.get("referenced_in_markdown") and i.get("embed_mode") == "inline")
+    appendix = sum(1 for i in items
+                   if i.get("referenced_in_markdown") and i.get("embed_mode") == "appendix")
+    reasons: Dict[str, int] = {}
+    for entry in omitted:
+        reason = str(entry.get("status") or "unknown")
+        reasons[reason] = reasons.get(reason, 0) + 1
+    return {
+        "extracted": asset_result.get("extracted_count", len(items) + len(omitted)),
+        "embedded": inline + appendix,
+        "inline": inline,
+        "appendix": appendix,
+        "omitted": len(omitted),
+        "omitted_reasons": reasons,
+    }
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -342,8 +553,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     os.makedirs(os.path.dirname(paths["report_json"]), exist_ok=True)
 
     document = _paragraphs_to_document(paths["pdf_path"], paths["stem"])
+    if not (args.images == "off" and args.tables == "off"):
+        print(f"Asset dir: {paths['asset_dir']} "
+              f"(relative --asset-dir resolves next to the Markdown file)")
     asset_result = _run_asset_extraction(args, paths)
-    _place_assets_in_document(document, asset_result, paths["out_md"])
+    placement = _place_assets_in_document(document, asset_result, paths["out_md"])
+    if asset_result.get("enabled"):
+        _annotate_and_persist_embed_status(asset_result, placement)
+    embed_summary = _summarize_embed_status(asset_result) if asset_result.get("enabled") else None
 
     from lib.markdown import render_markdown
 
@@ -375,7 +592,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             "extracted_count": asset_result.get(
                 "extracted_count", len(asset_result.get("items", []))
             ),
+            "embedded_count": (embed_summary or {}).get("embedded", 0),
+            "embed": {
+                "inline": (embed_summary or {}).get("inline", 0),
+                "appendix": (embed_summary or {}).get("appendix", 0),
+            },
             "omitted": omitted,
+            "omitted_reasons": (embed_summary or {}).get("omitted_reasons", {}),
             "index_json": asset_result.get("index_json", ""),
             "exit_code": asset_exit,
         },
@@ -391,6 +614,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"Wrote Markdown: {paths['out_md']}")
     print(f"Wrote blocks: {paths['blocks_json']}")
     print(f"Wrote report: {paths['report_json']}")
+    if embed_summary:
+        reasons = ", ".join(
+            f"{k} {v}" for k, v in sorted(embed_summary["omitted_reasons"].items())
+        ) or "none"
+        print(
+            f"Assets: extracted {embed_summary['extracted']}, "
+            f"embedded {embed_summary['embedded']} "
+            f"(inline {embed_summary['inline']}, appendix {embed_summary['appendix']}), "
+            f"omitted {embed_summary['omitted']} ({reasons})"
+        )
 
     # 资产提取启用但失败时，必须向上游传播失败信号（避免静默产出无图 md）
     if asset_failed:

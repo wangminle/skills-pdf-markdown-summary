@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.7**.
+Current package version: **0.6.8**.
 
 ## Core Workflow
 
@@ -56,8 +56,10 @@ See `references/cli-options.md` for details.
 ## Output Rules
 
 - Use relative image links in generated Markdown.
-- Insert accepted figure/table screenshots next to their matching caption paragraph; unmatched assets go to a trailing asset section.
-- Insert accepted Figure/Table screenshots next to matching caption paragraphs; unmatched assets still go to a trailing `## 提取资产` section.
+- `--asset-dir` relative paths resolve next to the Markdown output file, not the current working directory: `--out out/paper.md --asset-dir assets` writes to `out/assets/`; pass an absolute path to opt out. Nesting the Markdown dir twice (e.g. `--asset-dir out/assets` with `--out out/paper.md` producing `out/out/assets/`) means the base was misunderstood. The console prints the resolved `Asset dir:` absolute path on every extraction run.
+- Insert accepted Figure/Table screenshots next to their matching caption paragraph (before it when the crop sits above the caption, otherwise after); unmatched assets still go to a trailing `## 提取资产` section.
+- When a screenshot is inserted, body text lines fully covered by the asset bbox are suppressed from the Markdown (explicit captions and out-of-frame text are kept); each asset's embed status (`referenced_in_markdown` / `embed_mode` / `suppressed_text_blocks`) is written back to `images/index.json`.
+- Image destinations are URL-encoded on demand and caption alt text escapes backslashes and brackets, so spaces in paths and half-open-interval captions still render as valid images; file names stay untouched.
 - Keep table screenshots when structure extraction is unavailable; do not drop tables.
 - For summaries, default to Chinese unless the user asks for another language.
 - Always use both the text file and Figure/Table images when writing a figure-aware summary.
@@ -68,10 +70,11 @@ See `references/cli-options.md` for details.
 The asset extractor includes:
 
 - Smart caption scoring using position, format, structure, and context.
+- Multi-line caption merging: continuation lines across adjacent same-column text blocks (unfinished-signal plus geometry/font-size guards), verb-opened caption sentences, and hyphenated line-break rejoining guided by whole-document word-form evidence.
 - Identifier parsing for numeric, roman, S-prefix, Extended Data, Chinese Figure/Table labels.
 - Direction detection using local evidence, global anchor fallback, page-position heuristics, and explicit overrides.
 - Baseline limiting by neighboring captions and layout text blocks.
-- Figure refinement for text trimming, object alignment, column-aware X clipping, layout adjustment, autocrop, and figure-title recovery.
+- Figure refinement for text trimming, object alignment, column-aware X clipping, layout adjustment, autocrop, autocrop-vetoed X narrowing (native-object coverage plus in-frame text preservation guards), and figure-title recovery.
 - Table refinement for multiline header recovery, rendered horizontal-rule compensation, table-band detection, width restoration, text-bbox padding, wrapped-tail preservation, far-side section-heading trimming, explicit table-note recovery below the bottom rule (including superscript digit notes with sequential-marker checks), and border-rule inclusion.
 - Captionless table continuation recovery on adjacent pages when continuation markers, repeated headers, and horizontal rules agree. This runs automatically; `--allow-continued` controls repeated-caption items. Recovered fragments receive boundary checks and may require review.
 - Optional semantic-layout evidence, full-page one-to-one pairing, multi-frame grouping, conservative refinement, and four-state quality reporting.

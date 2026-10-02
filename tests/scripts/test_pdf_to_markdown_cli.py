@@ -204,6 +204,9 @@ def test_images_off_tables_on_does_not_insert_figures() -> None:
                 ),
                 encoding="utf-8",
             )
+            # BUG-133 起放置层会校验 PNG 存在，mock 需贴合真实提取契约
+            (out_dir / "Figure_1.png").write_bytes(b"x")
+            (out_dir / "Table_1.png").write_bytes(b"x")
             return 0
 
         original_main = extract_pdf_assets_module.main
@@ -294,6 +297,7 @@ def test_images_extracted_by_default() -> None:
                 ),
                 encoding="utf-8",
             )
+            (out_dir / "Figure_1.png").write_bytes(b"x")
             return 0
 
         original_main = extract_pdf_assets_module.main
@@ -361,6 +365,8 @@ def test_omitted_assets_are_reported_instead_of_silent_ready() -> None:
                 ),
                 encoding="utf-8",
             )
+            (out_dir / "Figure_1.png").write_bytes(b"x")
+            (out_dir / "Table_2.png").write_bytes(b"x")
             return 0
 
         original_main = extract_pdf_assets_module.main
@@ -420,6 +426,10 @@ def _run_markdown_with_fake_assets(
         (out_dir / "index.json").write_text(
             json.dumps({"items": items}), encoding="utf-8"
         )
+        # BUG-133 起放置层会校验 PNG 存在，mock 需贴合真实提取契约
+        for it in items:
+            if it.get("file"):
+                (out_dir / it["file"]).write_bytes(b"x")
         return 0
 
     original_main = extract_pdf_assets_module.main
@@ -569,6 +579,10 @@ def _place_single_asset_blocks(kind: str, caption_text: str, ident: str) -> list
         "file": "image.png",
         "caption": caption_text,
     }
+    # BUG-133 起放置层会校验 PNG 存在，mock 需贴合真实提取契约
+    asset_dir = Path("/tmp/assets")
+    asset_dir.mkdir(parents=True, exist_ok=True)
+    (asset_dir / "image.png").write_bytes(b"x")
     _place_assets_in_document(
         document,
         {"items": [item], "index_json": "/tmp/assets/index.json"},

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
+from urllib.parse import quote
 
 
 @dataclass
@@ -57,7 +58,11 @@ def render_block(block: MarkdownBlock) -> str:
 
     if block.type == "image":
         alt = block.caption.strip() or block.text.strip() or "PDF image"
-        return f"![{alt}]({block.path})"
+        # alt 来自 PDF 原文，反斜杠与方括号必须作为字面字符保留。
+        alt = alt.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+        # path 是原始文件路径；空格、#、?、% 与括号不能参与 Markdown/URI 语法。
+        path = quote(block.path, safe="/")
+        return f"![{alt}]({path})"
 
     if block.type == "table":
         return block.text.strip()

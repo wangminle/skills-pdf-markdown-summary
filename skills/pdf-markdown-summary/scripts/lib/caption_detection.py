@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
 from .pdf_backend import PDFDocument, PDFPage, create_rect
 
@@ -37,12 +37,81 @@ from .idents import (
 # 正文引用句式开头（"Table 8 shows that ..."）：段首恰好以编号对象开头、
 # 后接陈述动词的句子是正文引用而非题注；其后续行会被 merge_caption_lines
 # 误合并成高大的假题注。
+_CAPTION_DESCRIPTION_VERB_ALT = (
+    r"shows?|demonstrates?|presents?|describes?|illustrates?|reports?|compares?|"
+    r"summarizes?|lists?|gives?|provides?|indicates?|suggests?"
+)
 _BODY_CITATION_OPENER_RE = re.compile(
     r"^\s*(?:Table|Tab\.?|Figure|Fig\.?)\s+[A-Za-z]?\d+\s+"
-    r"(?:shows?|demonstrates?|presents?|describes?|illustrates?|reports?|compares?|"
-    r"summarizes?|lists?|gives?|provides?|indicates?|suggests?)\b",
+    rf"(?:{_CAPTION_DESCRIPTION_VERB_ALT})\b",
     re.I,
 )
+
+# 跨块续行信号：题注文本以此类字符/功能词结尾说明句子明显未完（BUG-130，
+# PARADISE F6 块15 以 "Gordon," 结尾、块16 为 "1997), with AVM tagging"）。
+# 标点之外只放少量英文连词/介词（and/with/of 等），其余词级情况不猜，
+# 配合跨块左缘对齐、字号、间距约束，避免吞正文。
+# 功能词必须带词边界（BUG-132）：否则 ImageNet 命中 et、data 命中 a，
+# 完整题注会被误判为未完并吞入下一块正文。
+_CAPTION_CONTINUATION_END_RE = re.compile(
+    r"(?:[,;:，；：、(\[（—–\-&+]|\b(?:and|or|with|of|the|a|an|to|for|in|on|by|vs|et))$",
+    re.I,
+)
+
+# 题注换行断词（BUG-137）：行末 [A-Za-z]- 且下一行以小写字母开头时，
+# 优先使用全文中未跨行的完整词形（BUG-140），区分 Pro-/gramBench
+# 与 reasoning-/intensive。两种拼写均存在时保留连字符。
+# 无词形证据时才沿用 BUG-137 的前缀启发式：一般断词去连字符，
+# 常见复合前缀保留（end-to-/end、well-/known）。这一回退仍有语言歧义。
+_HYPHEN_KEEP_PREFIXES = frozenset({
+    "all", "anti", "bi", "co", "counter", "cross", "de", "double", "down",
+    "end", "ex", "extra", "first", "fore", "full", "half", "high", "ill",
+    "in", "inter", "intra", "long", "low", "mid", "multi", "non", "of",
+    "off", "on", "one", "out", "over", "part", "per", "post", "pre", "pro",
+    "pseudo", "quasi", "re", "real", "second", "self", "semi", "short",
+    "single", "so", "state", "sub", "super", "the", "third", "to", "tri",
+    "ultra", "under", "up", "well",
+})
+_CAPTION_WORD_RE = re.compile(r"[A-Za-z]+(?:-[A-Za-z]+)*")
+_HYPHEN_BREAK_RE = re.compile(r"([A-Za-z]+(?:-[A-Za-z]+)*)-$")
+
+
+def collect_caption_word_forms(doc: Union[PDFDocument, Any]) -> Set[str]:
+    """收集全文已有的完整词形，不拼接换行，供题注断词判定（BUG-140）。"""
+    raw_doc = _unwrap_doc(doc)
+    forms: Set[str] = set()
+    for pno in range(len(raw_doc)):
+        forms.update(word.casefold() for word in _CAPTION_WORD_RE.findall(
+            raw_doc[pno].get_text("text")
+        ))
+    return forms
+
+
+def _join_caption_text(parts: List[str], word_forms: Optional[Set[str]] = None) -> str:
+    """拼接题注各行，完整词形证据优先；无证据时沿用断词启发式。"""
+    if not parts:
+        return ""
+    forms = word_forms or set()
+    out = parts[0]
+    for part in parts[1:]:
+        m = _HYPHEN_BREAK_RE.search(out)
+        if m and part[:1].islower():
+            next_word = _CAPTION_WORD_RE.match(part)
+            suffix = next_word.group() if next_word else ""
+            joined = (m.group(1) + suffix).casefold()
+            hyphenated = (m.group(1) + "-" + suffix).casefold()
+            # 两种拼写均有证据时保留原连字符，避免有损规范化。
+            if hyphenated in forms:
+                out += part
+            elif joined in forms:
+                out = out[:-1] + part
+            elif m.group(1).rsplit("-", 1)[-1].lower() in _HYPHEN_KEEP_PREFIXES:
+                out += part
+            else:
+                out = out[:-1] + part
+        else:
+            out += " " + part
+    return out
 
 # 模块日志器
 logger = logging.getLogger(__name__)
@@ -287,10 +356,10 @@ def is_likely_reference_context(text: str) -> bool:
         r'^(?:tables|tabs\.?|figures|figs\.?)\s+[a-z]?\d+\s*(?:and|,|;|–|-|to)\s*[a-z]?\d+\b',
         # 「标签 + 编号 + 描述动词 + that/how 从句」是正文句；限定 that/how
         # 是为了不误伤 "Figure 3 shows the architecture" 这类句式 caption。
-        r'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s*[a-z]?\d+\s+(?:shows?|demonstrates?|illustrates?|compares?|presents?|summarizes?|reports?)\s+(?:that|how)\b',
+        rf'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s*[a-z]?\d+\s+(?:{_CAPTION_DESCRIPTION_VERB_ALT})\s+(?:that|how)\b',
         # 同一句式若在句号后继续写下一句，已经是正文而不是题注。
         # "Table 4 presents the results of the factor analysis. The six factors..."
-        r'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s+[a-z]?\d+\s+(?:shows?|demonstrates?|illustrates?|compares?|presents?|summarizes?|reports?)\b.{8,}\.\s+\w',
+        rf'^(?:tables?|tabs?\.?|figures?|figs?\.?)\s+[a-z]?\d+\s+(?:{_CAPTION_DESCRIPTION_VERB_ALT})\b.{{8,}}\.\s+\w',
         r'如.*所示', r'见.*图', r'参见', r'如.*表.*所示',
         r'according to (figure|table)', r'based on (figure|table)',
         r'from (figure|table)',
@@ -339,7 +408,8 @@ def find_all_caption_candidates(
     page: "fitz.Page",
     page_num: int,
     pattern: re.Pattern,
-    kind: str = 'figure'
+    kind: str = 'figure',
+    word_forms: Optional[Set[str]] = None,
 ) -> List["CaptionCandidate"]:
     """
     在单页中找到所有匹配 pattern 的候选 caption。
@@ -349,6 +419,7 @@ def find_all_caption_candidates(
         page_num: 页码（0-based）
         pattern: 匹配 caption 的正则表达式
         kind: 'figure' 或 'table'
+        word_forms: 全文完整词形；None 时从页面所属文档收集
 
     Returns:
         CaptionCandidate 列表
@@ -358,9 +429,12 @@ def find_all_caption_candidates(
     candidates: List[CaptionCandidate] = []
 
     try:
+        if word_forms is None:
+            word_forms = collect_caption_word_forms(_unwrap_page(page).parent)
         dict_data = page.get_text("dict")
+        page_blocks = dict_data.get("blocks", [])
 
-        for blk_idx, blk in enumerate(dict_data.get("blocks", [])):
+        for blk_idx, blk in enumerate(page_blocks):
             if blk.get("type", 0) != 0:  # 只处理文本 block
                 continue
 
@@ -388,7 +462,11 @@ def find_all_caption_candidates(
                     if not number:
                         continue
 
-                    merged = merge_caption_lines(blk, ln_idx, pattern)
+                    merged = merge_caption_lines(
+                        blk, ln_idx, pattern,
+                        following_blocks=page_blocks[blk_idx + 1:],
+                        word_forms=word_forms,
+                    )
                     candidate = CaptionCandidate(
                         rect=merged.rect if merged else create_rect(*ln.get("bbox", [0, 0, 0, 0])),
                         text=merged.text if merged else text_stripped,
@@ -649,7 +727,8 @@ def build_caption_index(
     doc: Union[PDFDocument, Any],
     figure_pattern: Optional[re.Pattern] = None,
     table_pattern: Optional[re.Pattern] = None,
-    debug: bool = False
+    debug: bool = False,
+    word_forms: Optional[Set[str]] = None,
 ) -> "CaptionIndex":
     """
     预扫描全文，建立 caption 索引。
@@ -663,6 +742,7 @@ def build_caption_index(
             None 表示使用默认 Table 正则；
             False（布尔值）表示跳过 Table 检测。
         debug: 是否输出调试信息
+        word_forms: 可复用的全文完整词形；None 时扫描一次文档
 
     Returns:
         CaptionIndex 对象
@@ -681,13 +761,15 @@ def build_caption_index(
     all_candidates: Dict[str, List["CaptionCandidate"]] = {}
 
     raw_doc = _unwrap_doc(doc)
+    if word_forms is None:
+        word_forms = collect_caption_word_forms(doc)
     for pno in range(len(raw_doc)):
         page = raw_doc[pno]
         images = get_page_images(page)
         drawings = get_page_drawings(page)
 
         if not skip_figure and figure_pattern is not None:
-            figure_cands = find_all_caption_candidates(page, pno, figure_pattern, 'figure')
+            figure_cands = find_all_caption_candidates(page, pno, figure_pattern, 'figure', word_forms)
             for cand in figure_cands:
                 cand.score = score_caption_candidate(cand, images, drawings, debug=debug)
                 key = f"figure_{cand.number}"
@@ -696,7 +778,7 @@ def build_caption_index(
                 all_candidates[key].append(cand)
 
         if not skip_table and table_pattern is not None:
-            table_cands = find_all_caption_candidates(page, pno, table_pattern, 'table')
+            table_cands = find_all_caption_candidates(page, pno, table_pattern, 'table', word_forms)
             for cand in table_cands:
                 cand.score = score_caption_candidate(cand, images, drawings, debug=debug)
                 key = f"table_{cand.number}"
@@ -724,6 +806,8 @@ def merge_caption_lines(
     max_continuation_lines: int = 5,
     max_y_gap_ratio: float = 0.6,
     typical_line_h: Optional[float] = None,
+    following_blocks: Optional[List[Dict]] = None,
+    word_forms: Optional[Set[str]] = None,
 ) -> Optional["CaptionBlock"]:
     """
     将 caption 首行与后续续行合并为统一的 CaptionBlock。
@@ -737,6 +821,14 @@ def merge_caption_lines(
     3. 续行与前一行的 y 间距 < max_y_gap_ratio × typical_line_h
     4. 续行字号与首行相近（差值 < 3pt）
 
+    跨块续行（BUG-130，仅当传入 following_blocks 且块内行已耗尽时尝试）：
+    5. 当前合并文本必须以明确的未完信号结尾（逗号/分号/开括号/连字符等，
+       见 _CAPTION_CONTINUATION_END_RE）；无信号不跨块
+    6. 只进入阅读顺序上紧邻的下一个文本块，遇非文本块（图片等）即停
+    7. 跨块行左缘与题注首行左缘差 ≤ 3pt（比块内 x 重叠更严格，
+       用于排除首行缩进的正文段落）
+    8. 每跨完一个整块须再次出现未完信号才能继续下一块
+
     Args:
         block: PyMuPDF 文本块字典
         start_line_idx: 首行在 block["lines"] 中的索引
@@ -744,6 +836,9 @@ def merge_caption_lines(
         max_continuation_lines: 最大续行数
         max_y_gap_ratio: y 间距与行高的最大比值
         typical_line_h: 典型行高（None 则自动估计）
+        following_blocks: 同页阅读顺序上位于 block 之后的块列表；
+            None 表示只做块内合并（旧行为）
+        word_forms: 全文完整词形，用于区分排版断词与真实复合词
 
     Returns:
         CaptionBlock 或 None（如果首行索引无效）
@@ -771,6 +866,7 @@ def merge_caption_lines(
     merged_text_parts = [start_text]
     merged_count = 1
     prev_y1 = start_bbox.y1
+    block_exhausted = True
 
     for i in range(start_line_idx + 1, min(start_line_idx + max_continuation_lines + 1, len(lines))):
         line = lines[i]
@@ -784,19 +880,23 @@ def merge_caption_lines(
 
         if (pattern.match(line_text) or DEFAULT_FIGURE_LINE_RE.match(line_text)
                 or DEFAULT_TABLE_LINE_RE.match(line_text)):
+            block_exhausted = False
             break
 
         y_gap = line_bbox.y0 - prev_y1
         if y_gap > max_y_gap or line_bbox.y0 < start_bbox.y0 - 1:
+            block_exhausted = False
             break
         if (min(line_bbox.x1, merged_rect.x1) <= max(line_bbox.x0, merged_rect.x0)
                 and line_bbox.y0 > prev_y1 - 1.0):
+            block_exhausted = False
             break
 
         line_sizes = [float(sp.get("size", 10.0)) for sp in line_spans if "size" in sp]
         avg_line_size = sum(line_sizes) / len(line_sizes) if line_sizes else 10.0
 
         if abs(avg_line_size - avg_font_size) > 3.0:
+            block_exhausted = False
             break
 
         merged_rect = merged_rect | line_bbox
@@ -804,15 +904,67 @@ def merge_caption_lines(
         merged_count += 1
         prev_y1 = line_bbox.y1
 
-    full_text = " ".join(merged_text_parts)
+    # BUG-130：块内行耗尽且文本以未完信号结尾时，才尝试跨块续行
+    # （PARADISE F6 题注被 PDF 生成器拆成两个块）。跨块行追加更严格的
+    # 左缘对齐约束，整页正文段落首行通常缩进，进不来。
+    if (following_blocks and block_exhausted
+            and (merged_count - 1) < max_continuation_lines
+            and _CAPTION_CONTINUATION_END_RE.search(
+                " ".join(merged_text_parts).rstrip())):
+        for fblk in following_blocks:
+            if fblk.get("type", 0) != 0:
+                break
+            flines = fblk.get("lines", [])
+            if not flines:
+                break
+            consumed_all = True
+            for line in flines:
+                line_spans = line.get("spans", [])
+                line_text = "".join(sp.get("text", "") for sp in line_spans).strip()
+                if not line_text:
+                    continue
+                line_bbox = create_rect(*line.get("bbox", [0, 0, 0, 0]))
+                if (pattern.match(line_text) or DEFAULT_FIGURE_LINE_RE.match(line_text)
+                        or DEFAULT_TABLE_LINE_RE.match(line_text)):
+                    consumed_all = False
+                    break
+                y_gap = line_bbox.y0 - prev_y1
+                if y_gap > max_y_gap or line_bbox.y0 < start_bbox.y0 - 1:
+                    consumed_all = False
+                    break
+                if abs(line_bbox.x0 - start_bbox.x0) > 3.0:
+                    consumed_all = False
+                    break
+                line_sizes = [float(sp.get("size", 10.0)) for sp in line_spans if "size" in sp]
+                avg_line_size = sum(line_sizes) / len(line_sizes) if line_sizes else 10.0
+                if abs(avg_line_size - avg_font_size) > 3.0:
+                    consumed_all = False
+                    break
+                merged_rect = merged_rect | line_bbox
+                merged_text_parts.append(line_text)
+                merged_count += 1
+                prev_y1 = line_bbox.y1
+                if (merged_count - 1) >= max_continuation_lines:
+                    consumed_all = False
+                    break
+            if not consumed_all:
+                break
+            if not _CAPTION_CONTINUATION_END_RE.search(
+                    " ".join(merged_text_parts).rstrip()):
+                break
+
+    # 跨块信号检查必须看到行末原始连字符（"-" 本身是未完信号），
+    # 所以只对最终文本做断词合并，上面的 " ".join 保持不变。
+    full_text = _join_caption_text(merged_text_parts, word_forms)
 
     # 正文句 "Table 8 shows that RL plays..." 从段首开始，五条续行全部
     # 通过间距/字号/x 重叠检查，会合并成 60pt+ 的"题注"；这种假题注作为
     # 邻居参与方向判定时会把真题注的 above 证据挤掉（FunAudio T8 实测
-    # 方向翻成 below）。正文引用句式（Table/Figure N + 陈述动词）不是
-    # 冒号式题注，按正文处理，调用方回退为首行矩形。不能用合并高度判
-    # 断：Kimi K3 F12 的四行长题注（60.6pt）是真实的。
-    if _BODY_CITATION_OPENER_RE.match(start_text):
+    # 方向翻成 below）。描述动词本身也可出现在真题注中（BUG-136），
+    # 只有共享引用判据确认 shows that/how 或多句正文时才拒绝合并。
+    # 不能用合并高度判断：Kimi K3 F12 的四行长题注（60.6pt）是真实的。
+    if (_BODY_CITATION_OPENER_RE.match(start_text)
+            and is_likely_reference_context(full_text)):
         return None
 
     return CaptionBlock(

@@ -23,7 +23,7 @@ QA-01 统一测试入口
   一律失败，仅用户显式授权的排除模式可跳过），
   通过/失败数从 pytest 输出解析，解析不到标记"数量未知"。
 
-测试套件（共 24 个）：
+测试套件（共 25 个）：
 1. P0 环境变量优先级测试 (test_p0_env_priority.py)
 2. P1 标识符解析测试 (test_p1_ident_parsing.py)
 3. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
@@ -48,6 +48,7 @@ QA-01 统一测试入口
 22. 题注识别修复回归测试 (test_bugfix_20260930.py)
 23. table_refine 边界测试 (test_table_refine_boundaries_20260930.py)
 24. 零 BUG 功能覆盖抽查 (test_zero_bug_coverage_20260930.py)
+25. 复核修复回归测试 (test_bugfix_20261001.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -412,6 +413,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     test_suites.append({
         "name": "零 BUG 功能覆盖抽查 (20260930)",
         "path": TESTS_SCRIPTS_DIR / "test_zero_bug_coverage_20260930.py",
+    })
+
+    # 2026-10-01 BUG-130~131 / ADJ-015 / DOC-067 回归（跨块题注合并、
+    # 表体文字抑制、逐资产嵌入状态、asset-dir 说明）
+    test_suites.append({
+        "name": "复核修复回归 (20261001)",
+        "path": TESTS_SCRIPTS_DIR / "test_bugfix_20261001.py",
     })
 
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，

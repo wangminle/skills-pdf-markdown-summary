@@ -33,6 +33,7 @@ from .idents import TABLE_LINE_RE, build_output_basename, extract_table_ident, l
 from .caption_detection import (
     build_caption_index, select_best_caption, find_all_caption_candidates,
     merge_caption_lines, is_caption_reference, is_likely_reference_context,
+    collect_caption_word_forms,
 )
 from .assess import (
     AssessmentInput,
@@ -193,6 +194,7 @@ def extract_tables(
     pdf_name = os.path.basename(pdf_path)
     assert _doc is not None
     doc = _doc
+    caption_word_forms = collect_caption_word_forms(doc)
     os.makedirs(out_dir, exist_ok=True)
 
     records: List[AttachmentRecord] = []
@@ -214,7 +216,8 @@ def extract_tables(
             doc,
             figure_pattern=None,  # 图题注同样是表格搜索区的边界
             table_pattern=TABLE_LINE_RE,
-            debug=debug_captions
+            debug=debug_captions,
+            word_forms=caption_word_forms,
         )
         if debug_captions and caption_index:
             print(f"[CAPTION_INDEX] Built with {len(caption_index.candidates)} keys for tables")
@@ -277,7 +280,8 @@ def extract_tables(
         image_rects = collect_image_rects(dict_data, page_rect)
 
         # 查找 Table captions
-        for blk in dict_data.get("blocks", []):
+        page_blocks = dict_data.get("blocks", [])
+        for blk_idx, blk in enumerate(page_blocks):
             if blk.get("type", 0) != 0:
                 continue
 
@@ -337,6 +341,8 @@ def extract_tables(
                 caption_block = merge_caption_lines(
                     blk, ln_idx, TABLE_LINE_RE,
                     typical_line_h=typical_line_h,
+                    following_blocks=page_blocks[blk_idx + 1:],
+                    word_forms=caption_word_forms,
                 )
                 if caption_block is not None:
                     caption_bbox = caption_block.rect

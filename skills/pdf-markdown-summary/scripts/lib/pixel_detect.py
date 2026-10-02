@@ -470,3 +470,52 @@ def build_text_masks_px(
             masks.append((l, t, r, b))
 
     return masks
+
+
+def autocrop_x_range_with_object_support(
+    clip: "fitz.Rect",
+    autocrop_clip: "fitz.Rect",
+    object_rects: List["fitz.Rect"],
+    min_width_ratio: float = 0.30,
+    min_saving: float = 10.0,
+    support_ratio: float = 0.50,
+    text_lines: Optional[List[Tuple["fitz.Rect", float, str]]] = None,
+) -> Optional["fitz.Rect"]:
+    """autocrop 被高度守卫整体否决时，尝试只保留其 x 收窄分量。
+
+    栏位几何（refine_clip_x_range）只能夹栏的内侧缘（朝页中心一侧），
+    外侧缘始终落到页边距，右栏图的 x1、左栏图的 x0 只有像素证据能
+    收紧。高度守卫否决的是 y 收缩，x 分量可能依然正确；但像素噪声
+    也可能把图切窄，因此仅当收窄带得到原生对象（图像/矢量）面积
+    支撑（≥ support_ratio）时才采用。无原生对象的扫描页返回 None，
+    维持原行为。原框内的文字也必须保留：像素文字遮罩可能把图旁
+    或图底的标签隐藏，面积支撑本身不能证明文字完整。
+    """
+    if fitz is None or not object_rects:
+        return None
+    nx0 = max(clip.x0, autocrop_clip.x0)
+    nx1 = min(clip.x1, autocrop_clip.x1)
+    if nx1 - nx0 < clip.width * min_width_ratio:
+        return None
+    if clip.width - (nx1 - nx0) < min_saving:
+        return None
+    band = fitz.Rect(nx0, clip.y0, nx1, clip.y1)
+    total = 0.0
+    supported = 0.0
+    for rect in object_rects:
+        inter = rect & clip
+        if inter.is_empty or inter.width <= 0 or inter.height <= 0:
+            continue
+        total += inter.width * inter.height
+        inner = rect & band
+        if not inner.is_empty and inner.width > 0 and inner.height > 0:
+            supported += inner.width * inner.height
+    if total <= 0 or supported / total < support_ratio:
+        return None
+    for rect, _size, text in (text_lines or []):
+        visible = rect & clip
+        if not text.strip() or visible.is_empty:
+            continue
+        if visible.x0 < band.x0 - 1.0 or visible.x1 > band.x1 + 1.0:
+            return None
+    return fitz.Rect(nx0, clip.y0, nx1, clip.y1)
