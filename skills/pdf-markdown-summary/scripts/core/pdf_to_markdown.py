@@ -65,11 +65,12 @@ def _resolve_outputs(args: argparse.Namespace) -> Dict[str, str]:
     }
 
 
-def _paragraphs_to_document(pdf_path: str, title: str):
+def _paragraphs_to_document(pdf_path: str, title: str, validation=None):
     from lib.markdown import MarkdownBlock, MarkdownDocument
     from lib.text_extract import gather_structured_text, pre_validate_pdf
 
-    validation = pre_validate_pdf(pdf_path)
+    if validation is None:
+        validation = pre_validate_pdf(pdf_path)
     gathered = gather_structured_text(pdf_path)
 
     blocks: List[MarkdownBlock] = []
@@ -339,6 +340,148 @@ def _blocks_covered_by_assets(document, items, protected_idx: set):
     return covered, per_item_counts
 
 
+def _preserve_equation_regions(
+    document,
+    asset_result: Dict[str, Any],
+    paths: Dict[str, str],
+    images_enabled: bool,
+) -> Dict[str, Any]:
+    """独立公式碎片区域整块保留（BUG-145 / issue #4 问题5）。
+
+    扫描件 OCR 会把一个独立公式拆成多个碎片段落（分子/分数线/分母各一段），
+    直接序列化不可可靠消费。检测与分组由 lib.equation_regions 完成，
+    这里只按原页证据保留，不猜公式内容：
+
+    - --images figures 时按组 bbox 从原页截图，碎片段落替换为图片块；
+    - 图片关闭（或截图失败退回）时整块合并为 ```text 代码块，保留 OCR 原文；
+    - 检测结果标记为不完整（只有悬挂下标、边界无法补全）时不替换，
+      原文保留，并在 equations.needs_review 中显式计为待复核。
+
+    与已嵌入资产 final_bbox 重叠的碎片跳过（截图已覆盖该区域）。
+    截图失败按降级处理而非硬失败：文本仍完整保留，不丢数据。
+    """
+    from lib.equation_regions import detect_equation_groups
+
+    paragraph_items = []
+    for idx, block in enumerate(document.blocks):
+        if getattr(block, "type", "") != "paragraph":
+            continue
+        page = getattr(block, "page", None)
+        bbox = (getattr(block, "meta", None) or {}).get("bbox")
+        if page is None or not bbox or len(bbox) < 4:
+            continue
+        paragraph_items.append((idx, int(page), [float(v) for v in bbox[:4]], block.text))
+
+    exclusions = []
+    for item in asset_result.get("items") or []:
+        final_bbox = item.get("final_bbox")
+        page = item.get("page")
+        if final_bbox and len(final_bbox) >= 4 and page is not None:
+            exclusions.append((int(page), [float(v) for v in final_bbox[:4]]))
+
+    groups = detect_equation_groups(paragraph_items, exclusions=exclusions)
+    stats: Dict[str, Any] = {
+        "detected": len(groups),
+        "screenshot": 0,
+        "text_merged": 0,
+        "render_fallback": 0,
+        "needs_review": 0,
+        "groups": [],
+    }
+    if not groups:
+        return stats
+
+    import fitz
+
+    from lib.markdown import MarkdownBlock
+    from lib.output import get_unique_path, save_pixmap_clean
+
+    md_dir = os.path.dirname(os.path.abspath(paths["out_md"]))
+    member_indices: set = set()
+    replacements: Dict[int, MarkdownBlock] = {}
+    for seq, group in enumerate(groups, 1):
+        indices = sorted(int(k) for k in group.member_keys)
+        anchor = indices[0]
+        if not group.complete:
+            stats["needs_review"] += 1
+            stats["groups"].append({
+                "page": group.page,
+                "bbox": [round(v, 1) for v in group.bbox],
+                "members": len(indices),
+                "mode": "needs_review",
+            })
+            print(
+                f"WARNING: 公式区域边界不完整，保留原文待复核（page {group.page}）",
+                file=sys.stderr,
+            )
+            continue
+        member_indices.update(indices)
+        merged = "\n".join(
+            (document.blocks[i].text or "").strip()
+            for i in indices
+            if (document.blocks[i].text or "").strip()
+        )
+        if not merged:
+            continue
+        meta = {"equation_group": group.to_dict()}
+        replacement: Optional[MarkdownBlock] = None
+        if images_enabled:
+            # BUG-151：多份 PDF 共用资源目录时文件名会撞车，save_pixmap_clean
+            # 直接替换已有文件会覆盖用户已有的截图（AGENTS.md 第 10 条）；
+            # 复用 get_unique_path 换用不冲突的文件名，保留既有文件。
+            out_path, _ = get_unique_path(
+                os.path.join(paths["asset_dir"], f"Equation_p{group.page}_{seq}.png")
+            )
+            try:
+                with fitz.open(paths["pdf_path"]) as doc:
+                    page = doc[group.page - 1]
+                    clip = fitz.Rect(group.bbox) + (-3.0, -3.0, 3.0, 3.0)
+                    clip = clip & page.rect
+                    pix = page.get_pixmap(dpi=300, clip=clip)
+                    save_pixmap_clean(pix, out_path)
+                rel_path = os.path.relpath(out_path, md_dir).replace("\\", "/")
+                replacement = MarkdownBlock(
+                    type="image",
+                    text=f"Equation p{group.page}",
+                    path=rel_path,
+                    caption=" ".join(merged.split()),
+                    page=group.page,
+                    meta=meta,
+                )
+                stats["screenshot"] += 1
+            except Exception as exc:
+                stats["render_fallback"] += 1
+                print(
+                    f"WARNING: 公式区域截图失败，退回文本合并（page {group.page}）: {exc}",
+                    file=sys.stderr,
+                )
+        if replacement is None:
+            replacement = MarkdownBlock(
+                type="paragraph",
+                text=f"```text\n{merged}\n```",
+                page=group.page,
+                meta=meta,
+            )
+            stats["text_merged"] += 1
+        replacements[anchor] = replacement
+        stats["groups"].append({
+            "page": group.page,
+            "bbox": [round(v, 1) for v in group.bbox],
+            "members": len(indices),
+            "mode": "screenshot" if replacement.type == "image" else "text",
+        })
+
+    new_blocks = []
+    for idx, block in enumerate(document.blocks):
+        if idx in member_indices:
+            if idx in replacements:
+                new_blocks.append(replacements[idx])
+            continue
+        new_blocks.append(block)
+    document.blocks[:] = new_blocks
+    return stats
+
+
 def _place_assets_in_document(document, asset_result: Dict[str, Any], out_md: str) -> None:
     """把可插入资产放到对应题注旁；找不到题注的仍追加到文末。
 
@@ -546,17 +689,45 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"PDF not found: {paths['pdf_path']}", file=sys.stderr)
         return 1
 
-    os.makedirs(os.path.dirname(paths["out_md"]), exist_ok=True)
-    os.makedirs(paths["asset_dir"], exist_ok=True)
-    os.makedirs(paths["text_dir"], exist_ok=True)
-    os.makedirs(os.path.dirname(paths["blocks_json"]), exist_ok=True)
-    os.makedirs(os.path.dirname(paths["report_json"]), exist_ok=True)
+    from lib.output import validate_output_targets
 
-    document = _paragraphs_to_document(paths["pdf_path"], paths["stem"])
+    problems = validate_output_targets([
+        (paths["out_md"], False, "输出 Markdown"),
+        (paths["asset_dir"], True, "资源目录"),
+        (paths["text_dir"], True, "文本目录"),
+        (paths["blocks_json"], False, "blocks JSON"),
+        (paths["report_json"], False, "report JSON"),
+    ])
+    if problems:
+        for problem in problems:
+            print(f"[ERROR] {problem}", file=sys.stderr)
+        return 2
+
+    from lib.text_extract import pre_validate_pdf
+
+    validation = pre_validate_pdf(paths["pdf_path"])
+    if not validation.is_valid:
+        print(f"[ERROR] PDF validation failed: {validation.errors}", file=sys.stderr)
+        return 1
+
+    try:
+        os.makedirs(os.path.dirname(paths["out_md"]), exist_ok=True)
+        os.makedirs(paths["asset_dir"], exist_ok=True)
+        os.makedirs(paths["text_dir"], exist_ok=True)
+        os.makedirs(os.path.dirname(paths["blocks_json"]), exist_ok=True)
+        os.makedirs(os.path.dirname(paths["report_json"]), exist_ok=True)
+    except OSError as exc:
+        print(f"[ERROR] 创建输出目录失败: {exc}", file=sys.stderr)
+        return 2
+
+    document = _paragraphs_to_document(paths["pdf_path"], paths["stem"], validation)
     if not (args.images == "off" and args.tables == "off"):
         print(f"Asset dir: {paths['asset_dir']} "
               f"(relative --asset-dir resolves next to the Markdown file)")
     asset_result = _run_asset_extraction(args, paths)
+    equation_stats = _preserve_equation_regions(
+        document, asset_result, paths, images_enabled=args.images != "off"
+    )
     placement = _place_assets_in_document(document, asset_result, paths["out_md"])
     if asset_result.get("enabled"):
         _annotate_and_persist_embed_status(asset_result, placement)
@@ -564,18 +735,22 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from lib.markdown import render_markdown
 
-    with open(paths["out_md"], "w", encoding="utf-8") as f:
-        f.write(render_markdown(document))
+    try:
+        with open(paths["out_md"], "w", encoding="utf-8") as f:
+            f.write(render_markdown(document))
 
-    with open(paths["blocks_json"], "w", encoding="utf-8") as f:
-        json.dump(document.to_dict(), f, ensure_ascii=False, indent=2)
+        with open(paths["blocks_json"], "w", encoding="utf-8") as f:
+            json.dump(document.to_dict(), f, ensure_ascii=False, indent=2)
+    except OSError as exc:
+        print(f"[ERROR] 写入输出文件失败: {exc}", file=sys.stderr)
+        return 2
 
     asset_exit = asset_result.get("exit_code")
     asset_failed = bool(asset_result.get("enabled") and asset_exit)
     omitted = asset_result.get("omitted") or []
     if asset_failed:
         report_status = "failed"
-    elif omitted:
+    elif omitted or equation_stats.get("needs_review"):
         report_status = "review"
     else:
         report_status = "ready"
@@ -606,10 +781,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             "mode": args.ocr,
             "status": "not_implemented" if args.ocr != "off" else "off",
         },
+        "equations": equation_stats,
         "generated_at": datetime.now().isoformat(),
     }
-    with open(paths["report_json"], "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
+    try:
+        with open(paths["report_json"], "w", encoding="utf-8") as f:
+            json.dump(report, f, ensure_ascii=False, indent=2)
+    except OSError as exc:
+        print(f"[ERROR] 写入 report JSON 失败: {exc}", file=sys.stderr)
+        return 2
 
     print(f"Wrote Markdown: {paths['out_md']}")
     print(f"Wrote blocks: {paths['blocks_json']}")
@@ -623,6 +803,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             f"embedded {embed_summary['embedded']} "
             f"(inline {embed_summary['inline']}, appendix {embed_summary['appendix']}), "
             f"omitted {embed_summary['omitted']} ({reasons})"
+        )
+    if equation_stats.get("detected"):
+        print(
+            f"Equations: detected {equation_stats['detected']}, "
+            f"screenshot {equation_stats['screenshot']}, "
+            f"text merged {equation_stats['text_merged']}"
+            + (f", render fallback {equation_stats['render_fallback']}"
+               if equation_stats.get("render_fallback") else "")
+            + (f", needs review {equation_stats['needs_review']}"
+               if equation_stats.get("needs_review") else "")
         )
 
     # 资产提取启用但失败时，必须向上游传播失败信号（避免静默产出无图 md）

@@ -2,4 +2,4 @@
 # -*- coding: utf-8 -*-
 """PDF Markdown Summary Skill 脚本包。"""
 
-__version__ = "0.6.8"
+__version__ = "0.6.9"

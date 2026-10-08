@@ -65,6 +65,8 @@ Flags are grouped below to match their function in the source. Most flags are al
 > - Table-specific values (`--table-clip-height` 520, `--table-margin-x` 26, `--table-caption-gap` 6) already match the raw defaults.
 >
 > The preset only fills parameters that were not explicitly passed on the command line, including negative flags and aliases mapped to a different argparse `dest`.
+>
+> Geometry flags are validated at parse time: `--dpi` must be a positive integer, and `--clip-height` / `--table-clip-height` must be positive finite floats (`nan`/`inf` rejected). Invalid values abort with an argparse error (exit code 2) before any output directory is created.
 
 ### Input / Output
 

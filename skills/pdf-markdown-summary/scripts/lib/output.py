@@ -20,6 +20,7 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -40,6 +41,74 @@ def _relative_output_path(out_path: str, base_dir: str) -> str:
     if not out_path:
         return ""
     return os.path.relpath(os.path.abspath(out_path), base_dir).replace('\\', '/')
+
+def save_pixmap_clean(pix: Any, out_path: str) -> None:
+    """先写入同目录临时文件，成功且非空后再原子替换目标。
+
+    PyMuPDF 的 Pixmap.save 会先创建目标再写数据。若直接写到已有 PNG 上，
+    失败会把有效旧图截成 0 字节甚至删掉。临时文件失败只清理临时文件，
+    已有目标保持原字节；成功后用 os.replace 替换。空文件视为失败。
+    """
+    directory = os.path.dirname(os.path.abspath(out_path)) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".pixmap-", suffix=".png", dir=directory)
+    os.close(fd)
+    try:
+        pix.save(tmp_path)
+        if os.path.getsize(tmp_path) == 0:
+            raise OSError(f"pixmap save produced an empty file: {out_path}")
+        os.replace(tmp_path, out_path)
+    except Exception:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _nearest_existing_ancestor(path: str) -> Optional[str]:
+    """返回 path 最近的存在祖先（文件或目录）；全部不存在时返回 None。"""
+    parent = os.path.dirname(os.path.abspath(path))
+    while parent:
+        if os.path.exists(parent):
+            return parent
+        new_parent = os.path.dirname(parent)
+        if new_parent == parent:
+            return None
+        parent = new_parent
+    return None
+
+
+def validate_output_targets(checks) -> List[str]:
+    """校验输出路径与已存在的文件/目录是否类型冲突（写盘前前置检查）。
+
+    Args:
+        checks: (path, expect_dir, label) 序列。
+            - expect_dir=True：该路径必须是目录，已存在同名文件即冲突；
+            - expect_dir=False：该路径必须是文件，已存在同名目录即冲突。
+        除目标自身外，还会沿父链找到最近的存在祖先：若该祖先是文件，
+        则任何 makedirs/open 都只会在写盘阶段抛裸 FileExistsError，
+        这里提前报告。
+
+    Returns:
+        中文错误信息列表；空列表表示全部通过。
+    """
+    problems: List[str] = []
+    for path, expect_dir, label in checks:
+        if not path:
+            continue
+        if expect_dir:
+            if os.path.exists(path) and not os.path.isdir(path):
+                problems.append(f"{label}已存在同名文件，无法创建目录: {path}")
+        elif os.path.isdir(path):
+            problems.append(f"{label}指向已存在的目录，无法写入文件: {path}")
+        if not os.path.exists(path):
+            ancestor = _nearest_existing_ancestor(path)
+            if ancestor is not None and not os.path.isdir(ancestor):
+                problems.append(
+                    f"{label}的父路径是已存在的文件，无法在其下创建输出: {path}（父路径 {ancestor}）"
+                )
+    return problems
 
 def write_manifest(
     records: List["AttachmentRecord"],

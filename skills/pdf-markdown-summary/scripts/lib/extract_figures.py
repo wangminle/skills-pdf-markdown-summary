@@ -158,6 +158,9 @@ def extract_figures(
     # Global anchor
     global_anchor: Optional[str] = None,
     global_anchor_margin: float = 0.02,
+    # 渲染硬失败收集（I/O 级错误，区别于质量存疑）；传入列表时逐个追加，
+    # 由调用方（extract_pdf_assets.main_modular）汇总为非零退出码。
+    render_failures: Optional[List[Dict[str, Any]]] = None,
     _doc: Optional[PDFDocument] = None,
 ) -> List[AttachmentRecord]:
     """
@@ -653,9 +656,13 @@ def extract_figures(
                             )
                             if x_only_clip is not None:
                                 final_clip = x_only_clip
+                            # 与 extract_tables 同一写法：日志如实陈述实际触发条件，
+                            # 避免打印不成立的高度不等式误导排查（ISSUE-8）。
+                            reason = "min-height" if autocrop_h < min_h_px else "shrink-limit"
                             logger.debug(
                                 f"Figure {ident}: autocrop rejected "
-                                f"(h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})"
+                                f"(h={autocrop_h:.1f}, min_h_px={min_h_px:.1f}, "
+                                f"shrink_limit_h={base_h * autocrop_shrink_limit:.1f}, reason={reason})"
                                 + (", x range adopted" if x_only_clip is not None else "")
                             )
                     except Exception as e:
@@ -854,8 +861,22 @@ def extract_figures(
                 # 渲染与保存
                 # ================================================================
                 try:
-                    pix = page.get_pixmap(dpi=dpi, clip=final_clip)
-                    pix.save(out_path)
+                    from .output import save_pixmap_clean
+
+                    try:
+                        pix = page.get_pixmap(dpi=dpi, clip=final_clip)
+                        save_pixmap_clean(pix, out_path)
+                    except Exception as render_err:
+                        # 渲染/落盘是 I/O 级硬失败：记录到 render_failures 供
+                        # 主入口汇总为非零退出码，不能只当普通质量存疑。
+                        if render_failures is not None:
+                            render_failures.append({
+                                "kind": "figure",
+                                "id": ident,
+                                "page": pno + 1,
+                                "error": str(render_err),
+                            })
+                        raise
 
                     # A0-1: 落盘最终渲染框（只记录，不改变任何截图行为）
                     final_bbox = [final_clip.x0, final_clip.y0, final_clip.x1, final_clip.y1]

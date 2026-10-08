@@ -526,13 +526,6 @@ def test_page_centered_caption_never_marks_cross_column_table():
     assert table_spans_both_columns(clip, caption, page, lines) is False
 
 
-_PARADISE_P9_CANDIDATES = (
-    Path("/Users/fenix-macmini/Documents/Haier/6-HaierVibeCoding/"
-         "2-新需求设计/20260924-分布式唤醒主观体验测试方案/1-参考素材/"
-         "PARADISE-口语对话系统评价框架.pdf"),
-)
-
-
 def _write_reconstructed_paradise_page9(pdf_path: Path) -> None:
     """按 PARADISE 第 9 页实测坐标重建：左栏 Table 7 + 右栏重叠正文。"""
     doc = fitz.open()
@@ -578,13 +571,12 @@ def _write_reconstructed_paradise_page9(pdf_path: Path) -> None:
 
 
 def _paradise_page9_pdf(tmp_path: Path) -> Path:
+    """重建 PARADISE 第 9 页作为唯一样本源（ISSUE-9）。
+
+    不再依赖作者本机绝对路径：干净克隆上重建页可确定性复现同一布局
+    （左栏 Table 7 + 右栏重叠正文），断言按重建页几何标定。
+    """
     dest = tmp_path / "paradise_p9.pdf"
-    for src in _PARADISE_P9_CANDIDATES:
-        if src.is_file():
-            with fitz.open(src) as doc, fitz.open() as out:
-                out.insert_pdf(doc, from_page=8, to_page=8)
-                out.save(dest)
-            return dest
     _write_reconstructed_paradise_page9(dest)
     return dest
 
@@ -602,7 +594,9 @@ def test_paradise_page9_table7_stays_in_left_column(tmp_path):
     x0, y0, x1, y1 = table7.final_bbox
     assert x1 < 300, f"Table 7 扩进右栏 x1={x1}"
     assert x0 < 80, f"Table 7 左边界丢失 x0={x0}"
-    assert 100 <= y0 <= 130, f"Table 7 顶边偏离真表 y0={y0}"
+    # 重建页按实测坐标布排，标题行基线 111、pad=6.0 后顶边稳定在 ~96.4；
+    # 断言按重建页几何标定（真实 PDF 路径已移除，避免干净克隆上假红）。
+    assert 90 <= y0 <= 110, f"Table 7 顶边偏离重建页几何 y0={y0}"
     assert 155 <= y1 <= 190, f"Table 7 底边偏离真表 y1={y1}"
     with fitz.open(pdf) as doc:
         words = doc[0].get_text("words")
@@ -614,6 +608,55 @@ def test_paradise_page9_table7_stays_in_left_column(tmp_path):
         "integrative", "limitation", "paradise", "satisfaction",
     }]
     assert not polluted, f"右栏正文混入 Table 7: {polluted}"
+
+
+def test_autocrop_rejection_log_states_real_reason(tmp_path):
+    """issue#8：autocrop 拒绝日志必须陈述实际触发原因，不能是假不等式。
+
+    修复前拒绝日志打印 `h=74.0 < 59.2`（收缩比例守卫不成立），
+    实际归因是 min-height 守卫（74.0 < 80.0）；修复后应带
+    reason / min_h_px / shrink_limit_h / table_band_is_valid 且与
+    `if` 判定逻辑自洽。
+    """
+    import logging
+    import re
+
+    from lib.extract_tables import extract_tables
+    from lib.extract_tables import logger as tables_logger
+
+    pdf = _paradise_page9_pdf(tmp_path)
+    messages: list[str] = []
+
+    class _Recorder(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+
+    handler = _Recorder(level=logging.DEBUG)
+    old_level = tables_logger.level
+    tables_logger.setLevel(logging.DEBUG)  # pytest 下根 logger 为 WARNING，需显式放开
+    tables_logger.addHandler(handler)
+    try:
+        extract_tables(str(pdf), str(tmp_path / "images"), dpi=72, global_anchor_table="above")
+    finally:
+        tables_logger.removeHandler(handler)
+        tables_logger.setLevel(old_level)
+
+    rejected = [m for m in messages if "autocrop rejected" in m]
+    assert rejected, "重建页低 dpi 下应至少出现一条 autocrop 拒绝日志"
+    for m in rejected:
+        assert "reason=" in m and "min_h_px=" in m and "shrink_limit_h=" in m, m
+        assert "table_band_is_valid=" in m, m
+        h = float(re.search(r"h=([0-9.]+)", m).group(1))
+        min_h_px = float(re.search(r"min_h_px=([0-9.]+)", m).group(1))
+        shrink_limit_h = float(re.search(r"shrink_limit_h=([0-9.]+)", m).group(1))
+        band_valid = m.split("table_band_is_valid=")[1].split(",")[0] == "True"
+        reason = re.search(r"reason=(\S+)", m).group(1)
+        if reason == "min-height":
+            assert h < min_h_px, f"min-height 归因自洽性失败: {m}"
+        elif reason == "shrink-limit":
+            assert h < shrink_limit_h, f"shrink-limit 归因自洽性失败: {m}"
+            # 高度达标仍被拒只能是因为表格带无效（if 的第二条件是 or）
+            assert band_valid is False, f"shrink-limit 时表格带应无效: {m}"
 
 
 def test_paradise_page9_width_restore_ignores_right_column_prose():

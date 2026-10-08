@@ -160,6 +160,9 @@ def extract_tables(
     # Global anchor
     global_anchor_table: Optional[str] = None,
     global_anchor_table_margin: float = 0.03,
+    # 渲染硬失败收集（I/O 级错误，区别于质量存疑）；传入列表时逐个追加，
+    # 由调用方（extract_pdf_assets.main_modular）汇总为非零退出码。
+    render_failures: Optional[List[Dict[str, Any]]] = None,
     _doc: Optional[PDFDocument] = None,
 ) -> List[AttachmentRecord]:
     """
@@ -717,7 +720,16 @@ def extract_tables(
                             ):
                                 final_clip = autocrop_clip
                             else:
-                                logger.debug(f"Table {ident}: autocrop rejected (h={autocrop_h:.1f} < {base_h * autocrop_shrink_limit:.1f})")
+                                # 否决原因可能是 min-height 守卫，也可能是
+                                # shrink-limit 守卫（且表格带无效）；日志如实
+                                # 陈述触发条件，避免打印不成立的不等式误导排查。
+                                reason = "min-height" if autocrop_h < min_h_px else "shrink-limit"
+                                logger.debug(
+                                    f"Table {ident}: autocrop rejected "
+                                    f"(h={autocrop_h:.1f}, min_h_px={min_h_px:.1f}, "
+                                    f"shrink_limit_h={base_h * autocrop_shrink_limit:.1f}, "
+                                    f"table_band_is_valid={table_band_is_valid}, reason={reason})"
+                                )
                         except Exception as e:
                             logger.warning(f"Table {ident}: autocrop failed: {e}")
 
@@ -963,8 +975,22 @@ def extract_tables(
                 # 渲染与保存
                 # ================================================================
                 try:
-                    pix = page.get_pixmap(dpi=dpi, clip=final_clip)
-                    pix.save(out_path)
+                    from .output import save_pixmap_clean
+
+                    try:
+                        pix = page.get_pixmap(dpi=dpi, clip=final_clip)
+                        save_pixmap_clean(pix, out_path)
+                    except Exception as render_err:
+                        # 渲染/落盘是 I/O 级硬失败：记录到 render_failures 供
+                        # 主入口汇总为非零退出码，不能只当普通质量存疑。
+                        if render_failures is not None:
+                            render_failures.append({
+                                "kind": "table",
+                                "id": ident,
+                                "page": pno + 1,
+                                "error": str(render_err),
+                            })
+                        raise
 
                     # A0-1: 落盘最终渲染框（只记录，不改变任何截图行为）
                     final_bbox = [final_clip.x0, final_clip.y0, final_clip.x1, final_clip.y1]
@@ -1048,7 +1074,8 @@ def extract_tables(
                     logger.warning(f"Failed to extract Table {ident}: {e}")
 
     from .table_continuation import recover_table_continuations
-    recover_table_continuations(doc, records, out_dir, dpi=dpi, debug_visual=debug_visual)
+    recover_table_continuations(doc, records, out_dir, dpi=dpi, debug_visual=debug_visual,
+                                render_failures=render_failures)
     logger.info(f"Extracted {len(records)} tables from {pdf_name}")
     return records
 

@@ -3,7 +3,7 @@
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
 >
-> 当前版本 / Current version: **0.6.8**
+> 当前版本 / Current version: **0.6.9**
 
 ---
 
@@ -179,9 +179,11 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 插图后框内文字抑制：截图插入 Markdown 时，完整落入资产框内的表体/图内散行文字自动抑制（显式题注行与框外正文保留），逐资产嵌入状态（`referenced_in_markdown` / `embed_mode` / `suppressed_text_blocks`）回写 `images/index.json`。
 - Markdown 图片序列化：图片目的地址按需 URL 编码、题注替代文本转义反斜杠与方括号，含空格目录与半开区间题注仍形成有效图片语法，文件名保持原值。
 - 题注多行合并增强：跨紧邻同栏文本块的续行合并（未完信号 + 几何/字号守卫，不吞正文）、动词句式多行真题注完整合并、行末断词连字符合并（全文未跨行词形证据优先，避免 Pro-gramBench 式真实复合词误并）。
+- 独立公式区域整块保留：OCR/排版拆散的公式碎片按保守信号识别、按栏分组，并在同栏内补全竖向分母、求和限、高括号和公式编号；不跨栏、不越过图表区域、不吞中间正文。含等号的短句（如 `We set a=1.`）不是公式。图片开启时对完整区域按原页截图，图片关闭时合并为单个 text 围栏代码块；无法补全的悬挂碎片保留原文并记入 `equations.needs_review`。宁可漏检不误检正文。
+- 多行标题归一：编号与标题文本被排版拆行时序列化为单行 ATX 标题，后半段不再掉入正文（段落换行策略保持不变）。
 - `--prune-images` 安全化：仅清理运行前已存在且未被修改、未被当前索引引用的 PNG。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；当前回归基线为 603 passed、0 failed、0 skipped（2026-10-02 复验）。
+- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；当前回归基线为 653 passed、0 failed、0 skipped（2026-10-08 复验）。
 - Basic Benchmark 已完成多轮逐图 debug 排查，图表选取策略记录见 `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
 - 当前图表提取代码流程说明见 `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
@@ -360,9 +362,11 @@ Implemented:
 - In-frame text suppression after placement: body/table text lines fully covered by an inserted screenshot's bbox are suppressed from the Markdown (explicit captions and out-of-frame text are kept); per-asset embed status (`referenced_in_markdown` / `embed_mode` / `suppressed_text_blocks`) is written back to `images/index.json`.
 - Markdown image serialization: image destinations are URL-encoded on demand and caption alt text escapes backslashes and brackets, so directories with spaces and half-open-interval captions still form valid image syntax; file names stay untouched.
 - Multi-line caption merging enhancements: continuation lines across adjacent same-column text blocks (unfinished-signal plus geometry/font-size guards that refuse to swallow body text), verb-opened multi-line captions merged whole, and hyphenated line-break rejoining driven by whole-document word-form evidence (avoiding false joins such as "Pro-gramBench").
+- Display-equation region preservation: OCR-scattered formula fragments are identified by conservative signals and grouped per column. The same column then picks up vertical denominators, summation limits, tall brackets, and equation numbers; absorption does not cross columns, asset regions, or prose sitting between formulas. A short sentence such as `We set a=1.` is not an equation. With images on, a complete region is screenshotted from the original page; with images off it becomes one fenced ```text block. A dangling fragment that cannot be completed stays as source text and is counted in `equations.needs_review`. Misses are preferred over false positives on body text.
+- Multi-line heading normalization: headings whose numbering and text were split across lines serialize as a single-line ATX heading (the tail no longer leaks into body text); paragraph line-breaking is unchanged.
 - Safe `--prune-images`: only PNGs that existed before the run, are unchanged, and are unreferenced by the current index are removed.
 - Complete CLI options reference (`references/cli-options.md`).
-- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; the current regression baseline is 603 passed, 0 failed, 0 skipped (reverified on 2026-10-02).
+- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; the current regression baseline is 653 passed, 0 failed, 0 skipped (reverified on 2026-10-08).
 - Multi-round Basic Benchmark visual review is recorded in `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
 - Current extraction flow diagrams are documented in `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.

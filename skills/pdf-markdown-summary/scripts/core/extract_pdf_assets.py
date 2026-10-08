@@ -23,9 +23,10 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import os
 import sys
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 # 确保 scripts 目录在 path 中
 _scripts_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -68,6 +69,26 @@ except ImportError:
 logger = get_logger(__name__)
 
 
+def _positive_int(value: str) -> int:
+    """argparse type：整数且必须 > 0（DPI 等像素几何参数的下界守卫）。"""
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f"必须是大于 0 的整数（当前 {value}）")
+    return ivalue
+
+
+def _positive_float(value: str) -> float:
+    """argparse type：浮点数且必须 > 0（裁剪高度等几何参数的下界守卫）。
+
+    同时拒绝 nan/inf：float("nan") 的比较恒为 False，只比较 <= 0 会放行，
+    非有限值进入几何计算会产生不可预期的裁剪框。
+    """
+    fvalue = float(value)
+    if not math.isfinite(fvalue) or fvalue <= 0:
+        raise argparse.ArgumentTypeError(f"必须是大于 0 的有限数值（当前 {value}）")
+    return fvalue
+
+
 def build_parser_modular() -> argparse.ArgumentParser:
     """构建 extract_pdf_assets 的 argparse parser（供 parse 与 preset dest 映射共用）。"""
     p = argparse.ArgumentParser(
@@ -97,8 +118,8 @@ Examples:
     p.add_argument("--no-prune-images", action="store_false", dest="prune_images")
 
     # === 渲染与裁剪（Figure） ===
-    p.add_argument("--dpi", type=int, default=300, help="Render DPI")
-    p.add_argument("--clip-height", type=float, default=650.0, help="Clip window height (pt)")
+    p.add_argument("--dpi", type=_positive_int, default=300, help="Render DPI")
+    p.add_argument("--clip-height", type=_positive_float, default=650.0, help="Clip window height (pt)")
     p.add_argument("--margin-x", type=float, default=20.0, help="Horizontal margin (pt)")
     p.add_argument("--caption-gap", type=float, default=5.0, help="Gap between caption and crop (pt)")
     p.add_argument("--max-caption-chars", type=int, default=160, help="Max caption chars for filename")
@@ -178,7 +199,7 @@ Examples:
         help="Enable table extraction (default: enabled)",
     )
     p.add_argument("--no-tables", dest="include_tables", action="store_false", help="Disable table extraction")
-    p.add_argument("--table-clip-height", type=float, default=520.0, help="Table clip height (pt)")
+    p.add_argument("--table-clip-height", type=_positive_float, default=520.0, help="Table clip height (pt)")
     p.add_argument("--table-margin-x", type=float, default=26.0, help="Table margin-x (pt)")
     p.add_argument("--table-caption-gap", type=float, default=6.0, help="Table caption gap (pt)")
     p.add_argument("--t-below", default="", help="Table ids to crop BELOW captions")
@@ -276,9 +297,29 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
 
     run_id = configure_logging(level=args.log_level, log_file=args.log_file, log_jsonl=args.log_jsonl)
 
-    os.makedirs(out_dir, exist_ok=True)
-    preexisting_images = snapshot_prunable_images(out_dir)
-    os.makedirs(text_dir, exist_ok=True)
+    # 输出路径与已存在的文件/目录类型冲突时提前报错，避免在写盘阶段
+    # 抛裸 IsADirectoryError / FileExistsError（ISSUE-7，rc=2）。
+    from lib.output import validate_output_targets
+
+    output_problems = validate_output_targets([
+        (out_dir, True, "输出目录"),
+        (text_dir, True, "文本目录"),
+        (out_text, False, "输出文本"),
+        (index_json, False, "index JSON"),
+        (manifest_path, False, "manifest CSV"),
+    ])
+    if output_problems:
+        for problem in output_problems:
+            logger.error(problem)
+        return 2
+
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        preexisting_images = snapshot_prunable_images(out_dir)
+        os.makedirs(text_dir, exist_ok=True)
+    except OSError as e:
+        logger.error(f"创建输出目录失败: {e}")
+        return 2
 
     validation = pre_validate_pdf(pdf_path)
     if not validation.is_valid:
@@ -341,6 +382,9 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     no_refine_figs = parse_comma_list(args.no_refine)
 
     records: List[AttachmentRecord] = []
+    # 渲染/落盘 I/O 硬失败收集：区别于质量存疑（review_required），
+    # 任一渲染出口失败都必须让进程以非零退出码结束。
+    render_failures: List[Dict[str, Any]] = []
     if getattr(args, "include_figures", True):
         records.extend(
             extract_figures(
@@ -380,6 +424,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
                 debug_visual=bool(args.debug_visual),
                 adaptive_line_height=bool(args.adaptive_line_height),
                 layout_model=layout_model,
+                render_failures=render_failures,
             )
         )
 
@@ -423,6 +468,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
                 adaptive_line_height=bool(args.adaptive_line_height),
                 layout_model=layout_model,
                 no_refine_tables=no_refine_figs,
+                render_failures=render_failures,
             )
         )
 
@@ -522,6 +568,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
                     # --no-refine 的排除延续到 A3，否则被用户显式排除的 id
                     # 仍会被 Layout 候选覆盖（评审#3 P2）。
                     skip_idents=set(no_refine_figs),
+                    render_failures=render_failures,
                 )
 
                 refine_report_path = os.path.join(out_dir, "layout_refinement.json")
@@ -561,22 +608,27 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
             kinds=inventory_kinds,
             min_figure=getattr(args, "min_figure", None),
             max_figure=getattr(args, "max_figure", None),
+            render_failures=render_failures,
         )
     except Exception as e:
         logger.warning("Caption inventory finalize failed: %s", e)
 
-    write_manifest(records, manifest_path)
-    write_index_json(
-        records,
-        index_json,
-        pdf_path=pdf_path,
-        preset=args.preset,
-        run_id=run_id,
-        log_jsonl=args.log_jsonl,
-        layout_model=layout_model,
-        validation=validation,
-        inventory=inventory,
-    )
+    try:
+        write_manifest(records, manifest_path)
+        write_index_json(
+            records,
+            index_json,
+            pdf_path=pdf_path,
+            preset=args.preset,
+            run_id=run_id,
+            log_jsonl=args.log_jsonl,
+            layout_model=layout_model,
+            validation=validation,
+            inventory=inventory,
+        )
+    except OSError as e:
+        logger.error(f"写入输出文件失败: {e}")
+        return 2
 
     if args.prune_images:
         pruned = prune_unindexed_images(out_dir=out_dir, index_json_path=index_json, preexisting=preexisting_images)
@@ -596,6 +648,23 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
         figures=figures_n,
         tables=tables_n,
     )
+
+    if render_failures:
+        # 渲染/落盘硬失败必须体现为非零退出码；已写出的 index/清单仍然保留，
+        # 供调用方（pdf_to_markdown 的 assets.exit_code / report.status）识别失败。
+        log_event(
+            "render_failed",
+            pdf=os.path.basename(pdf_path),
+            message="render/save hard failures",
+            count=len(render_failures),
+            failures=render_failures,
+        )
+        logger.error(
+            "Render/save failed for %d asset(s): %s",
+            len(render_failures),
+            "; ".join(f"{f['kind']} {f['id']} p{f['page']}" for f in render_failures),
+        )
+        return 1
 
     return 0
 

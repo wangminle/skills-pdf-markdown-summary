@@ -218,9 +218,15 @@ def pre_validate_pdf(pdf_path: str) -> "PDFValidationResult":
                         _ = doc[0].get_text("text")[:100]
                         warnings.append("PDF is marked as encrypted but content is readable")
                     except Exception as e:
-                        warnings.append(f"PDF is encrypted; extraction may be incomplete. detail={e}")
+                        # 空密码也解不开且连第 0 页都读不出：后续必然在 doc[pno]
+                        # 抛裸异常，必须升级为 error 让预检判定为无效。
+                        errors.append(f"PDF is encrypted and cannot be opened: {e}")
             except Exception as e:
                 warnings.append(f"PDF is encrypted; extraction may be incomplete. detail={e}")
+
+        if page_count == 0:
+            # 0 页 PDF 会通过后续所有采样循环，直到 doc[0] 才炸；提前判无效。
+            errors.append("PDF has no pages")
 
         pages_with_text = 0
         scan_text_pages = []

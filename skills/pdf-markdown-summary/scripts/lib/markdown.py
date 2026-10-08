@@ -54,7 +54,11 @@ class MarkdownDocument:
 def render_block(block: MarkdownBlock) -> str:
     if block.type == "heading":
         level = min(max(block.level or 2, 1), 6)
-        return f"{'#' * level} {block.text.strip()}".strip()
+        # 标题块内部可能带换行（OCR/排版把编号与标题文本拆成两行）；
+        # 直接序列化会把后半段漏到正文。仅在标题渲染时归一为单行，
+        # 段落换行策略保持不变。
+        text = " ".join(block.text.split())
+        return f"{'#' * level} {text}".strip()
 
     if block.type == "image":
         alt = block.caption.strip() or block.text.strip() or "PDF image"

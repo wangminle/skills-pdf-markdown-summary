@@ -429,8 +429,14 @@ def _rerender_asset(
     bbox: List[float],
     out_path: str,
     dpi: int = 300,
+    render_failures: Optional[List[Dict[str, Any]]] = None,
+    ident: str = "",
+    kind: str = "",
 ) -> bool:
     """用新 bbox 重新渲染资产图片。
+
+    落盘走 save_pixmap_clean：先写临时文件，成功后再替换。失败时旧 PNG
+    保持原字节，并把硬失败记入 render_failures（若调用方提供）。
 
     Args:
         pdf_path: PDF 文件路径
@@ -438,12 +444,16 @@ def _rerender_asset(
         bbox: 新的裁剪框 [x0, y0, x1, y1]
         out_path: 输出文件路径
         dpi: 渲染 DPI
+        render_failures: 可选的硬失败收集列表
+        ident: 资产编号，写入失败记录
+        kind: 资产类型，写入失败记录
 
     Returns:
         True 如果成功
     """
     try:
         import fitz
+        from .output import save_pixmap_clean
         from .pdf_backend import create_rect
 
         doc = fitz.open(pdf_path)
@@ -451,12 +461,19 @@ def _rerender_asset(
             page = doc[page_num]
             clip = create_rect(*bbox)
             pix = page.get_pixmap(dpi=dpi, clip=clip)
-            pix.save(out_path)
+            save_pixmap_clean(pix, out_path)
         finally:
             doc.close()
         return True
     except Exception as e:
         logger.warning(f"Re-render failed for page {page_num}: {e}")
+        if render_failures is not None:
+            render_failures.append({
+                "kind": kind or "asset",
+                "id": ident,
+                "page": page_num + 1,
+                "error": str(e),
+            })
         return False
 
 
@@ -467,6 +484,7 @@ def run_refinement_pipeline(
     out_dir: str,
     dpi: int = 300,
     skip_idents: Optional[Set[str]] = None,
+    render_failures: Optional[List[Dict[str, Any]]] = None,
 ) -> RefinementReport:
     """执行 A3 精修管道。
 
@@ -482,6 +500,8 @@ def run_refinement_pipeline(
         skip_idents: 不参与精修的 id 集合（对应 CLI 的 --no-refine）。
             这些 record 既不参与候选匹配（不占用候选），也不做精修，
             但在报告中留一条 skipped 记录，便于核对排除范围。
+        render_failures: 重渲染 I/O 硬失败收集列表。失败时旧图保留，
+            几何回滚，同时向该列表追加记录，供主入口返回非零退出码。
 
     Returns:
         RefinementReport
@@ -709,6 +729,9 @@ def run_refinement_pipeline(
 
                             rerender_ok = _rerender_asset(
                                 pdf_path, page_num, result.bbox, out_path, dpi=dpi,
+                                render_failures=render_failures,
+                                ident=str(rec.ident),
+                                kind=str(rec.kind),
                             )
                             if rerender_ok:
                                 rec_record.applied = True

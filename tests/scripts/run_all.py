@@ -422,6 +422,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         "path": TESTS_SCRIPTS_DIR / "test_bugfix_20261001.py",
     })
 
+    # 2026-10-06 GitHub issue #4~#9 回归（预检/几何参数下界/输出冲突/
+    # 渲染硬失败清理与退出码传播/多行标题序列化）
+    test_suites.append({
+        "name": "issue 回归测试 (20261006)",
+        "path": TESTS_SCRIPTS_DIR / "test_issue_regressions_20261006.py",
+    })
+
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，
     # 就会重演「静默跳过、退出码仍为 0」的假绿。golden 单独处理，故排除。
     explicitly_skipped: Set[str] = set()

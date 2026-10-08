@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.8**.
+Current package version: **0.6.9**.
 
 ## Core Workflow
 
@@ -60,6 +60,7 @@ See `references/cli-options.md` for details.
 - Insert accepted Figure/Table screenshots next to their matching caption paragraph (before it when the crop sits above the caption, otherwise after); unmatched assets still go to a trailing `## 提取资产` section.
 - When a screenshot is inserted, body text lines fully covered by the asset bbox are suppressed from the Markdown (explicit captions and out-of-frame text are kept); each asset's embed status (`referenced_in_markdown` / `embed_mode` / `suppressed_text_blocks`) is written back to `images/index.json`.
 - Image destinations are URL-encoded on demand and caption alt text escapes backslashes and brackets, so spaces in paths and half-open-interval captions still render as valid images; file names stay untouched.
+- Display-equation regions are preserved as a whole instead of scattered OCR fragments: fragments are detected conservatively and grouped per column; vertical pieces (denominators, summation limits, tall brackets, equation numbers) on the same column are included, while cross-column text, asset regions, and prose between formulas are not. A short sentence such as `We set a=1.` is not an equation. With `--images figures` a complete region is screenshotted from the original page; with images off it merges into one text fenced block. A dangling fragment whose boundary cannot be completed stays as source text and is counted under `equations.needs_review`. Body text is never replaced (misses preferred over false positives).
 - Keep table screenshots when structure extraction is unavailable; do not drop tables.
 - For summaries, default to Chinese unless the user asks for another language.
 - Always use both the text file and Figure/Table images when writing a figure-aware summary.

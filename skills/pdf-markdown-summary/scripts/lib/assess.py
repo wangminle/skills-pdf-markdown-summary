@@ -5,10 +5,13 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+logger = logging.getLogger(__name__)
 
 from .caption_detection import (
     is_caption_anchor_candidate,
@@ -508,6 +511,7 @@ def finalize_caption_inventory(
     kinds: Optional[Set[str]] = None,
     min_figure: Optional[int] = None,
     max_figure: Optional[int] = None,
+    render_failures: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Mark unexpected/duplicates, crop missing explicit captions, return inventory summary.
 
@@ -517,6 +521,8 @@ def finalize_caption_inventory(
     review_required 条目，污染输出目录与汇总数字。
     min_figure/max_figure: 与 --min/--max-figure 同口径的 figure 编号范围；
     范围外的编号同样不算「缺失」。
+    render_failures: 渲染硬失败收集列表；补裁渲染失败时追加记录，
+    由主入口汇总为非零退出码（区别于质量存疑）。
     """
     try:
         import fitz
@@ -554,6 +560,13 @@ def finalize_caption_inventory(
             page = doc[item.candidate.page]
             gap_record = render_inventory_gap(page, item, out_dir, dpi=dpi)
             if gap_record is None:
+                if render_failures is not None:
+                    render_failures.append({
+                        "kind": item.kind,
+                        "id": item.ident,
+                        "page": item.page,
+                        "error": "inventory gap render failed",
+                    })
                 records.append(
                     AttachmentRecord(
                         kind=item.kind,
@@ -625,9 +638,17 @@ def render_inventory_gap(
     filename = f"{expected.kind.title()}_{expected.ident}_p{expected.page}_inventory_gap_{safe}.png"
     out_path = os.path.join(out_dir, filename)
     try:
+        from .output import save_pixmap_clean
+
         pix = page.get_pixmap(dpi=dpi, clip=clip)
-        pix.save(out_path)
-    except Exception:
+        save_pixmap_clean(pix, out_path)
+    except Exception as e:
+        # 渲染/落盘是 I/O 级硬失败：save_pixmap_clean 已清理 0 字节残骸，
+        # 这里必须留下可见告警，不能静默返回 None。
+        logger.warning(
+            f"Inventory gap render failed for {expected.kind} {expected.ident} "
+            f"on page {expected.page}: {e}"
+        )
         return None
     record = AttachmentRecord(
         kind=expected.kind,

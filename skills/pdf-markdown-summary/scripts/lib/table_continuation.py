@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import fitz
 
@@ -85,7 +85,10 @@ def preceding_table_parts(doc: Any, record: AttachmentRecord):
 
 
 def recover_table_continuations(doc: Any, records: List[AttachmentRecord], out_dir: str,
-                                *, dpi: int = 300, debug_visual: bool = False) -> None:
+                                *, dpi: int = 300, debug_visual: bool = False,
+                                render_failures: Optional[List[Dict[str, Any]]] = None) -> None:
+    from .output import save_pixmap_clean
+
     known = {(r.kind,r.ident,r.page) for r in records}
     for anchor in list(records):
         parts = preceding_table_parts(doc, anchor)
@@ -98,7 +101,19 @@ def recover_table_continuations(doc: Any, records: List[AttachmentRecord], out_d
             if key in known:
                 continue
             path, _ = get_unique_path(os.path.join(out_dir,f'Table_{anchor.ident}_p{pno+1}_continued.png'))
-            doc[pno].get_pixmap(dpi=dpi,clip=clip).save(path)
+            try:
+                save_pixmap_clean(doc[pno].get_pixmap(dpi=dpi,clip=clip), path)
+            except Exception as e:
+                # 渲染/落盘是 I/O 级硬失败：记录供主入口汇总为非零退出码，
+                # 已清理 0 字节残骸，本条续页记录跳过但不中断其他资产。
+                if render_failures is not None:
+                    render_failures.append({
+                        "kind": "table",
+                        "id": anchor.ident,
+                        "page": pno + 1,
+                        "error": str(e),
+                    })
+                continue
             debug = []
             if debug_visual:
                 from .debug_visual import create_debug_stage, save_debug_visualization
