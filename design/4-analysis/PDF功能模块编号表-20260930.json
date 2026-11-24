@@ -13,11 +13,12 @@
       "old-version/",
       "design/2-ref/",
       "experiments/",
+      "tools/",
       "tests/results/",
       "tests/annotations/",
       "tests/holdout/"
     ],
-    "reason": "归档/只读参考/生成产物/一次性实验与数据不属于当前维护的正式实现；package.json为空对象，无额外可执行JS。"
+    "reason": "归档/只读参考/生成产物/一次性实验与数据、仓库维护脚本（tools/）不属于当前维护的正式实现；package.json为空对象，无额外可执行JS。"
   },
   "groups": [
     {
@@ -148,19 +149,19 @@
     {
       "id": "F26",
       "name": "测试保障与批次诊断",
-      "count": 38
+      "count": 42
     }
   ],
   "stats": {
     "runtime_files": 55,
-    "testing_files": 38,
+    "testing_files": 40,
     "runtime_features": 345,
-    "testing_features": 62,
-    "definitions": 1468,
-    "definition_coverage": 1468
+    "testing_features": 66,
+    "definitions": 1515,
+    "definition_coverage": 1515
   },
   "source_sha256": {
-    "skills/pdf-markdown-summary/scripts/__init__.py": "99b057e771b63f2590342366bdb3ebd4b113a5aede9da811614a97e472547215",
+    "skills/pdf-markdown-summary/scripts/__init__.py": "d9818980bedc82963c130309bfe96d0db754a582552d5b051ba176b526c4f046",
     "skills/pdf-markdown-summary/scripts/core/__init__.py": "873a743bfba2d72093fb14483ed6edff8d3c4cfac0139f1e0174fa13510538b5",
     "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py": "b5be376c16fabac23346e6d0fed37d2005449c043e4b4a7b3d0da72973afc29f",
     "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py": "d5f6d4b4b2b223159d294892335cbe8f6e49e65291913acd7d216f2d72119074",
@@ -216,13 +217,13 @@
     "skills/pdf-markdown-summary/scripts/summarize_pdf.py": "60f545934dfe142c2b4b41314d5033b2ab7001d16ffa945bf635a3e884884379",
     "tests/scripts/analyze_debug_batch.py": "546bfcc8c63171416d19af387597e0c89af2554d4ff1c5295062263eb3cdb255",
     "tests/scripts/conftest.py": "258a041d92fea78cb0243ed48b55c7abf29c3c80a32af252a59aafd460db13dd",
-    "tests/scripts/run_all.py": "5d5b2ad01b6d762d12d4df241e976f80a8d1ccbb25a091b72ad857760a412bc5",
+    "tests/scripts/run_all.py": "429b1f6347af3af615902e4148951a54556c9a6af71cf1e727aac2125a1414b1",
     "tests/scripts/test_a2_a3_fixes.py": "26c4910aac42549da5aeefb1977fb38b67f4408897151b2415b0e45a0ee3a325",
     "tests/scripts/test_analyze_debug_batch.py": "53246d0b21e6902ebb8e590d97a2c5440f121883ee34f9191674524180ffcd62",
-    "tests/scripts/test_bugfix_20260928.py": "c321dd9fdb87df982a47e9782c9b9bbe3293d7c30020cb93f41fa29c56941de8",
+    "tests/scripts/test_bugfix_20260928.py": "9d40134e730d825aa39f881de4c05336fd75caeadee4c2fa1996bfdafef9db3c",
     "tests/scripts/test_bugfix_20260929.py": "4d4c133e3ef3db89a96b99160da4442beb68540e79e201dc4e0b587afc7ac5b8",
     "tests/scripts/test_caption_anchor_quality.py": "0e14be30bbcac1b77fb02ed3c1ae8be6cb050b73cd2ddce79dd7db4d8623e9aa",
-    "tests/scripts/test_extraction_golden.py": "f7f8238b2c1d251a892dce103c1bd522bcf8430c5df9cbea77ee79e9662c7fd4",
+    "tests/scripts/test_extraction_golden.py": "716886aecb9319bbf0ac89e39e0aabfc90361b2b331375b2b554402659279d4a",
     "tests/scripts/test_extraction_status_inventory.py": "861dba961d8e81763eb1dd7944177c1d163e9961195213f0f009db6110c95883",
     "tests/scripts/test_maintenance_fixes.py": "3e6f4ceb5bf47529dc32e2e117f6913a8a9205a9943e256d5c5928f19ae91c94",
     "tests/scripts/test_p0_env_priority.py": "7eaf492e4635f1c29b4a91ff19e27b44ab4eb7f14ca1a194b75278a119b6f00f",
@@ -252,7 +253,9 @@
     "skills/pdf-markdown-summary/scripts/lib/equation_regions.py": "444526cffe7777b9e23371328c48e9431ca75f1b1d267453097951becf13e992",
     "tests/scripts/test_issue_regressions_20261006.py": "21c6532771e3fd7a79b6b5d8977907fb88aed0fcf19a21b67b5824d94607ba2f",
     "tests/scripts/test_bugfix_20261123.py": "3b3b4d920961ff7f31209e4a9b15fa5130d7c03f94247e48e0c12a6dde89d41a",
-    "tests/scripts/test_markdown_structure_20261123.py": "fde456a0004d07d1084e12960b8a37a7a622394ddb6e16ea76a36a84434f0970"
+    "tests/scripts/test_markdown_structure_20261123.py": "fde456a0004d07d1084e12960b8a37a7a622394ddb6e16ea76a36a84434f0970",
+    "tests/scripts/test_golden_env_isolation_20261124.py": "715f285f1b92ea2dd4be105555392e450a64d15e1bcd6be86283d8c5d31e536f",
+    "tests/scripts/test_tools_maintenance_20261124.py": "56bd460c4e3a8eba660a98a1e724998323ee2bfaa36e4d5ea7604c41ab137a99"
   },
   "features": [
     {
@@ -9512,20 +9515,20 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_command",
-          "line": 108,
-          "end": 125
+          "line": 111,
+          "end": 128
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_pytest_suite",
-          "line": 160,
-          "end": 209
+          "line": 163,
+          "end": 212
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_script_suite",
-          "line": 212,
-          "end": 239
+          "line": 215,
+          "end": 242
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9544,50 +9547,50 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult",
-          "line": 81,
-          "end": 105
+          "line": 84,
+          "end": 108
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.total",
-          "line": 94,
-          "end": 95
+          "line": 97,
+          "end": 98
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.success",
-          "line": 98,
-          "end": 100
+          "line": 101,
+          "end": 103
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.counts_str",
-          "line": 102,
-          "end": 105
+          "line": 105,
+          "end": 108
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "parse_pytest_output",
-          "line": 128,
-          "end": 140
+          "line": 131,
+          "end": 143
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "parse_legacy_output",
-          "line": 143,
-          "end": 148
+          "line": 146,
+          "end": 151
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "_fill_counts",
-          "line": 151,
-          "end": 157
+          "line": 154,
+          "end": 160
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "_print_suite_result",
-          "line": 603,
-          "end": 612
+          "line": 619,
+          "end": 628
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9606,8 +9609,8 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "find_unregistered_suites",
-          "line": 585,
-          "end": 600
+          "line": 601,
+          "end": 616
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9626,8 +9629,8 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "main",
-          "line": 242,
-          "end": 579
+          "line": 245,
+          "end": 595
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9728,26 +9731,26 @@
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_compute_code_fingerprint",
-          "line": 94,
-          "end": 107
+          "line": 106,
+          "end": 119
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_current_code_fingerprint",
-          "line": 114,
-          "end": 118
+          "line": 126,
+          "end": 130
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_write_code_fingerprint",
-          "line": 121,
-          "end": 129
+          "line": 133,
+          "end": 141
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_read_code_fingerprint",
-          "line": 132,
-          "end": 142
+          "line": 144,
+          "end": 154
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9761,37 +9764,37 @@
     {
       "group": "26",
       "name": "Golden 独立批次与路径选择",
-      "description": "创建 tests/results 日期序号批次，查找可复用 index 和基准并解析对应路径。",
+      "description": "创建 tests/results 日期序号批次，查找可复用 index 和基准并解析对应路径；基准优先取完整渲染环境键文件，没有则依次只读回退同平台/架构/PyMuPDF 的旧环境键与旧版无后缀基准。",
       "refs": [
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_compute_batch_dir",
-          "line": 145,
-          "end": 158
-        },
-        {
-          "file": "tests/scripts/test_extraction_golden.py",
-          "symbol": "_get_batch_dir",
-          "line": 165,
+          "line": 157,
           "end": 170
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_get_batch_dir",
+          "line": 177,
+          "end": 182
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_find_existing_index",
-          "line": 173,
-          "end": 201
+          "line": 185,
+          "end": 213
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_find_golden_index",
-          "line": 204,
-          "end": 224
+          "line": 282,
+          "end": 299
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_resolve_golden_paths",
-          "line": 666,
-          "end": 686
+          "line": 888,
+          "end": 909
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9810,50 +9813,50 @@
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "GoldenSpec",
-          "line": 232,
-          "end": 239
+          "line": 315,
+          "end": 322
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "ItemSignature",
-          "line": 325,
-          "end": 353
+          "line": 408,
+          "end": 436
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "ItemSignature.identity",
-          "line": 343,
-          "end": 345
+          "line": 426,
+          "end": 428
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "ItemSignature.__hash__",
-          "line": 347,
-          "end": 348
+          "line": 430,
+          "end": 431
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "ItemSignature.__eq__",
-          "line": 350,
-          "end": 353
+          "line": 433,
+          "end": 436
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "ComparisonResult",
-          "line": 357,
-          "end": 370
+          "line": 440,
+          "end": 453
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "extract_item_signatures",
-          "line": 399,
-          "end": 441
+          "line": 482,
+          "end": 524
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_file_sha256",
-          "line": 377,
-          "end": 383
+          "line": 460,
+          "end": 466
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9872,32 +9875,32 @@
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "load_index_json",
-          "line": 386,
-          "end": 396
+          "line": 469,
+          "end": 479
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "extract_id_sets",
-          "line": 444,
-          "end": 459
+          "line": 527,
+          "end": 542
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "count_by_type",
-          "line": 462,
-          "end": 475
+          "line": 545,
+          "end": 558
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "check_files_exist",
-          "line": 478,
-          "end": 490
+          "line": 561,
+          "end": 573
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "compare_with_golden",
-          "line": 512,
-          "end": 659
+          "line": 595,
+          "end": 742
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9916,20 +9919,20 @@
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "_compare_bbox",
-          "line": 493,
-          "end": 509
+          "line": 576,
+          "end": 592
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "compare_with_golden",
-          "line": 512,
-          "end": 659
+          "line": 595,
+          "end": 742
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "print_diff_summary",
-          "line": 902,
-          "end": 939
+          "line": 1152,
+          "end": 1189
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9948,20 +9951,20 @@
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "golden_is_self_comparison",
-          "line": 689,
-          "end": 705
+          "line": 912,
+          "end": 928
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "run_golden_tests",
-          "line": 749,
-          "end": 899
+          "line": 972,
+          "end": 1149
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "test_golden_index_comparison",
-          "line": 952,
-          "end": 983
+          "line": 1202,
+          "end": 1242
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9975,25 +9978,43 @@
     {
       "group": "26",
       "name": "Golden 缺产物重提取与基准更新",
-      "description": "需要时从只读 benchmark 重新提取到结果批次；显式更新基准写另一独立批次。",
+      "description": "需要时从只读 benchmark 重新提取到结果批次；显式更新基准写另一独立批次的完整环境基准文件（记录平台、CPU 架构、PyMuPDF 与 MuPDF 版本），并报告它与其他环境基准、本环境上一版基准的条目、精确 final_bbox 与 PNG 字节差异。",
       "refs": [
         {
           "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "diff_golden_baselines",
+          "line": 772,
+          "end": 788
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_format_baseline_diff",
+          "line": 791,
+          "end": 797
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_baseline_diff_notes",
+          "line": 800,
+          "end": 822
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "ensure_extracted_index",
-          "line": 708,
-          "end": 746
+          "line": 931,
+          "end": 969
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "run_golden_tests",
-          "line": 749,
-          "end": 899
+          "line": 972,
+          "end": 1149
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "main",
-          "line": 1023,
-          "end": 1083
+          "line": 1282,
+          "end": 1342
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -10012,14 +10033,14 @@
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "test_golden_index_comparison",
-          "line": 952,
-          "end": 983
+          "line": 1202,
+          "end": 1242
         },
         {
           "file": "tests/scripts/test_extraction_golden.py",
           "symbol": "test_golden_baseline_coverage",
-          "line": 987,
-          "end": 1016
+          "line": 1246,
+          "end": 1275
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -13501,7 +13522,7 @@
           "file": "tests/scripts/test_bugfix_20260928.py",
           "symbol": "test_update_golden_writes_to_a_separate_batch",
           "line": 1008,
-          "end": 1042
+          "end": 1047
         },
         {
           "file": "tests/scripts/test_maintenance_fixes.py",
@@ -13960,6 +13981,60 @@
           "end": 60
         },
         {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_sha",
+          "line": 37,
+          "end": 38
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_item",
+          "line": 41,
+          "end": 48
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_golden",
+          "line": 51,
+          "end": 55
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_write_json",
+          "line": 58,
+          "end": 60
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_Rig",
+          "line": 63,
+          "end": 99
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_Rig.__init__",
+          "line": 66,
+          "end": 81
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_Rig.current",
+          "line": 83,
+          "end": 90
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_Rig.baseline",
+          "line": 92,
+          "end": 96
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "_Rig.run",
+          "line": 98,
+          "end": 99
+        },
+        {
           "file": "tests/scripts/test_maintenance_fixes.py",
           "symbol": "_make_pdf",
           "line": 39,
@@ -14294,6 +14369,24 @@
           "symbol": "_check",
           "line": 29,
           "end": 30
+        },
+        {
+          "file": "tests/scripts/test_tools_maintenance_20261124.py",
+          "symbol": "_load_module",
+          "line": 22,
+          "end": 27
+        },
+        {
+          "file": "tests/scripts/test_tools_maintenance_20261124.py",
+          "symbol": "_synthetic_registry",
+          "line": 30,
+          "end": 55
+        },
+        {
+          "file": "tests/scripts/test_tools_maintenance_20261124.py",
+          "symbol": "test_dict_probe_pages_come_from_pdf_not_last_instrumented_call.fake_run",
+          "line": 94,
+          "end": 102
         },
         {
           "file": "tests/scripts/test_visual_review_20260907.py",
@@ -14755,6 +14848,297 @@
       "key": "26/BUG-154~160 安全与评测回归保障",
       "scope": "testing",
       "id": "F26.038"
+    },
+    {
+      "group": "26",
+      "name": "Golden 渲染环境识别与基准命名",
+      "description": "输出 PNG 的像素由 MuPDF 在具体平台与 CPU 架构上栅格化。读取平台、CPU 架构、PyMuPDF 与 MuPDF 版本，生成「平台-CPU架构-pymupdf版本-mupdf版本」完整环境标识及基准文件名；保留不含 MuPDF 的旧环境键生成助手用于兼容既有基准，旧版无后缀基准的环境标识为空串。",
+      "refs": [
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "render_environment",
+          "line": 216,
+          "end": 230
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "legacy_render_environment_key",
+          "line": 233,
+          "end": 236
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "render_environment_key",
+          "line": 239,
+          "end": 242
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "golden_filename_for",
+          "line": 245,
+          "end": 247
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_environment_key_of_filename",
+          "line": 250,
+          "end": 257
+        }
+      ],
+      "inputs": "测试参数 / 合成输入 / 既有产物",
+      "outputs": "断言结果或测试报告",
+      "mode": "测试/评测工具",
+      "depends": [],
+      "key": "26/Golden 渲染环境识别与基准命名",
+      "scope": "testing",
+      "id": "F26.039"
+    },
+    {
+      "group": "26",
+      "name": "Golden 多环境基准登记与差异诊断",
+      "description": "枚举各批次基准；优先完整环境键，依次回退同平台/架构/PyMuPDF 旧环境键与旧版无后缀基准，其他环境不借用。自检双向拒绝文件名与文件内环境记录不一致，包括无后缀文件带环境记录。差异统计按精确 final_bbox 计数（亚 0.5pt 变化也计入），正式比较仍用 0.5pt 容差；PNG 字节保持严格。",
+      "refs": [
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_find_golden_variants",
+          "line": 260,
+          "end": 279
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_find_golden_index",
+          "line": 282,
+          "end": 299
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "recorded_environment_key",
+          "line": 302,
+          "end": 307
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_batch_name_of",
+          "line": 749,
+          "end": 751
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "baseline_problems",
+          "line": 754,
+          "end": 769
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "diff_golden_baselines",
+          "line": 772,
+          "end": 788
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_format_baseline_diff",
+          "line": 791,
+          "end": 797
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_baseline_diff_notes",
+          "line": 800,
+          "end": 822
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "_stale_baseline_hint",
+          "line": 825,
+          "end": 856
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "comparison_hints",
+          "line": 859,
+          "end": 881
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "run_golden_tests",
+          "line": 972,
+          "end": 1149
+        },
+        {
+          "file": "tests/scripts/test_extraction_golden.py",
+          "symbol": "test_golden_index_comparison",
+          "line": 1202,
+          "end": 1242
+        }
+      ],
+      "inputs": "测试参数 / 合成输入 / 既有产物",
+      "outputs": "断言结果或测试报告",
+      "mode": "测试/评测工具",
+      "depends": [
+        "F26.039"
+      ],
+      "key": "26/Golden 多环境基准登记与差异诊断",
+      "scope": "testing",
+      "id": "F26.040"
+    },
+    {
+      "group": "26",
+      "name": "Golden 基线环境隔离回归保障",
+      "description": "覆盖 Golden 环境隔离与迁移回归：完整环境键含 MuPDF；旧环境键在同平台/架构/PyMuPDF 下继续可用，新基准只写完整环境键文件且不改写旧文件；其他环境不借用；无后缀文件带环境记录同样拒绝；亚容差 bbox 变化计入差异报告但不导致正式比较失败；保留多环境更新、过期诊断与严格 PNG 比较。",
+      "refs": [
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_render_environment_key_names_platform_arch_and_pymupdf",
+          "line": 106,
+          "end": 116
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_environment_baseline_is_preferred_over_legacy",
+          "line": 123,
+          "end": 130
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_falls_back_to_legacy_baseline_when_environment_has_none",
+          "line": 133,
+          "end": 136
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_pre_mupdf_environment_baseline_remains_compatible",
+          "line": 139,
+          "end": 146
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_other_environment_baseline_is_never_borrowed",
+          "line": 149,
+          "end": 156
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_variants_list_every_environment_once_with_newest_batch",
+          "line": 159,
+          "end": 167
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_update_golden_writes_environment_file_and_keeps_legacy_untouched",
+          "line": 174,
+          "end": 191
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_update_golden_reports_differences_against_other_and_previous_baselines",
+          "line": 194,
+          "end": 207
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_baseline_diff_counts_sub_tolerance_bbox_change_without_failing_comparison",
+          "line": 210,
+          "end": 215
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_legacy_baseline_png_mismatch_fails_and_names_the_environment",
+          "line": 222,
+          "end": 236
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_same_environment_png_mismatch_is_a_plain_failure",
+          "line": 239,
+          "end": 249
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_geometry_change_fails_against_legacy_baseline_too",
+          "line": 252,
+          "end": 260
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_environment_file_with_foreign_recorded_key_is_rejected",
+          "line": 263,
+          "end": 272
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_legacy_filename_with_environment_record_is_rejected",
+          "line": 275,
+          "end": 284
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_stale_environment_baseline_is_flagged_when_output_matches_newer_baseline",
+          "line": 291,
+          "end": 301
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_no_stale_hint_when_this_environment_baseline_is_the_newest",
+          "line": 304,
+          "end": 312
+        },
+        {
+          "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+          "symbol": "test_no_stale_hint_when_output_matches_neither_baseline",
+          "line": 315,
+          "end": 324
+        }
+      ],
+      "inputs": "临时结果目录、构造的基准批次与 PNG 字节",
+      "outputs": "pytest 断言",
+      "mode": "默认",
+      "depends": [
+        "F26.004",
+        "F26.040"
+      ],
+      "key": "26/Golden 基线环境隔离回归保障",
+      "scope": "testing",
+      "id": "F26.041"
+    },
+    {
+      "group": "26",
+      "name": "维护工具链回归保障",
+      "description": "覆盖功能索引 SVG 与渲染探测工具回归：功能域数量、分栏和 runtime/testing 范围由编号表动态生成；按页解析探测的页数取 PDF 实际页数，get_text/get_drawings/get_image_info 缓存键同时纳入位置与关键字参数；所有 JSON 写盘显式使用 UTF-8 与 LF，保证跨平台产物一致。",
+      "refs": [
+        {
+          "file": "tests/scripts/test_tools_maintenance_20261124.py",
+          "symbol": "test_draw_feature_index_uses_dynamic_domain_count_and_scopes",
+          "line": 58,
+          "end": 80
+        },
+        {
+          "file": "tests/scripts/test_tools_maintenance_20261124.py",
+          "symbol": "test_dict_probe_pages_come_from_pdf_not_last_instrumented_call",
+          "line": 83,
+          "end": 108
+        },
+        {
+          "file": "tests/scripts/test_tools_maintenance_20261124.py",
+          "symbol": "test_probe_call_keys_include_positional_and_keyword_options",
+          "line": 111,
+          "end": 124
+        },
+        {
+          "file": "tests/scripts/test_tools_maintenance_20261124.py",
+          "symbol": "test_all_probe_json_writes_pin_lf_newlines",
+          "line": 127,
+          "end": 146
+        }
+      ],
+      "inputs": "合成编号表、临时 PDF、位置/关键字参数与工具源码",
+      "outputs": "pytest 断言",
+      "mode": "默认",
+      "depends": [
+        "F26.004"
+      ],
+      "key": "26/维护工具链回归保障",
+      "scope": "testing",
+      "id": "F26.042"
     }
   ],
   "source_coverage": [
@@ -22705,7 +23089,7 @@
       "file": "tests/scripts/run_all.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 616,
+      "end": 632,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -22719,8 +23103,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult",
-      "line": 81,
-      "end": 105,
+      "line": 84,
+      "end": 108,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -22731,8 +23115,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.total",
-      "line": 94,
-      "end": 95,
+      "line": 97,
+      "end": 98,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -22745,8 +23129,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.success",
-      "line": 98,
-      "end": 100,
+      "line": 101,
+      "end": 103,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -22759,8 +23143,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.counts_str",
-      "line": 102,
-      "end": 105,
+      "line": 105,
+      "end": 108,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -22773,8 +23157,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_command",
-      "line": 108,
-      "end": 125,
+      "line": 111,
+      "end": 128,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22785,8 +23169,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "parse_pytest_output",
-      "line": 128,
-      "end": 140,
+      "line": 131,
+      "end": 143,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22797,8 +23181,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "parse_legacy_output",
-      "line": 143,
-      "end": 148,
+      "line": 146,
+      "end": 151,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22809,8 +23193,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "_fill_counts",
-      "line": 151,
-      "end": 157,
+      "line": 154,
+      "end": 160,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22821,8 +23205,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_pytest_suite",
-      "line": 160,
-      "end": 209,
+      "line": 163,
+      "end": 212,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22833,8 +23217,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_script_suite",
-      "line": 212,
-      "end": 239,
+      "line": 215,
+      "end": 242,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22845,8 +23229,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "main",
-      "line": 242,
-      "end": 579,
+      "line": 245,
+      "end": 595,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22857,8 +23241,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "find_unregistered_suites",
-      "line": 585,
-      "end": 600,
+      "line": 601,
+      "end": 616,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22869,8 +23253,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "_print_suite_result",
-      "line": 603,
-      "end": 612,
+      "line": 619,
+      "end": 628,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23673,7 +24057,7 @@
       "file": "tests/scripts/test_bugfix_20260928.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 1042,
+      "end": 1047,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -23811,7 +24195,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_dont_swallow_next_element",
-        "test_border_rules_dont_swallow_next_element._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24070,7 +24454,7 @@
       "kind": "function",
       "ancestors": [
         "test_legacy_rejected_not_promoted_by_refiner",
-        "test_legacy_rejected_not_promoted_by_refiner._Cand"
+        "_Cand"
       ],
       "ids": [
         "F26.027"
@@ -24111,7 +24495,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_never_slice_adjacent_text",
-        "test_border_rules_never_slice_adjacent_text._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24176,7 +24560,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_do_not_slice_line_that_already_crosses_clip",
-        "test_border_rules_do_not_slice_line_that_already_crosses_clip._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24217,7 +24601,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_keep_rule_when_text_overlaps_stroke",
-        "test_border_rules_keep_rule_when_text_overlaps_stroke._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24258,7 +24642,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_do_not_swallow_tall_body_to_keep_rule",
-        "test_border_rules_do_not_swallow_tall_body_to_keep_rule._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24299,7 +24683,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_follow_overlapping_short_notes",
-        "test_border_rules_follow_overlapping_short_notes._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24340,7 +24724,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_top_edge_keeps_rule_when_text_overlaps_stroke",
-        "test_border_rules_top_edge_keeps_rule_when_text_overlaps_stroke._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24381,7 +24765,7 @@
       "kind": "function",
       "ancestors": [
         "test_border_rules_fallback_to_clip_on_degenerate_intersection",
-        "test_border_rules_fallback_to_clip_on_degenerate_intersection._Page"
+        "_Page"
       ],
       "ids": [
         "F26.025"
@@ -24442,7 +24826,7 @@
       "file": "tests/scripts/test_bugfix_20260928.py",
       "symbol": "test_update_golden_writes_to_a_separate_batch",
       "line": 1008,
-      "end": 1042,
+      "end": 1047,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25656,7 +26040,7 @@
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 1087,
+      "end": 1346,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -25667,15 +26051,17 @@
         "F26.011",
         "F26.012",
         "F26.013",
-        "F26.014"
+        "F26.014",
+        "F26.039",
+        "F26.040"
       ],
       "mapping": "所在文件的功能归属（不是独立功能）"
     },
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_compute_code_fingerprint",
-      "line": 94,
-      "end": 107,
+      "line": 106,
+      "end": 119,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25686,8 +26072,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_current_code_fingerprint",
-      "line": 114,
-      "end": 118,
+      "line": 126,
+      "end": 130,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25698,8 +26084,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_write_code_fingerprint",
-      "line": 121,
-      "end": 129,
+      "line": 133,
+      "end": 141,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25710,8 +26096,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_read_code_fingerprint",
-      "line": 132,
-      "end": 142,
+      "line": 144,
+      "end": 154,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25722,19 +26108,7 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_compute_batch_dir",
-      "line": 145,
-      "end": 158,
-      "kind": "function",
-      "ancestors": [],
-      "ids": [
-        "F26.008"
-      ],
-      "mapping": "直接引用"
-    },
-    {
-      "file": "tests/scripts/test_extraction_golden.py",
-      "symbol": "_get_batch_dir",
-      "line": 165,
+      "line": 157,
       "end": 170,
       "kind": "function",
       "ancestors": [],
@@ -25745,9 +26119,21 @@
     },
     {
       "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "_get_batch_dir",
+      "line": 177,
+      "end": 182,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.008"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_find_existing_index",
-      "line": 173,
-      "end": 201,
+      "line": 185,
+      "end": 213,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25758,20 +26144,21 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_find_golden_index",
-      "line": 204,
-      "end": 224,
+      "line": 282,
+      "end": 299,
       "kind": "function",
       "ancestors": [],
       "ids": [
-        "F26.008"
+        "F26.008",
+        "F26.040"
       ],
       "mapping": "直接引用"
     },
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "GoldenSpec",
-      "line": 232,
-      "end": 239,
+      "line": 315,
+      "end": 322,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -25782,8 +26169,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "ItemSignature",
-      "line": 325,
-      "end": 353,
+      "line": 408,
+      "end": 436,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -25794,8 +26181,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "ItemSignature.identity",
-      "line": 343,
-      "end": 345,
+      "line": 426,
+      "end": 428,
       "kind": "function",
       "ancestors": [
         "ItemSignature"
@@ -25808,8 +26195,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "ItemSignature.__hash__",
-      "line": 347,
-      "end": 348,
+      "line": 430,
+      "end": 431,
       "kind": "function",
       "ancestors": [
         "ItemSignature"
@@ -25822,8 +26209,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "ItemSignature.__eq__",
-      "line": 350,
-      "end": 353,
+      "line": 433,
+      "end": 436,
       "kind": "function",
       "ancestors": [
         "ItemSignature"
@@ -25836,8 +26223,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "ComparisonResult",
-      "line": 357,
-      "end": 370,
+      "line": 440,
+      "end": 453,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -25848,8 +26235,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_file_sha256",
-      "line": 377,
-      "end": 383,
+      "line": 460,
+      "end": 466,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25860,8 +26247,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "load_index_json",
-      "line": 386,
-      "end": 396,
+      "line": 469,
+      "end": 479,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25872,8 +26259,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "extract_item_signatures",
-      "line": 399,
-      "end": 441,
+      "line": 482,
+      "end": 524,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25884,8 +26271,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "extract_id_sets",
-      "line": 444,
-      "end": 459,
+      "line": 527,
+      "end": 542,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25896,8 +26283,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "count_by_type",
-      "line": 462,
-      "end": 475,
+      "line": 545,
+      "end": 558,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25908,8 +26295,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "check_files_exist",
-      "line": 478,
-      "end": 490,
+      "line": 561,
+      "end": 573,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25920,8 +26307,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_compare_bbox",
-      "line": 493,
-      "end": 509,
+      "line": 576,
+      "end": 592,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25932,8 +26319,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "compare_with_golden",
-      "line": 512,
-      "end": 659,
+      "line": 595,
+      "end": 742,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25945,8 +26332,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "_resolve_golden_paths",
-      "line": 666,
-      "end": 686,
+      "line": 888,
+      "end": 909,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25957,8 +26344,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "golden_is_self_comparison",
-      "line": 689,
-      "end": 705,
+      "line": 912,
+      "end": 928,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25969,8 +26356,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "ensure_extracted_index",
-      "line": 708,
-      "end": 746,
+      "line": 931,
+      "end": 969,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -25981,21 +26368,22 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "run_golden_tests",
-      "line": 749,
-      "end": 899,
+      "line": 972,
+      "end": 1149,
       "kind": "function",
       "ancestors": [],
       "ids": [
         "F26.012",
-        "F26.013"
+        "F26.013",
+        "F26.040"
       ],
       "mapping": "直接引用"
     },
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "print_diff_summary",
-      "line": 902,
-      "end": 939,
+      "line": 1152,
+      "end": 1189,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -26006,21 +26394,22 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "test_golden_index_comparison",
-      "line": 952,
-      "end": 983,
+      "line": 1202,
+      "end": 1242,
       "kind": "function",
       "ancestors": [],
       "ids": [
         "F26.012",
-        "F26.014"
+        "F26.014",
+        "F26.040"
       ],
       "mapping": "直接引用"
     },
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "test_golden_baseline_coverage",
-      "line": 987,
-      "end": 1016,
+      "line": 1246,
+      "end": 1275,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -26031,8 +26420,8 @@
     {
       "file": "tests/scripts/test_extraction_golden.py",
       "symbol": "main",
-      "line": 1023,
-      "end": 1083,
+      "line": 1282,
+      "end": 1342,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -34981,6 +35370,609 @@
       "ancestors": [],
       "ids": [
         "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "render_environment",
+      "line": 216,
+      "end": 230,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.039"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "render_environment_key",
+      "line": 239,
+      "end": 242,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.039"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "golden_filename_for",
+      "line": 245,
+      "end": 247,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.039"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "_environment_key_of_filename",
+      "line": 250,
+      "end": 257,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.039"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "_find_golden_variants",
+      "line": 260,
+      "end": 279,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "recorded_environment_key",
+      "line": 302,
+      "end": 307,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "_batch_name_of",
+      "line": 749,
+      "end": 751,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "baseline_problems",
+      "line": 754,
+      "end": 769,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "diff_golden_baselines",
+      "line": 772,
+      "end": 788,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040",
+        "F26.013"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "_format_baseline_diff",
+      "line": 791,
+      "end": 797,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040",
+        "F26.013"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "_baseline_diff_notes",
+      "line": 800,
+      "end": 822,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040",
+        "F26.013"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "_stale_baseline_hint",
+      "line": 825,
+      "end": 856,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "comparison_hints",
+      "line": 859,
+      "end": 881,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.040"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "<module>",
+      "line": 1,
+      "end": 324,
+      "kind": "module",
+      "ancestors": [],
+      "ids": [
+        "F26.036",
+        "F26.041"
+      ],
+      "mapping": "所在文件的功能归属（不是独立功能）"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_sha",
+      "line": 37,
+      "end": 38,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_item",
+      "line": 41,
+      "end": 48,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_golden",
+      "line": 51,
+      "end": 55,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_write_json",
+      "line": 58,
+      "end": 60,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_Rig",
+      "line": 63,
+      "end": 99,
+      "kind": "class",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_Rig.__init__",
+      "line": 66,
+      "end": 81,
+      "kind": "function",
+      "ancestors": [
+        "_Rig"
+      ],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_Rig.current",
+      "line": 83,
+      "end": 90,
+      "kind": "function",
+      "ancestors": [
+        "_Rig"
+      ],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_Rig.baseline",
+      "line": 92,
+      "end": 96,
+      "kind": "function",
+      "ancestors": [
+        "_Rig"
+      ],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "_Rig.run",
+      "line": 98,
+      "end": 99,
+      "kind": "function",
+      "ancestors": [
+        "_Rig"
+      ],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_render_environment_key_names_platform_arch_and_pymupdf",
+      "line": 106,
+      "end": 116,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_environment_baseline_is_preferred_over_legacy",
+      "line": 123,
+      "end": 130,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_falls_back_to_legacy_baseline_when_environment_has_none",
+      "line": 133,
+      "end": 136,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_other_environment_baseline_is_never_borrowed",
+      "line": 149,
+      "end": 156,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_variants_list_every_environment_once_with_newest_batch",
+      "line": 159,
+      "end": 167,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_update_golden_writes_environment_file_and_keeps_legacy_untouched",
+      "line": 174,
+      "end": 191,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_update_golden_reports_differences_against_other_and_previous_baselines",
+      "line": 194,
+      "end": 207,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_legacy_baseline_png_mismatch_fails_and_names_the_environment",
+      "line": 222,
+      "end": 236,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_same_environment_png_mismatch_is_a_plain_failure",
+      "line": 239,
+      "end": 249,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_geometry_change_fails_against_legacy_baseline_too",
+      "line": 252,
+      "end": 260,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_environment_file_with_foreign_recorded_key_is_rejected",
+      "line": 263,
+      "end": 272,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_stale_environment_baseline_is_flagged_when_output_matches_newer_baseline",
+      "line": 291,
+      "end": 301,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_no_stale_hint_when_this_environment_baseline_is_the_newest",
+      "line": 304,
+      "end": 312,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_no_stale_hint_when_output_matches_neither_baseline",
+      "line": 315,
+      "end": 324,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_extraction_golden.py",
+      "symbol": "legacy_render_environment_key",
+      "line": 233,
+      "end": 236,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.039"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_pre_mupdf_environment_baseline_remains_compatible",
+      "line": 139,
+      "end": 146,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_baseline_diff_counts_sub_tolerance_bbox_change_without_failing_comparison",
+      "line": 210,
+      "end": 215,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_golden_env_isolation_20261124.py",
+      "symbol": "test_legacy_filename_with_environment_record_is_rejected",
+      "line": 275,
+      "end": 284,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.041"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "<module>",
+      "line": 1,
+      "end": 146,
+      "kind": "module",
+      "ancestors": [],
+      "ids": [
+        "F26.036",
+        "F26.042"
+      ],
+      "mapping": "所在文件的功能归属（不是独立功能）"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "_load_module",
+      "line": 22,
+      "end": 27,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "_synthetic_registry",
+      "line": 30,
+      "end": 55,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "test_draw_feature_index_uses_dynamic_domain_count_and_scopes",
+      "line": 58,
+      "end": 80,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.042"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "test_dict_probe_pages_come_from_pdf_not_last_instrumented_call",
+      "line": 83,
+      "end": 108,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.042"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "test_dict_probe_pages_come_from_pdf_not_last_instrumented_call.fake_run",
+      "line": 94,
+      "end": 102,
+      "kind": "function",
+      "ancestors": [
+        "test_dict_probe_pages_come_from_pdf_not_last_instrumented_call"
+      ],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "test_probe_call_keys_include_positional_and_keyword_options",
+      "line": 111,
+      "end": 124,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.042"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_tools_maintenance_20261124.py",
+      "symbol": "test_all_probe_json_writes_pin_lf_newlines",
+      "line": 127,
+      "end": 146,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.042"
       ],
       "mapping": "直接引用"
     }

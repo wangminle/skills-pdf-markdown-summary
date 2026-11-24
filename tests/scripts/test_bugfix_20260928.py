@@ -1036,7 +1036,12 @@ def test_update_golden_writes_to_a_separate_batch(tmp_path, monkeypatch) -> None
 
     passed, failed, results = golden.run_golden_tests(update_golden=True)
 
-    updated_path = baseline_batch / "paper" / "images" / "golden_index.json"
+    # BUG-166 之后基准按渲染环境分文件：更新只写本环境的基准文件
+    updated_path = (
+        baseline_batch / "paper" / "images"
+        / golden.golden_filename_for(golden.render_environment_key())
+    )
     assert (passed, failed) == (1, 0)
     assert updated_path.exists(), results[0].messages
+    assert not (updated_path.parent / golden.LEGACY_GOLDEN_FILENAME).exists()
     assert not golden.golden_is_self_comparison(source_index, updated_path)

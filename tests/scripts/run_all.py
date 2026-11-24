@@ -23,7 +23,7 @@ QA-01 统一测试入口
   一律失败，仅用户显式授权的排除模式可跳过），
   通过/失败数从 pytest 输出解析，解析不到标记"数量未知"。
 
-测试套件（共 25 个）：
+测试套件（共 30 个）：
 1. P0 环境变量优先级测试 (test_p0_env_priority.py)
 2. P1 标识符解析测试 (test_p1_ident_parsing.py)
 3. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
@@ -51,6 +51,9 @@ QA-01 统一测试入口
 25. 复核修复回归测试 (test_bugfix_20261001.py)
 26. issue 回归测试 (test_issue_regressions_20261006.py)
 27. BUG-154~160 回归测试 (test_bugfix_20261123.py)
+28. Markdown 结构修复回归测试 (test_markdown_structure_20261123.py)
+29. Golden 基线环境隔离回归测试 (test_golden_env_isolation_20261124.py)
+30. 维护工具链回归测试 (test_tools_maintenance_20261124.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -440,6 +443,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     test_suites.append({
         "name": "安全与评测回归 (20261123)",
         "path": TESTS_SCRIPTS_DIR / "test_bugfix_20261123.py",
+    })
+
+    # 2026-11-24 BUG-166：golden 基准按渲染环境分文件。跨平台渲染的同页同框 PNG
+    # 只差个别像素，字节数与 sha256 却不同；本环境基准优先、旧版基准回退且不覆盖
+    test_suites.append({
+        "name": "Golden 基线环境隔离回归 (20261124)",
+        "path": TESTS_SCRIPTS_DIR / "test_golden_env_isolation_20261124.py",
+    })
+
+    # 2026-11-24 维护工具：动态功能域、探测页数与缓存键、JSON 跨平台 LF
+    test_suites.append({
+        "name": "维护工具链回归 (20261124)",
+        "path": TESTS_SCRIPTS_DIR / "test_tools_maintenance_20261124.py",
     })
 
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，

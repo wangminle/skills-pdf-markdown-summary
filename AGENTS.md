@@ -15,6 +15,7 @@
 - `design/`：项目设计与文档目录。
 - `skills/`：核心工作目录，正式 Skill 存放处。
 - `experiments/`：本地实验产物目录（已加入 .gitignore，不上传 GitHub）。一次性探索脚本与大体积 PNG/debug/Layout 产物写这里，内部文件不受 `-yyyyMMDD` 命名约束。
+- `tools/`：仓库维护脚本目录（纳入版本控制）：功能编号校验与三张 SVG 的重生成脚本、渲染特征探测脚本。不属于 PDF Skill 实现，不纳入功能编号；运行产物仍写入 `experiments/`。用法见 `tools/README-20261124.md`。
 - `tests/`：测试数据、测试脚本、测试结果目录（不要整体加入 .gitignore）。
   - `tests/basic-benchmark/`：**只读**。固定测试集 PDF 存放目录。**禁止往 benchmark 中写入任何测试结果或临时文件**。
   - `tests/results/`：端到端测试输出目录，按日期分文件夹（如 `20260807-001/`），已加入 .gitignore。**所有测试结果都写这里**（含 golden 基准）。
@@ -74,7 +75,7 @@
 - `tests/results/<yyyymmdd-xxx>/` 下按每个 PDF 名称建立独立结果目录，例如 `tests/results/20260605-001/<pdf-name>/`。
 - 每个 PDF 结果目录下应按输出类型分层保存：`markdown/` 存 Markdown，`assets/` 存通用资源，`images/` 存图片，`txt/` 存文本。
 - `pytest tests/scripts/ -q` 的「全绿」定义：golden 用例默认纳入且必须实际执行、0 跳过；golden 收集数为 0 或被跳过一律判失败。本地定向调试可用环境变量 `PDF_SKILL_ALLOW_GOLDEN_SKIP=1` 放行排除，但该模式**不算全绿**（仅 WARNING）。
-- golden 基准（`tests/results/**/images/golden_index.json`）是变更检测器而非正确性基准；基准不纳入版本控制（tests/results/ 已 gitignore），clone 后需运行 `--update-golden` 本地生成；基准更新后在 `task-list.md` 逐条说明差异原因。
+- golden 基准（`tests/results/**/images/golden_index*.json`）是变更检测器而非正确性基准；基准按渲染环境分文件（`golden_index.<平台-架构-pymupdf版本-mupdf版本>.json`），本环境完整键优先，同平台/架构/PyMuPDF 的旧环境键与旧版无后缀基准依次只读回退且不覆盖，别的环境的基准不借用，PNG 字节比较保持严格；基准不纳入版本控制（tests/results/ 已 gitignore），clone 后或换了环境需运行 `--update-golden` 本地生成；基准更新后在 `task-list.md` 逐条说明差异原因。
 - `tests/eval/` 是版本化评测器（非 pytest 套件），可复用指标计算放这里；一次性探索脚本与大体积产物放 `experiments/`。
 - `tests/annotations/` 存放人工 bbox 真值与标注规范（SCHEMA），标注产物不进 `design/2-ref/`。
 - debug 叠图做跨版本/跨批次对比前，必须先用机器判据标注产物代际：`grep -l "LINE STYLE TAXONOMY" <批次>/*/images/debug/*_stages_legend.txt | wc -l`（0 命中=旧体系 ≤V0.6.6，全命中=新三桶线型体系）；不要用 `"Style: Solid"` 判别（旧图例天然含该字样）。体系规范、新旧对照与判据详见 `design/4-analysis/debug视觉标注体系说明-20260930.md`；改动标线颜色/线型须同步该文档与功能编号 F23.008/011/012。
@@ -86,7 +87,7 @@
 - 必须同步维护 `design/4-analysis/` 中的[功能模块全集与编号](design/4-analysis/PDF功能模块全集与编号-20260930.md)、[机器可读编号表](design/4-analysis/PDF功能模块编号表-20260930.json)与[源码覆盖索引](design/4-analysis/PDF功能模块源码覆盖索引-20260930.md)，更新受影响的职责、适用状态、输入输出、实现引用、行号与源码哈希。
 - 已发布的 `Fxx.nnn` 保持身份：函数/文件移动、重命名或展示排序变化不重排编号；新功能在对应域追加；删除功能保留原编号并标记弃用，不删除历史身份、不复用编号。拆分或合并时记录新旧功能的承接关系。
 - 功能、数量、分组或流程关系变化时，同步更新[功能全集索引 SVG](design/4-analysis/PDF功能模块全集索引图-20260930.svg)、[脚本协作泳道图](design/4-analysis/PDF脚本协作泳道图-20260930.svg)、[图表提取展开图](design/4-analysis/PDF图表提取模块展开图-20260930.svg)及相关阅读说明；仅实现位置变化时，核对图中引用是否需要更新。
-- 完成变更前，验证编号唯一性、文档/JSON/SVG 一致性、源码声明归属、实现引用与链接有效性；SVG 有变化时检查渲染。检查结果、编号调整与无需修改某项产物的理由须用中文记录到 `task-list.md`。源码声明覆盖检查不能替代第 8 节要求的业务测试。
+- 完成变更前，验证编号唯一性、文档/JSON/SVG 一致性、源码声明归属、实现引用与链接有效性；SVG 有变化时检查渲染。检查结果、编号调整与无需修改某项产物的理由须用中文记录到 `task-list.md`。源码声明覆盖检查不能替代第 8 节要求的业务测试。校验命令：`python3 tools/feature-registry/verify_numbering_dynamic_20260930.py`（退出码非 0 即不通过）；SVG 重生成：`python3 tools/feature-registry/draw_feature_index.py`。
 
 ## 会话结束任务同步（必须）
 
