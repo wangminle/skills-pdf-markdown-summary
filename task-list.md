@@ -193,6 +193,7 @@
 | BUG-180 | 修复 | 探测 JSON 未固定换行，Windows 与 macOS 产物字节不一致 | 2026-11-24 15:41 | 2026-11-24 15:41 | 已修复 | 两个 render-probe 脚本全部 JSON write_text 显式 encoding=utf-8、newline=LF；AST 回归覆盖所有写盘点。 |
 | BUG-181 | 修复 | Golden 更新会复用异渲染环境的提取产物并写入本环境基准 | 2026-11-24 16:00 | - | 待修复 | P2，[[CHK-077]] 合成复现：产物 `_code_fingerprint.json` 只含源码指纹与生成时间，`_find_existing_index()` 不核对渲染环境；同源码由 MuPDF 1.29.1 产生的索引和 PNG 在模拟 MuPDF 1.29.0 时被选中，`run_golden_tests(update_golden=True)` 把该 PNG 哈希写入标注 1.29.0 的 Golden 并成功退出。应验明产物来源，不匹配或未知时重提取。未触及真实基准。 |
 | BUG-182 | 修复 | Golden 旧环境键回退忽略元数据中已知的 MuPDF 版本冲突 | 2026-11-24 16:00 | - | 待修复 | P2，[[CHK-077]] 合成复现：同平台、架构和 PyMuPDF 的旧键文件记录 MuPDF 1.29.1，模拟本机 MuPDF 1.29.0 时仍被选中并通过 `baseline_problems()` 自检。应区别版本未知的历史兼容数据与明确不匹配的已知版本，拒绝后者，PNG 严格比较仍保留。 |
+| BUG-183 | 修复 | WP-2.1 标准库直方图在内部桶边界因浮点除法误差归入前一桶，与 NumPy 左闭右开语义不等价 | 2026-11-24 17:35 | 2026-11-24 17:35 | 已修复 | 承接 [[CHK-078]] P3。detect_columns 改用 bisect_right(bins, value)-1 并夹取到 0..19，内部边界归后一桶、最大右端点仍归末桶；所有阈值不变。同步处理三项 P4：43 个内部边界样本进入公开函数回归并保存全部差分输入；detect_vacant_regions 缺依赖 warning 改为每文档最多一次；without_numpy fixture 增加 pytest.raises(ImportError) 自证屏蔽生效。 |
 
 ## 调整事项
 
@@ -295,6 +296,8 @@
 | CHK-075 | 检查 | 审查全部未提交代码：golden 环境隔离、run_all 套件登记与 tools 新增脚本 | 2026-11-24 15:00 | 2026-11-24 15:02 | 已完成 | 审查范围：git status 里全部未提交代码——tests/scripts/run_all.py、test_bugfix_20260928.py、test_extraction_golden.py、新增 test_golden_env_isolation_20261124.py，以及新增 tools/feature-registry 与 tools/render-probe 的 5 个脚本；同时核对配套的 design/4-analysis、WBS、README、AGENTS 改动。方法：逐行读 diff 与新增文件、pyflakes 与 compileall、全量 pytest、编号动态校验、两个探测脚本在 8 份 benchmark 上真实复跑（输出写 /tmp，不污染仓库）。结果：全量 733 passed / 0 failed / 0 skipped（29.9s，含 golden）；编号校验 410 编号 / 26 域 / 94 文件 / 1504 声明；探测脚本正常产出，特征数据与 experiments/arch-convergence-probe-20261124 的既有结果一致，仅耗时随机器负载变化。发现并修复 1 个工具链缺陷 [[BUG-173]]。未修复的观察（均未改动）：(1) render_environment_key 未包含 MuPDF 版本，而 render_environment 记录 mupdf；同 PyMuPDF 版本但 MuPDF 不同的构建会得到同一个基准文件名，后写的覆盖先写的；(2) draw_feature_index.py 硬编码 26 个功能域与 F01–F24、F25–F26 文案，并按 9/18 切片分组，域数量或分界变化时 SVG 会静默缺项，动态校验也不覆盖这两处；(3) baseline_problems 只拦“环境文件名 + 异环境记录”，把异环境基准改名为 golden_index.json 时不会报，旧版回退仍可能跨环境比较；(4) diff_golden_baselines 的 final_bbox 差异沿用 0.5pt 容差，亚容差变化计为 0，与“差异”字面不完全一致（与判定口径一致）；(5) test_extraction_golden.py 的 test_golden_baseline_coverage 文档字符串仍写“必须有 golden_index.json”，与按环境分文件的现状不符；(6) probe_dict_call_reuse.py 的 pages 用 max(page)+1，末页无解析调用时会少计，get_text 与 get_drawings 的位置参数未进入缓存键，distinct_keys 与可缓存估算可能偏低；(7) 探测 JSON 的 write_text 未固定 newline，Windows 上产物与 macOS 不是逐字节一致，但只影响本地实验产物。结论：未发现业务源码或 golden 判定逻辑的阻断性缺陷；未修改 skills/ 正式代码、未重跑强制重提取、未更新 golden。；更正探测复跑范围：probe_render_features.py 在 8 份 benchmark 上全量复跑；probe_dict_call_reuse.py 只以 FunAudio-ASR 单份复跑（约 8s），未做 8 份全量重跑。；2026-11-24 15:41 后续：上述 7 项观察已全部修复，见 [[BUG-174]]～[[BUG-180]] 与 [[CHK-076]]；全量 740 passed/0 failed/0 skipped。 |
 | CHK-076 | 检查 | 修复 CHK-075 七项 golden 与维护工具观察并完成全量验收 | 2026-11-24 15:41 | 2026-11-24 15:41 | 已完成 | [[BUG-174]]～[[BUG-180]] 全部修复。TDD 先 7 failed/14 passed，修复后 golden 17/17、工具 4/4、定向 21/21；新套件登记 run_all（30 个）。全量 740 passed/0 failed/0 skipped，compileall 与 git diff --check 通过。新增 F26.042，编号 411/26 域/95 文件/1515 声明，动态校验与三 SVG 渲染通过；AGENTS 环境键规则同步。证据 tests/results/20261124-007/；未更新 golden、未写只读目录、未提交 Git。；真实探测复跑：probe_dict_call_reuse.py --only FunAudio-ASR --out-dir tests/results/20261124-007/dict-probe 返回 0，pages=15，get_text(dict) 195 次/15 个键；README 中英回归基线与环境键说明同步为 740 项及 MuPDF 完整键。 |
 | CHK-077 | 检查 | 审查全部未提交内容并核算 Build1292 | 2026-11-24 15:58 | 2026-11-24 16:00 | 已完成 | 基线 `4922d0e` Build1271，检查 14 个已跟踪修改、10 个未跟踪文件，暂存区为空，正式 Skill 无改动。用 `git archive HEAD skills tests/scripts tests/eval` 隔离前版，对前版和当前分别运行 `python3 -m pytest tests/scripts/ --collect-only -q -p no:cacheprovider`：719 到 740，新增 Golden 环境回归 17、工具回归 4、移除 0，按上一版新增用例口径建议 1271 + 21 = 1292。`python3 -m pytest tests/scripts/ -q --basetemp=tests/results/20261124-008/review/assets/pytest`：740 通过、0 失败、0 跳过，含 Golden 9 项；`python3 tests/scripts/test_extraction_golden.py` 既有产物对比 8/8。`python3 -m compileall -q tools tests/scripts`、编号动态校验（411 编号、1515 声明）、`git diff --check HEAD` 与逐个新文件空白检查通过；验证日志在 `tests/results/20261124-008/review/assets/`。隔离样例复现 [[BUG-181]]、[[BUG-182]]；未改源码、编号、真实 Golden 或只读输入，未暂存或提交。台账写后运行 `task_list_cli.py check`。 |
+| CHK-078 | 检查 | 复核 WP-2.1（detect_columns 标准库迁移）实现与证据 | 2026-11-24 17:00 | 2026-11-24 17:12 | 已完成 | 审查范围：layout_model.py 直方图与 warning、requirements.txt、新增 test_detect_columns_stdlib_20261124.py、run_all 登记，以及 WBS、编号三件套、SVG、README、台账同步。方法：逐行读 diff、pyflakes、全量 pytest、编号动态校验、与 NumPy 旧实现做差分复算（现实分布 9000 组 0 差异；含桶边界值 400 组 6 组不一致），并构造可复现反例。结果：全量 743 passed/0 failed/0 skipped（14.1s，golden 实跑）；verify 412 编号/26 域/96 文件(55+41)/1521 声明；文档计数与 run_all 31 套件登记一致。发现 1 项低风险等价性偏差（P3）：值恰好落在内部桶边界时，`int((value-first_edge)/bin_width)` 可能因浮点下溢得到 i−ε 而落入前一桶，NumPy 则按左闭右开归入后一桶。反例：x0=[54+i*13.35, i=0..20] 时 NumPy 直方图为 [1,1,…,1,2]，新实现为 [2,0,1,1,1,1,2,0,2,0,1,1,2,0,1,1,1,2,0,2]；完整 detect_columns 反例（page=511.85，43 个结构化 x0 值）旧实现判 1 栏/gap 0，新实现判 2 栏/gap 34.47。改用 `bisect.bisect_right(bins, value)-1` 并夹取到 0..19 后，400 组含边界用例与 NumPy 全一致，反例恢复 1 栏。另有三项 P4 观察：(1) 8 份 benchmark 全部单栏（old-layout-summary.json 全为 num_columns=1），8 份零差异只覆盖单栏分支，双栏等价性目前只有合成差分与 1 个单测支撑；(2) detect_vacant_regions 的 warning 在逐页循环内，缺 NumPy/SciPy 时每页一条；(3) without_numpy fixture 仅屏蔽 import，而 detect_columns 已无 NumPy import，对当前实现无实际约束，可加 `pytest.raises(ImportError)` 断言证明屏蔽生效。未发现阻断性缺陷，未修改任何文件；建议按上述方式修复分桶边界并补内部边界回归。 |
+| CHK-079 | 检查 | 二次审查 WP-2.1 未提交代码：栏检测标准库迁移、边界修复与套件登记 | 2026-11-24 17:33 | 2026-11-24 17:40 | 已完成 | 2026-11-24 17:33 二次审查当前全部未提交代码，承接 [[CHK-078]]。范围：skills/pdf-markdown-summary/scripts/lib/layout_model.py（NumPy 直方图改标准库、留白缺依赖 warning）、requirements.txt 注释、tests/scripts/run_all.py 第 31 套件登记、新增 test_detect_columns_stdlib_20261124.py，以及 WBS、编号三件套、两张 SVG、README、台账同步。方法：逐行读 diff；全量 pytest；编号动态校验；pyflakes/compileall；四入口 --help；与 NumPy 旧实现做差分——随机直方图 2000 组、含边界 500 组、完整 detect_columns 3000 组均 0 差异；用 8 份 benchmark 的真实 text_units 复算，旧实现、新实现与模型自身的栏数和逐单元栏位一致（8 份均单栏）；核对 run_all 清单 31 个套件与文档一致。结果：全量 745 passed / 0 failed / 0 skipped（14.2s，golden 实跑）；verify 412 编号 / 26 域 / 96 文件(55+41) / 1523 声明；compileall、四入口 --help、git diff --check、task_list check 均通过。未发现功能缺陷：bisect_right 的内部边界左闭右开语义与 NumPy 一致，末桶包含最大右端点；缺依赖 warning 每文档一次；样本不足仍回单栏。P4 观察：F26.043 描述只写末桶与双栏，未描述已挂 refs 的内部边界与 warning 两个测试；8 份 benchmark 全为单栏，真实双栏等价性仍靠合成差分。交付风险（非代码 bug）：tests/scripts/test_detect_columns_stdlib_20261124.py 仍为未跟踪文件，而 run_all、编号 JSON、覆盖索引已引用它，提交时若漏加会破坏 verify 与套件清单，请显式 git add。本次未修改任何文件。；补充（17:43）：复核期间并行会话于 17:41 在 layout_model.py 新增 _x0_histogram（第 175 行），但 detect_columns 仍保留原内联分桶代码、未调用该助手，属未接线死代码；编号 JSON 未登记该声明、layout_model.py 哈希与 5 处行号未刷新，verify_numbering_dynamic 由通过转为失败 8 项（哈希陈旧、声明未归属、行号漂移、声明数 1524 对 1523）。全量 pytest 仍 745 passed（内联实现未变），定向 5 passed，compileall 通过。此状态可能是并行会话的中间态；本次未改动该文件，待其接线并跑编号同步后再复核。此前的 P4 观察与交付风险仍成立。；再补充（17:44）：并行会话已于 17:42:14 移除未接线的 _x0_histogram，detect_columns 回到内联标准库分桶实现；编号哈希与声明数恢复一致，verify 重新通过 412 编号 / 26 域 / 96 文件 / 1523 声明。故上文 17:41 的红灯为并行编辑中间态，最终状态无死代码、无未登记声明；本次复核结论仍为未发现功能缺陷。 |
 
 ## 测试数据
 
@@ -349,6 +352,8 @@
 | TST-047 | 检查 | 补 PARADISE 第 9 页 Table 7 真实页面回归，防止宽度恢复吞右栏正文 | 2026-09-30 11:20 | 2026-09-30 11:29 | 已完成 | test_real_layout_regressions_20260929.py：优先从 1-参考素材 PARADISE PDF 抽第 9 页跑完整 extract_tables；另用该页实测坐标约束 restore_table_clip_width。去掉短单元格过滤时 x1=524.8，过滤恢复后保持左栏。 |
 | TST-048 | 检查 | 补表格行带与补边函数的 below/above 双向对称边界测试（26 项，y 轴镜像） | 2026-09-30 20:32 | 2026-09-30 20:32 | 已完成 | 回应 CHK-025「多项边界反例仍只覆盖 below」：`test_table_refine_boundaries_20260930.py` 新增 `TestTableBandBothDirections`（8 场景 × 2 方向）与 `TestExpandBoundsBothDirections`（5 场景 × 2 方向）共 26 项。不手抄第二份期望值：同一份 below 坐标场景按 y 轴镜像（Y−y）映射成 above 输入，调用后镜像回 below 坐标断言，两个方向必须得到同一结果。覆盖：编号小节行不并入、正文句终止行带、中等间距桥接、超限间距断开、稀疏标签桥接、弱行表最少 3 行、单强行不变、题注侧守卫；补边的连接行恢复、远处孤立行、正文句不回拉、题注行不回拉、reference_clip 上限。结果：全部一次通过，说明 above 实现本就对称，现由测试固定。BUG-126 的数字尾注位于表底部，函数本身无方向参数，无需镜像。未覆盖：`test_caption_anchor_quality.py` 中历史的单向用例未改动。 |
 | TST-049 | 检查 | 新增 golden 基准环境隔离回归（14 项），并建立 macOS 同环境基线批次 | 2026-11-24 10:38 | 2026-11-24 10:47 | 已完成 | 新增 tests/scripts/test_golden_env_isolation_20261124.py（14 项，已登记 tests/scripts/run_all.py 为第 29 个套件）：覆盖环境标识生成与稳定性、按环境基准文件名、本环境优先、旧无后缀基准回退且不覆盖、差异报告文案。受影响既有用例同步更新：test_extraction_golden.py 的基准契约由 golden_index.json 改为按环境分文件，test_bugfix_20260928.py 断言随契约调整。同时修正 run_all.py 文档字符串「共 25 个」与实际不符、漏列 test_markdown_structure_20261123.py 的计数问题。基线批次 tests/results/20261124-005/（由对照版本产物生成）与验收产物批次 20261124-006/。 |
+| TST-050 | 检查 | 验证 WP-2.1 三项回归、无 NumPy 直调及 8 份 PDF 新旧栏位与裁剪一致性 | 2026-11-24 16:49 | 2026-11-24 16:49 | 已完成 | 新增 test_detect_columns_stdlib_20261124.py 并登记为 run_all 第 31 个套件。TDD 旧实现为 2 failed/1 passed，迁移后相关定向 94 passed。仅含 PyMuPDF、find_spec(numpy)=None 的隔离直调通过：标准双栏 num_columns=2、左右标注正确、gap≈16.65，样本不足与末桶右端点通过；临时链接已清理。1004 组 NumPy 旧算法/标准库新算法差分 0 不一致。PDF_GOLDEN_REEXTRACT=1 全量 743 passed/0 failed/0 skipped，Golden 9/9，产物 20261124-010；与旧实现 20261124-006 比较，8 份 layout_model.json 全等，12496 个单元栏位、177 个裁剪条目与 177 张 PNG 均零差异。compileall、四入口 --help、git diff --check 通过；未更新 Golden，benchmark 保持只读。日志与对照 JSON 在 tests/results/20261124-009/wp-2-1/。 |
+| TST-051 | 检查 | 回归验证 CHK-078 内部桶边界修复、告警降噪与 fixture 自证 | 2026-11-24 17:35 | 2026-11-24 17:35 | 已完成 | TDD 先红：内部边界公开函数反例 2!=1、三页 warning 3!=1，其余 3 项通过；修复后相关定向 96 passed。复核反例+1000 组随机内部边界共 1001 组与 NumPy 旧实现零差异，所有样本和新旧结果保存于 tests/results/20261124-011/wp-2-1-review/boundary-differential.json。PDF_GOLDEN_REEXTRACT=1 全量 745 passed/0 failed/0 skipped，Golden 9/9，产物 20261124-012；与 20261124-010 对比 8 份 layout_model.json、177 个裁剪条目及全部 PNG 零差异。compileall、四入口 --help、编号校验、SVG 渲染、git diff --check 通过；未更新 Golden，benchmark 只读。 |
 
 ## 文档维护
 
@@ -430,6 +435,9 @@
 | DOC-074 | 文档 | 登记渲染环境隔离相关功能编号 F26.039~F26.041，同步三件套、SVG 与 README/AGENTS | 2026-11-24 10:58 | 2026-11-24 11:04 | 已完成 | 新增 F26.039 渲染环境识别与命名、F26.040 多环境基准登记与诊断、F26.041 环境隔离回归保障；同步更新受影响的 F26.008/013/014。用 experiments/sync-numbering-20260930/sync_numbering_bug166_20261124.py（默认演练、`--apply` 写盘）机械同步，结果：410 编号 / 26 域 / 94 文件(55+39) / 1504 声明，verify 通过，AST-JSON-索引-全集-SVG 一致。脚本协作泳道图逐字节不变；图表提取展开图仅脚注「F25–F26 对应 62 项」更新为 65 项。阅读说明同步功能总数、测试项数、维护文件数与基准日期。README 中英文回归基线由 653 passed 更新为 733 passed（含 macOS arm64 + PyMuPDF 1.28.0 与强制重提取说明）；AGENTS 第 8 节 golden 说明改写为按渲染环境分文件、本环境优先、旧基准只回退不覆盖。未改业务源码。 |
 | DOC-075 | 文档 | WP-1.1 探测简报与按页解析数据的快照入 design/4-analysis（带日期后缀），决策依据留在 GitHub 上 | 2026-11-24 13:32 | 2026-11-24 13:46 | 已完成 | 2026-11-24，经用户确认执行。两份快照：design/4-analysis/架构收敛WP-1.1渲染特征探测简报-20261124.md（29.5 KB，内容是 experiments/arch-convergence-probe-20261124/probe_brief.md 的工作副本，标题下加了一行来源说明），以及 design/4-analysis/架构收敛WP-1.1按页解析调用重复程度-20261124.json（13.7 KB，原文件名 dict_call_reuse.json，与原件逐字节一致）。采用快照而不是移动，原因有三：WBS 的验收口径要求探测产物写在 experiments/；台账里 [[CHK-072]] 与 [[BUG-168]] 至 [[BUG-170]] 引用的证据路径指向那里，原件留在原处这些引用才继续成立；design/4-analysis 里的是 2026-11-24 这一次测量的留档，解读只对应当时的代码，代码改动后重跑应另存新的日期快照。快照内容核对：没有 Markdown 链接、HTML 样标签、控制字符和行尾空白；编号校验脚本的链接检查通过。简报工作副本同步改了三处：头部脚本路径改为 tools/render-probe/probe_render_features.py，附录的数据来源补上脚本新位置与快照文件名，末尾新增「五、留档与重跑」小节。仍未入库的内容：probe_results.json（412 KB，可由脚本重算）、逐次调用明细 runs/ 与各轮日志。脚本迁移见 [[OPS-011]]。 |
 | DOC-076 | 文档 | 版本号提升 0.6.10 → 0.6.11 并核对全部现行文档为最新 | 2026-11-24 16:01 | 2026-11-24 16:16 | 已完成 | 用户要求提升版本号并检查所有文档已更新到最新。改动：README、skills/pdf-markdown-summary/SKILL.md、scripts/__init__.py 三处版本串改为 0.6.11；tools/feature-registry/draw_flows.py 泳道落款改「当前工作区 0.6.11 · 2026-11-24」，运行 draw_feature_index.py 重生成三张 SVG，序列比对仅泳道图落款变化、另两张逐字节不变，qlmanage 渲染确认落款；PDF脚本协作图阅读说明头部版本同步；scripts/__init__.py 哈希刷新编号表 JSON 与覆盖索引 md 两处，行号与声明不变。全仓扫描：0.6.10 仅剩架构收敛WP-1.1渲染特征探测简报-20261124.md 三处，对应 git 4922d0e 的探测快照，属历史事实记录保留不改；WBS 与 MarkItDown 对比中的 0.6.9 同理。当前计数核对：阅读说明/全集/索引图 411 编号、26 域、345+66 项、95 文件、1515 声明与 JSON 一致；README 中英基线 740 passed 与实际全量一致。验证：verify 通过；四入口 --help 4/4、compileall、git diff --check 通过；全量 pytest 740 passed/0 failed/0 skipped（含 golden 9/9，另单独运行 golden 9 passed）。首次全量运行（冷缓存、301 秒）出现 140 个 setup ERROR（600 passed/140 errors），原因未定位；随后三次复跑（独立 basetemp 两次、同一 basetemp 路径一次）均为 740 passed，按通过结果记录基线，未归因为测试缺陷。未提交 git；Build 号待用户确定（CHK-077 按新增用例口径建议 1292）。 |
+| DOC-077 | 文档 | 同步 WP-2.1 的 WBS、功能编号三件套、SVG 与回归基线文档 | 2026-11-24 16:49 | 2026-11-24 16:49 | 已完成 | WBS 2.1 行补充落地结果；F06.011 改为标准库栏检测职责，F06.013 补缺依赖 warning，新增 F26.043 栏检测标准库迁移回归保障。通过 sync_numbering_wp2_1_20261124.py 同步 JSON/全集/覆盖索引，当前 412 编号、26 域、96 文件、1521 声明；阅读说明计数同步。draw_feature_index.py 重生成三张 SVG，qlmanage 渲染并查看通过；verify_numbering_dynamic_20260930.py 通过。README 中英回归基线更新为 743 passed。泳道流程与模块结构未变。；同步脚本首次幂等复验暴露已登记功能仍查尾部锚点的问题，已在实验脚本中加已登记短路；复验为变更文件 0、新符号 0、实现引用变化 0，正式编号资料未变。 |
+| DOC-078 | 文档 | 同步 CHK-078 修复后的功能描述、测试引用、SVG 与 745 项回归基线 | 2026-11-24 17:35 | 2026-11-24 17:35 | 已完成 | 沿用 F26.043，不新增编号；新增内部边界与每文档一次 warning 两处测试引用。F06.011 描述补 bisect_right 内部边界语义，F06.013 改为每文档一次 warning；当前 412 编号、26 域、96 文件、1523 声明，verify 通过。相关 SVG 重生成、qlmanage 渲染并查看通过；WBS 2.1 与 README 中英基线更新为 5 项新增回归、745 passed。 |
+| DOC-079 | 文档 | 版本号提升 0.6.11 → 0.6.12，按新口径核算 Build1324 并撰写 commit message | 2026-11-24 17:55 | 2026-11-24 18:20 | 已完成 | 用户要求升级版本、撰写 commit message 并计算 Build。Build 按用户口径：函数/功能模块新增或修改 5、用例/脚本新增或修改 9、文档变更 11、重要执行动作 7，合计 32（台账不计），1292 + 32 = 1324。版本串三处改 0.6.12；draw_flows.py 落款改「当前工作区 0.6.12 · 2026-11-24」后重生成三张 SVG，仅泳道图落款变化，qlmanage 渲染确认；阅读说明同步；scripts/__init__.py 哈希刷新编号表 JSON 与覆盖索引两处。验证：verify 412 编号/26 域/96 文件(55+41)/1523 声明一致；全量 745 passed/0 failed/0 skipped（285.8s，版本串变更触发 8 份重提取，golden 实跑）；四入口 --help、compileall、git diff --check、task_list check 通过；全仓无 0.6.11 残留（台账历史除外）。拟提交信息见文末同名小节。未提交 git。 |
 
 ## 功能开发
 
@@ -452,6 +460,7 @@
 | DEV-015 | 调整 | golden 基准目录迁移：8 份 golden_index.json 从 tests/basic-benchmark/<stem>/images/ 移至 tests/results/20260810-001/<stem>/images/（与提取产物同批次）；basic-benchmark 恢复为纯 PDF 只读输入 | 2026-08-10 16:16 | 2026-08-10 16:30 | 已完成 | test_extraction_golden 新增 _find_golden_index（从 results 各批次找最新 golden，不校验指纹）；_resolve_golden_paths 去掉 basic-benchmark golden 逻辑和 benchmark_group 兼容；--update-golden 改写当前批次；.gitignore 加 tests/results/**/golden_index.json 例外；AGENTS.md §3/§8 同步 |
 | DEV-016 | 开发 | 主链三态验收 + 题注对账：留白不降级，污染/漏检落盘 | 2026-09-07 22:47 | 2026-09-07 23:10 | 已完成 | `lib/assess.py` 按布尔信号定级：标题/正文入框或正文引用 → rejected；截断/表带未收束/弱锚点/重复 PNG/对账补裁 → review_required；额外留白仍 accepted。四态字段保留，`accepted_with_margin` 仅 Layout 链使用。显式题注与裸 `Figure N`/`Table N` 纳入 expected；漏检补裁 PNG 进 index，Markdown 只插入 accepted / accepted_with_margin。污染候选不再静默跳过。 |
 | DEV-017 | 开发 | Markdown 把 accepted 图表插回正文对应题注位置，不再一律堆到文末 | 2026-09-30 11:20 | 2026-09-30 11:29 | 已完成 | `pdf_to_markdown.py` 新增 `_place_assets_in_document`：按题注段落匹配 Figure/Table ident，内容在题注上方则插在题注前，否则插在题注后；正文引用不抢槽；未匹配资产仍进文末提取资产节。见 test_pdf_to_markdown_cli.py 三条新用例。 |
+| DEV-018 | 开发 | 完成 WP-2.1：detect_columns 去 NumPy 并保持栏检测行为等价 | 2026-11-24 16:49 | 2026-11-24 16:49 | 已完成 | 将 lib/layout_model.py 的 20 桶直方图、均值阈值与行宽中位数改为标准库实现；样本数、峰值、栏间距和峰距阈值均未调整，末桶继续包含最大右端点，删除无 NumPy 时静默回单栏分支。detect_vacant_regions 缺 NumPy/SciPy 时改为 logger.warning 后回空；requirements.txt 注释同步。未新增或调整运行参数。 |
 
 ## 配置运维
 
@@ -473,14 +482,14 @@
 
 | 分类 | 总数 | 已完成 | 待开发/待修复 | 完成率 |
 | --- | --- | --- | --- | --- |
-| 代码 Bug | 182 | 173 | 9 | 95.1% |
+| 代码 Bug | 183 | 174 | 9 | 95.1% |
 | 调整事项 | 15 | 13 | 2 | 86.7% |
-| 检查事项 | 77 | 77 | 0 | 100% |
-| 测试数据 | 49 | 49 | 0 | 100% |
-| 文档维护 | 76 | 76 | 0 | 100% |
-| 功能开发 | 17 | 15 | 2 | 88.2% |
+| 检查事项 | 79 | 79 | 0 | 100% |
+| 测试数据 | 51 | 51 | 0 | 100% |
+| 文档维护 | 79 | 79 | 0 | 100% |
+| 功能开发 | 18 | 16 | 2 | 88.9% |
 | 配置运维 | 11 | 11 | 0 | 100% |
-| **总计** | 427 | 414 | 13 | 97.0% |
+| **总计** | 436 | 423 | 13 | 97.0% |
 
 ## 项目阅读与诊断记录（2026-09-07）
 
@@ -2435,3 +2444,71 @@ V0.6.9-Build????-20261008
 | 首次全量运行（冷缓存，basetemp 置于新批次 tests/results/20261124-009 下） | 600 passed / 140 errors，301 秒；随后以独立 basetemp 复跑两次、同一 basetemp 路径复跑一次均为 740 passed，未复现，未计入基线 |
 
 未提交 git；commit 标题（V0.6.11-Build????-20261124）的 Build 号按惯例留待用户确定（已知 V0.6.10=1271，CHK-077 建议 1292）。
+
+## 2026-11-24 WP-2.1 独立复核（对应 [[CHK-078]]）
+
+- 复核对象：`detect_columns` 的标准库直方图迁移、`detect_vacant_regions` 的缺依赖 warning、`requirements.txt` 注释、新增 `test_detect_columns_stdlib_20261124.py` 与 `run_all.py` 登记，以及 WBS、编号三件套、三张 SVG、README 与台账同步。未修改任何文件。
+- 总体结论：未发现阻断性缺陷。全量 743 passed / 0 failed / 0 skipped（14.1 秒，golden 实跑）；编号校验 412 编号 / 26 域 / 96 文件（55+41）/ 1521 声明；文档计数与 31 个套件登记一致；现实分布下新旧实现 9000 组差分 0 差异。
+- P3 等价性偏差：值恰好落在内部桶边界时，`int((value - first_edge) / bin_width)` 可能因浮点下溢得到 i−ε 而落入前一桶；NumPy 按左闭右开把边界值归入后一桶（最大右端点除外）。反例一：`x0 = [54 + i*13.35 for i in range(21)]` 时 NumPy 直方图为 `[1,1,…,1,2]`，新实现为 `[2,0,1,1,1,1,2,0,2,0,1,1,2,0,1,1,1,2,0,2]`。反例二（完整函数）：page=511.85、43 个按桶边界构造的 x0 值，旧 NumPy 实现判 1 栏、gap 0，新实现判 2 栏、gap 34.47。改用 `bisect.bisect_right(bins, value) - 1` 并夹取到 0..19 后，400 组含边界用例与 NumPy 全一致，反例恢复为 1 栏。建议修复并补一条“内部桶边界值”回归（现有第 3 条测试只覆盖最大右端点）。
+- P4 观察：(1) 8 份 benchmark 全部为单栏（`old-layout-summary.json` 中 num_columns 均为 1），8 份零差异只证明单栏分支；双栏等价性目前由 1004 组合成差分（报告未留样本）与 1 个单测支撑，建议补真实双栏 PDF 对照或在差分中加入边界值。(2) `detect_vacant_regions` 的 warning 位于逐页循环内，缺 NumPy/SciPy 时每页记录一条，建议循环外或仅首页记录一次。(3) `without_numpy` fixture 只屏蔽 import，而 `detect_columns` 已无 NumPy import，对当前实现没有实际约束，可加 `pytest.raises(ImportError)` 断言证明屏蔽确实生效。
+- 新增测试与登记核对：3 项用例通过；`run_all.py` 文档与清单均为 31 个套件；未触碰 `tests/basic-benchmark/`。
+- 后续（17:45）：P3 已由 [[BUG-183]] 修复（`bisect_right` 分桶）并由 [[TST-051]] 补内部边界与 warning 回归，全量 745 passed；本轮复核后把 F26.043 描述补齐“内部桶边界左闭右开”与“缺依赖每文档一次 warning”，`draw_feature_index.py` 重生成索引图，verify 412 编号 / 1523 声明通过。
+
+## 2026-11-24 版本号提升 0.6.11 → 0.6.12
+
+- 用户要求版本升级到 0.6.12、撰写 commit message 并计算 Build 数。本轮以工作区 WP-2.1 成果（含 [[BUG-183]] 修复）为基线，未回退任何未提交修改。
+- Build 计算按用户新口径：函数/功能模块、用例/脚本、文档、重要执行动作都计数，台账不计；合计 32，1292 + 32 = **1324**，明细见下。事实口径：`git archive HEAD` 隔离 V0.6.11（6b22792）收集 740 例，当前工作区 745 例。
+- 版本号三处更新：`README.md`、`skills/pdf-markdown-summary/SKILL.md`、`skills/pdf-markdown-summary/scripts/__init__.py` → **0.6.12**。全仓扫描（排除 task-list 历史、design/1-archive、design/2-ref、old-version、tests/results、experiments）无 0.6.11 残留。
+- 随版本同步：`draw_flows.py` 泳道落款改「当前工作区 0.6.12 · 2026-11-24」后重生成三张 SVG（仅泳道图落款变化，另两张逐字节不变），qlmanage 渲染确认；`PDF脚本协作图阅读说明` 头部版本同步。
+- 编号资料：`scripts/__init__.py` 版本串变更刷新编号表 JSON 与覆盖索引 md 两处 SHA256（行号、声明数不变），verify 通过：412 编号 / 26 域 / 96 文件（55+41）/ 1523 声明。
+- README 中英回归基线 745 保持不变（本轮无测试增减）。
+
+### Build 计分明细（V0.6.11 → 当前）
+
+| 类别 | 计数 | 明细 |
+| --- | --- | --- |
+| 函数/功能模块新增或修改 | 5 | `detect_columns`、`detect_vacant_regions`；F06.011、F06.013（修改）、F26.043（新增） |
+| 用例/脚本新增或修改 | 9 | 5 个新用例；新增测试脚本、`run_all.py`、`draw_flows.py`、`scripts/__init__.py` |
+| 文档变更数 | 11 | README、SKILL、WBS、功能全集、编号表 JSON、覆盖索引、阅读说明、三张 SVG、requirements.txt |
+| 重要执行动作 | 7 | Build 核算、全量 pytest（含 8 份重提取）、定向 5 项、编号校验、SVG 重生成与渲染、四入口/compileall/diff check、8 份 benchmark 对照 |
+| **合计** | **32** | 1292 + 32 = **1324** |
+
+### 拟提交信息
+
+标题：`V0.6.12-Build1324-20261124`
+
+正文（265 字，不含空白；含空白 294 字）：
+
+```text
+V0.6.12-Build1324-20261124
+
+1. detect_columns 改用标准库 20 桶直方图与 statistics.median，移除 NumPy 依赖；bisect_right 分桶保证内部边界左闭右开、末桶含右端点，栏位判定与旧实现等价，8 份 benchmark 零差异。
+2. detect_vacant_regions 缺依赖时每文档一次 warning，不再静默降级。
+3. 新增 5 项栏检测回归（无 NumPy 双栏、样本不足、末桶、内部边界、warning 一次）；745 passed，Golden 9/9。
+4. 同步编号三件套、三张 SVG、WBS、README 与台账；版本 0.6.12。
+```
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `git archive HEAD` + `pytest --collect-only`（V0.6.11） | 740 例（事实记录） |
+| `pytest --collect-only`（当前工作区） | 745 例（事实记录） |
+| `python3 -m pytest tests/scripts/ -q` | **745 passed、0 failed、0 skipped**（285.8s，版本串变更触发 8 份重提取，golden 实跑） |
+| `python3 tools/feature-registry/verify_numbering_dynamic_20260930.py` | 412 编号 / 26 域 / 96 文件(55+41) / 1523 声明，一致 |
+| 三张 SVG | 仅泳道图落款变化；qlmanage 渲染通过 |
+| 四入口 `--help`、compileall、`git diff --check`、台账 check | 通过 |
+
+未提交 git；`tests/scripts/test_detect_columns_stdlib_20261124.py` 仍为未跟踪文件，提交时需一并 `git add`。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `python3 -m pytest tests/scripts/ -q` | 743 passed / 0 failed / 0 skipped（14.1s，golden 实跑） |
+| `python3 -m pytest tests/scripts/test_detect_columns_stdlib_20261124.py -q`（定向） | 3 passed |
+| `python3 tools/feature-registry/verify_numbering_dynamic_20260930.py` | 412 编号 / 26 域 / 96 文件(55+41) / 1521 声明，一致 |
+| 新旧直方图差分（现实分布 9000 组） | 0 差异 |
+| 新旧直方图差分（含桶边界值 400 组） | 6 组不一致；`bisect_right` 方案 0 组不一致 |
+| 完整 `detect_columns` 反例 | 旧 1 栏/gap 0，新 2 栏/gap 34.47；bisect 方案恢复 1 栏 |
+| `git diff --check`、pyflakes | 通过（仅存量 `Optional` 未用与 f-string 无占位符提示） |

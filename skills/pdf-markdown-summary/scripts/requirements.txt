@@ -4,8 +4,8 @@ pymupdf
 # 可选依赖（表格结构分析增强）
 # pdfplumber
 
-# 可选依赖（双栏检测 / 留白区域检测，lib/layout_model.py 按需 import；
-# 缺失时静默降级为单栏处理，不影响主流程）
+# 可选依赖（留白区域检测，lib/layout_model.py 按需 import；
+# 缺失时记录 warning 并跳过留白区域检测，不影响主流程；双栏检测仅使用标准库）
 # numpy
 # scipy
 

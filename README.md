@@ -3,7 +3,7 @@
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
 >
-> 当前版本 / Current version: **0.6.11**
+> 当前版本 / Current version: **0.6.12**
 
 ---
 
@@ -183,7 +183,7 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 多行标题归一：编号与标题文本被排版拆行时序列化为单行 ATX 标题，后半段不再掉入正文（段落换行策略保持不变）。
 - `--prune-images` 安全化：仅清理运行前已存在且未被修改、未被当前索引引用的 PNG。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；基准按平台、架构、PyMuPDF 与 MuPDF 完整渲染环境分文件（同页同框的 PNG 在 macOS 与 Windows 上只差个别像素，字节数与 sha256 不同），完整环境键优先，同平台/架构/PyMuPDF 旧键及无后缀基准只读回退且不覆盖。当前回归基线为 740 passed、0 failed、0 skipped（2026-11-24 在 macOS arm64 + PyMuPDF 1.28.0 + MuPDF 1.29.0 复验，golden 实际执行）。
+- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；基准按平台、架构、PyMuPDF 与 MuPDF 完整渲染环境分文件（同页同框的 PNG 在 macOS 与 Windows 上只差个别像素，字节数与 sha256 不同），完整环境键优先，同平台/架构/PyMuPDF 旧键及无后缀基准只读回退且不覆盖。当前回归基线为 745 passed、0 failed、0 skipped（2026-11-24 在 macOS arm64 + PyMuPDF 1.28.0 + MuPDF 1.29.0 复验，golden 实际执行）。
 - Basic Benchmark 已完成多轮逐图 debug 排查，图表选取策略记录见 `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
 - 当前图表提取代码流程说明见 `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
 - 旧版 scripts 快照归档。
@@ -366,7 +366,7 @@ Implemented:
 - Multi-line heading normalization: headings whose numbering and text were split across lines serialize as a single-line ATX heading (the tail no longer leaks into body text); paragraph line-breaking is unchanged.
 - Safe `--prune-images`: only PNGs that existed before the run, are unchanged, and are unreferenced by the current index are removed.
 - Complete CLI options reference (`references/cli-options.md`).
-- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; baselines are stored per full rendering environment (platform, architecture, PyMuPDF, and MuPDF; the same clip renders to PNGs that differ by a few pixels between macOS and Windows, so byte size and sha256 differ). The full environment key takes precedence, while same-platform/architecture/PyMuPDF legacy keys and unsuffixed baselines are read-only fallbacks and are never overwritten. The current regression baseline is 740 passed, 0 failed, 0 skipped (reverified on 2026-11-24 on macOS arm64 with PyMuPDF 1.28.0 and MuPDF 1.29.0, with golden tests actually executed).
+- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; baselines are stored per full rendering environment (platform, architecture, PyMuPDF, and MuPDF; the same clip renders to PNGs that differ by a few pixels between macOS and Windows, so byte size and sha256 differ). The full environment key takes precedence, while same-platform/architecture/PyMuPDF legacy keys and unsuffixed baselines are read-only fallbacks and are never overwritten. The current regression baseline is 745 passed, 0 failed, 0 skipped (reverified on 2026-11-24 on macOS arm64 with PyMuPDF 1.28.0 and MuPDF 1.29.0, with golden tests actually executed).
 - Multi-round Basic Benchmark visual review is recorded in `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
 - Current extraction flow diagrams are documented in `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
 - Archived previous root-level scripts snapshot.

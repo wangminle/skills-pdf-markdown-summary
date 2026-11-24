@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import logging
 import re
+from bisect import bisect_right
+from statistics import median
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .pdf_backend import open_pdf
@@ -215,75 +217,75 @@ def detect_columns(
                 unit.column = -1
         return num_columns, column_gap, all_units
 
-    # 使用 numpy 进行直方图分析
-    try:
-        import numpy as np
-        x0_array = np.array(x0_values)
-        hist, bins = np.histogram(x0_array, bins=20)
+    # 使用标准库进行直方图分析，分桶规则与 numpy.histogram 一致。
+    bin_count = 20
+    first_edge = min(x0_values)
+    last_edge = max(x0_values)
+    if first_edge == last_edge:
+        first_edge -= 0.5
+        last_edge += 0.5
+    bin_width = (last_edge - first_edge) / bin_count
+    bins = [first_edge + i * bin_width for i in range(bin_count)] + [last_edge]
+    hist = [0] * bin_count
+    for value in x0_values:
+        bin_idx = max(0, min(bin_count - 1, bisect_right(bins, value) - 1))
+        hist[bin_idx] += 1
 
-        threshold = np.mean(hist) * 1.5
-        peaks_idx = np.where(hist > threshold)[0]
+    threshold = (sum(hist) / bin_count) * 1.5
+    peaks_idx = [i for i, count in enumerate(hist) if count > threshold]
 
-        if len(peaks_idx) >= 2:
-            top_peaks = sorted(peaks_idx, key=lambda i: hist[i], reverse=True)[:2]
-            top_peaks.sort()
+    if len(peaks_idx) >= 2:
+        top_peaks = sorted(peaks_idx, key=lambda i: hist[i], reverse=True)[:2]
+        top_peaks.sort()
 
-            peak1_x = bins[top_peaks[0]]
-            peak2_x = bins[top_peaks[1]]
+        peak1_x = bins[top_peaks[0]]
+        peak2_x = bins[top_peaks[1]]
 
-            # 栏间距估计：两峰间距 ≈ 栏宽 + 栏间距，用段落行宽中位数估计栏宽后相减。
-            # 旧公式误减 (page_width - peak2_x)（= 栏宽 + 右页边距），对称布局下
-            # 恒等于 栏间距 - 页边距，标准边距 54pt > 栏间距 ~30pt 时必为负，
-            # 导致双栏检测恒失效。
-            med_line_width = float(np.median(width_values))
-            candidate_gap = peak2_x - peak1_x - med_line_width
-            peak_sep = peak2_x - peak1_x
-            valid_gap = 0 < candidate_gap <= 0.30 * page_width
-            valid_sep = 0.18 * page_width <= peak_sep <= 0.60 * page_width
+        # 栏间距估计：两峰间距 ≈ 栏宽 + 栏间距，用段落行宽中位数估计栏宽后相减。
+        # 旧公式误减 (page_width - peak2_x)（= 栏宽 + 右页边距），对称布局下
+        # 恒等于 栏间距 - 页边距，标准边距 54pt > 栏间距 ~30pt 时必为负，
+        # 导致双栏检测恒失效。
+        med_line_width = float(median(width_values))
+        candidate_gap = peak2_x - peak1_x - med_line_width
+        peak_sep = peak2_x - peak1_x
+        valid_gap = 0 < candidate_gap <= 0.30 * page_width
+        valid_sep = 0.18 * page_width <= peak_sep <= 0.60 * page_width
 
-            if not (valid_gap and valid_sep):
-                num_columns = 1
-                column_gap = 0.0
-
-                if debug:
-                    print("Rejected TWO-column candidate:")
-                    print(f"  Left peak x0 ≈ {peak1_x:.1f}pt")
-                    print(f"  Right peak x0 ≈ {peak2_x:.1f}pt")
-                    print(f"  Candidate gap ≈ {candidate_gap:.1f}pt")
-                    print(f"  Peak separation ≈ {peak_sep:.1f}pt")
-
-                for units in all_units.values():
-                    for unit in units:
-                        unit.column = -1
-            else:
-                num_columns = 2
-                column_gap = candidate_gap
-                mid_x = (peak1_x + peak2_x) / 2
-
-                if debug:
-                    print(f"Detected TWO columns:")
-                    print(f"  Left column x0 ≈ {peak1_x:.1f}pt")
-                    print(f"  Right column x0 ≈ {peak2_x:.1f}pt")
-                    print(f"  Column gap ≈ {column_gap:.1f}pt")
-
-                for units in all_units.values():
-                    for unit in units:
-                        unit.column = 0 if unit.bbox.x0 < mid_x else 1
-        else:
+        if not (valid_gap and valid_sep):
             num_columns = 1
             column_gap = 0.0
 
             if debug:
-                print(f"Detected SINGLE column")
+                print("Rejected TWO-column candidate:")
+                print(f"  Left peak x0 ≈ {peak1_x:.1f}pt")
+                print(f"  Right peak x0 ≈ {peak2_x:.1f}pt")
+                print(f"  Candidate gap ≈ {candidate_gap:.1f}pt")
+                print(f"  Peak separation ≈ {peak_sep:.1f}pt")
 
             for units in all_units.values():
                 for unit in units:
                     unit.column = -1
-    except ImportError:
-        if debug:
-            print("NumPy not available, assuming single column")
+        else:
+            num_columns = 2
+            column_gap = candidate_gap
+            mid_x = (peak1_x + peak2_x) / 2
+
+            if debug:
+                print(f"Detected TWO columns:")
+                print(f"  Left column x0 ≈ {peak1_x:.1f}pt")
+                print(f"  Right column x0 ≈ {peak2_x:.1f}pt")
+                print(f"  Column gap ≈ {column_gap:.1f}pt")
+
+            for units in all_units.values():
+                for unit in units:
+                    unit.column = 0 if unit.bbox.x0 < mid_x else 1
+    else:
         num_columns = 1
         column_gap = 0.0
+
+        if debug:
+            print(f"Detected SINGLE column")
+
         for units in all_units.values():
             for unit in units:
                 unit.column = -1
@@ -505,6 +507,10 @@ def detect_vacant_regions(
                     print(f"  Region {i+1}: {rect}, area={area_ratio:.1%}")
 
         except ImportError:
+            if pno == 0:
+                logger.warning(
+                    "NumPy/SciPy not available; skipping vacant region detection for this document"
+                )
             if debug and pno == 0:
                 print(f"[Page {pno+1}] NumPy/SciPy not available, skipping vacant region detection")
             all_vacant[pno] = []

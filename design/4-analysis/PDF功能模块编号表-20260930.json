@@ -149,19 +149,19 @@
     {
       "id": "F26",
       "name": "测试保障与批次诊断",
-      "count": 42
+      "count": 43
     }
   ],
   "stats": {
     "runtime_files": 55,
-    "testing_files": 40,
+    "testing_files": 41,
     "runtime_features": 345,
-    "testing_features": 66,
-    "definitions": 1515,
-    "definition_coverage": 1515
+    "testing_features": 67,
+    "definitions": 1523,
+    "definition_coverage": 1523
   },
   "source_sha256": {
-    "skills/pdf-markdown-summary/scripts/__init__.py": "d9818980bedc82963c130309bfe96d0db754a582552d5b051ba176b526c4f046",
+    "skills/pdf-markdown-summary/scripts/__init__.py": "35fccd724ac508f2ab5e92fa767cd796647bd9c11275a1f2c4fd3ec0002e2483",
     "skills/pdf-markdown-summary/scripts/core/__init__.py": "873a743bfba2d72093fb14483ed6edff8d3c4cfac0139f1e0174fa13510538b5",
     "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py": "b5be376c16fabac23346e6d0fed37d2005449c043e4b4a7b3d0da72973afc29f",
     "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py": "d5f6d4b4b2b223159d294892335cbe8f6e49e65291913acd7d216f2d72119074",
@@ -189,7 +189,7 @@
     "skills/pdf-markdown-summary/scripts/lib/figure_post.py": "720b5ce7d8b9d76c7c36ba92271abe634db84bb7dc41c99aaf2a2065bb59046a",
     "skills/pdf-markdown-summary/scripts/lib/idents.py": "f86e0be791dda34749ce2766c19d83695fcf5c87c4ad1e94cf8aa78b5b6e65f2",
     "skills/pdf-markdown-summary/scripts/lib/layout_integration.py": "6151370c7de69a2f4ca7eae1e7b31fcfa1709cb31b4dbb0b2ea53f408fb4ac13",
-    "skills/pdf-markdown-summary/scripts/lib/layout_model.py": "048ef07723e08b94a9b3d5f1d992538e28cd61ca6b692ddea3511ed6bcd2ebc7",
+    "skills/pdf-markdown-summary/scripts/lib/layout_model.py": "9dc447719f344aa0cbf67e4627ec33d30d799a67288303cb769c69b695a440f4",
     "skills/pdf-markdown-summary/scripts/lib/markdown.py": "453fd10abd189caccd6debcdb943e44a87e841dc5d0dbff9da22cfaac5916e85",
     "skills/pdf-markdown-summary/scripts/lib/markdown_models.py": "badeabae85a9562103ab960bb1af6fe6f755730aa2ddc17fb1020021a8e3ea56",
     "skills/pdf-markdown-summary/scripts/lib/markdown_render.py": "9399ecdbba0a7cd1d7fa23e8d01fb341537d883fbd3a33370c183dbd9f0ef720",
@@ -217,7 +217,7 @@
     "skills/pdf-markdown-summary/scripts/summarize_pdf.py": "60f545934dfe142c2b4b41314d5033b2ab7001d16ffa945bf635a3e884884379",
     "tests/scripts/analyze_debug_batch.py": "546bfcc8c63171416d19af387597e0c89af2554d4ff1c5295062263eb3cdb255",
     "tests/scripts/conftest.py": "258a041d92fea78cb0243ed48b55c7abf29c3c80a32af252a59aafd460db13dd",
-    "tests/scripts/run_all.py": "429b1f6347af3af615902e4148951a54556c9a6af71cf1e727aac2125a1414b1",
+    "tests/scripts/run_all.py": "6fd68e451bb61c18d6525118ae1e0897a35c1138dc7d2542b00458eb55584f4b",
     "tests/scripts/test_a2_a3_fixes.py": "26c4910aac42549da5aeefb1977fb38b67f4408897151b2415b0e45a0ee3a325",
     "tests/scripts/test_analyze_debug_batch.py": "53246d0b21e6902ebb8e590d97a2c5440f121883ee34f9191674524180ffcd62",
     "tests/scripts/test_bugfix_20260928.py": "9d40134e730d825aa39f881de4c05336fd75caeadee4c2fa1996bfdafef9db3c",
@@ -255,7 +255,8 @@
     "tests/scripts/test_bugfix_20261123.py": "3b3b4d920961ff7f31209e4a9b15fa5130d7c03f94247e48e0c12a6dde89d41a",
     "tests/scripts/test_markdown_structure_20261123.py": "fde456a0004d07d1084e12960b8a37a7a622394ddb6e16ea76a36a84434f0970",
     "tests/scripts/test_golden_env_isolation_20261124.py": "715f285f1b92ea2dd4be105555392e450a64d15e1bcd6be86283d8c5d31e536f",
-    "tests/scripts/test_tools_maintenance_20261124.py": "56bd460c4e3a8eba660a98a1e724998323ee2bfaa36e4d5ea7604c41ab137a99"
+    "tests/scripts/test_tools_maintenance_20261124.py": "56bd460c4e3a8eba660a98a1e724998323ee2bfaa36e4d5ea7604c41ab137a99",
+    "tests/scripts/test_detect_columns_stdlib_20261124.py": "4d4b2eb2deda4b23042e5ec2b1ac6fd041735d74b520ceb1a5cbf1169dd1f996"
   },
   "features": [
     {
@@ -2390,8 +2391,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "classify_text_types",
-          "line": 43,
-          "end": 166
+          "line": 45,
+          "end": 168
         }
       ],
       "inputs": "增强行级文本",
@@ -2410,8 +2411,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "classify_text_types",
-          "line": 43,
-          "end": 166
+          "line": 45,
+          "end": 168
         }
       ],
       "inputs": "增强行、典型字号",
@@ -2430,8 +2431,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "classify_text_types",
-          "line": 43,
-          "end": 166
+          "line": 45,
+          "end": 168
         }
       ],
       "inputs": "增强行及典型字体",
@@ -2445,13 +2446,13 @@
     {
       "group": "06",
       "name": "基础 Layout 双栏峰值与栏间距估计",
-      "description": "采样正文 x0 做直方图双峰检测，用行宽中位数估算栏间距并校验峰距，标注左右栏；无 numpy 或样本不足回单栏。",
+      "description": "采样正文 x0 用标准库构造 20 桶直方图并检测双峰，bisect_right 保证内部边界左闭右开且末桶包含最大右端点；用 statistics.median 的行宽中位数估算栏间距并校验峰距，标注左右栏；仅样本不足回单栏，不依赖 NumPy。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "detect_columns",
-          "line": 173,
-          "end": 291
+          "line": 175,
+          "end": 293
         }
       ],
       "inputs": "各页文本行、页面宽",
@@ -2470,8 +2471,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "build_text_blocks",
-          "line": 298,
-          "end": 414
+          "line": 300,
+          "end": 416
         }
       ],
       "inputs": "增强文本行、典型行高",
@@ -2485,13 +2486,13 @@
     {
       "group": "06",
       "name": "网格留白连通区域估计",
-      "description": "以 50pt 网格遮罩段落/列表，用 scipy 连通域形成未覆盖区域并过滤小于页面 5% 的区域；缺依赖回空。",
+      "description": "以 50pt 网格遮罩段落/列表，用 scipy 连通域形成未覆盖区域并过滤小于页面 5% 的区域；缺 NumPy/SciPy 时每文档仅记录一次 warning 并回空。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "detect_vacant_regions",
-          "line": 421,
-          "end": 512
+          "line": 423,
+          "end": 518
         }
       ],
       "inputs": "文本块、页面尺寸",
@@ -2510,8 +2511,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "adjust_clip_with_layout",
-          "line": 519,
-          "end": 692
+          "line": 525,
+          "end": 698
         }
       ],
       "inputs": "clip、caption、Layout、方向",
@@ -2530,8 +2531,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "adjust_clip_with_layout",
-          "line": 519,
-          "end": 692
+          "line": 525,
+          "end": 698
         }
       ],
       "inputs": "clip、保护文本块、典型行高",
@@ -2550,8 +2551,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
           "symbol": "should_enable_layout_driven",
-          "line": 699,
-          "end": 803
+          "line": 705,
+          "end": 809
         }
       ],
       "inputs": "PDF、debug",
@@ -9515,20 +9516,20 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_command",
-          "line": 111,
-          "end": 128
+          "line": 112,
+          "end": 129
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_pytest_suite",
-          "line": 163,
-          "end": 212
+          "line": 164,
+          "end": 213
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_script_suite",
-          "line": 215,
-          "end": 242
+          "line": 216,
+          "end": 243
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9547,50 +9548,50 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult",
-          "line": 84,
-          "end": 108
+          "line": 85,
+          "end": 109
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.total",
-          "line": 97,
-          "end": 98
+          "line": 98,
+          "end": 99
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.success",
-          "line": 101,
-          "end": 103
+          "line": 102,
+          "end": 104
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.counts_str",
-          "line": 105,
-          "end": 108
+          "line": 106,
+          "end": 109
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "parse_pytest_output",
-          "line": 131,
-          "end": 143
+          "line": 132,
+          "end": 144
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "parse_legacy_output",
-          "line": 146,
-          "end": 151
+          "line": 147,
+          "end": 152
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "_fill_counts",
-          "line": 154,
-          "end": 160
+          "line": 155,
+          "end": 161
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "_print_suite_result",
-          "line": 619,
-          "end": 628
+          "line": 626,
+          "end": 635
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9609,8 +9610,8 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "find_unregistered_suites",
-          "line": 601,
-          "end": 616
+          "line": 608,
+          "end": 623
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9629,8 +9630,8 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "main",
-          "line": 245,
-          "end": 595
+          "line": 246,
+          "end": 602
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -13969,6 +13970,24 @@
           "end": 2523
         },
         {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "without_numpy",
+          "line": 22,
+          "end": 32
+        },
+        {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "without_numpy.blocked_import",
+          "line": 25,
+          "end": 28
+        },
+        {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "_paragraph",
+          "line": 35,
+          "end": 40
+        },
+        {
           "file": "tests/scripts/test_extraction_status_inventory.py",
           "symbol": "_candidate",
           "line": 37,
@@ -15139,6 +15158,53 @@
       "key": "26/维护工具链回归保障",
       "scope": "testing",
       "id": "F26.042"
+    },
+    {
+      "group": "26",
+      "name": "栏检测标准库迁移回归保障",
+      "description": "覆盖 WP-2.1 栏检测标准库迁移：阻断 NumPy 导入后标准双栏仍判两栏并标注左右栏；少于 10 个正文样本保持单栏回退；20 桶直方图末桶包含最大右端点，内部桶边界按左闭右开归入后一桶，避免等价迁移改变峰检测与栏间距；留白检测缺 NumPy/SciPy 时每文档只记录一次 warning。",
+      "refs": [
+        {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "test_standard_two_columns_without_numpy",
+          "line": 43,
+          "end": 52
+        },
+        {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "test_insufficient_paragraph_samples_remain_single_column",
+          "line": 55,
+          "end": 62
+        },
+        {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "test_histogram_last_bin_includes_right_endpoint",
+          "line": 65,
+          "end": 73
+        },
+        {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "test_internal_bucket_boundaries_match_numpy_semantics",
+          "line": 76,
+          "end": 89
+        },
+        {
+          "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+          "symbol": "test_vacant_region_dependency_warning_emitted_once_per_document",
+          "line": 92,
+          "end": 103
+        }
+      ],
+      "inputs": "合成正文行、页面宽度与被阻断的 NumPy 导入",
+      "outputs": "pytest 断言",
+      "mode": "默认",
+      "depends": [
+        "F26.004",
+        "F06.011"
+      ],
+      "key": "26/栏检测标准库迁移回归保障",
+      "scope": "testing",
+      "id": "F26.043"
     }
   ],
   "source_coverage": [
@@ -18768,7 +18834,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 815,
+      "end": 821,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -18787,8 +18853,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
       "symbol": "classify_text_types",
-      "line": 43,
-      "end": 166,
+      "line": 45,
+      "end": 168,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18801,8 +18867,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
       "symbol": "detect_columns",
-      "line": 173,
-      "end": 291,
+      "line": 175,
+      "end": 293,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18813,8 +18879,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
       "symbol": "build_text_blocks",
-      "line": 298,
-      "end": 414,
+      "line": 300,
+      "end": 416,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18825,8 +18891,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
       "symbol": "detect_vacant_regions",
-      "line": 421,
-      "end": 512,
+      "line": 423,
+      "end": 518,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18837,8 +18903,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
       "symbol": "adjust_clip_with_layout",
-      "line": 519,
-      "end": 692,
+      "line": 525,
+      "end": 698,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18850,8 +18916,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/layout_model.py",
       "symbol": "should_enable_layout_driven",
-      "line": 699,
-      "end": 803,
+      "line": 705,
+      "end": 809,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23089,7 +23155,7 @@
       "file": "tests/scripts/run_all.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 632,
+      "end": 639,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -23103,8 +23169,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult",
-      "line": 84,
-      "end": 108,
+      "line": 85,
+      "end": 109,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -23115,8 +23181,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.total",
-      "line": 97,
-      "end": 98,
+      "line": 98,
+      "end": 99,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -23129,8 +23195,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.success",
-      "line": 101,
-      "end": 103,
+      "line": 102,
+      "end": 104,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -23143,8 +23209,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.counts_str",
-      "line": 105,
-      "end": 108,
+      "line": 106,
+      "end": 109,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -23157,8 +23223,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_command",
-      "line": 111,
-      "end": 128,
+      "line": 112,
+      "end": 129,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23169,8 +23235,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "parse_pytest_output",
-      "line": 131,
-      "end": 143,
+      "line": 132,
+      "end": 144,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23181,8 +23247,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "parse_legacy_output",
-      "line": 146,
-      "end": 151,
+      "line": 147,
+      "end": 152,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23193,8 +23259,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "_fill_counts",
-      "line": 154,
-      "end": 160,
+      "line": 155,
+      "end": 161,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23205,8 +23271,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_pytest_suite",
-      "line": 163,
-      "end": 212,
+      "line": 164,
+      "end": 213,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23217,8 +23283,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_script_suite",
-      "line": 215,
-      "end": 242,
+      "line": 216,
+      "end": 243,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23229,8 +23295,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "main",
-      "line": 245,
-      "end": 595,
+      "line": 246,
+      "end": 602,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23241,8 +23307,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "find_unregistered_suites",
-      "line": 601,
-      "end": 616,
+      "line": 608,
+      "end": 623,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -23253,8 +23319,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "_print_suite_result",
-      "line": 619,
-      "end": 628,
+      "line": 626,
+      "end": 635,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -35973,6 +36039,117 @@
       "ancestors": [],
       "ids": [
         "F26.042"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "<module>",
+      "line": 1,
+      "end": 103,
+      "kind": "module",
+      "ancestors": [],
+      "ids": [
+        "F26.036",
+        "F26.043"
+      ],
+      "mapping": "所在文件的功能归属（不是独立功能）"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "without_numpy",
+      "line": 22,
+      "end": 32,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "without_numpy.blocked_import",
+      "line": 25,
+      "end": 28,
+      "kind": "function",
+      "ancestors": [
+        "without_numpy"
+      ],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "_paragraph",
+      "line": 35,
+      "end": 40,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "test_standard_two_columns_without_numpy",
+      "line": 43,
+      "end": 52,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.043"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "test_insufficient_paragraph_samples_remain_single_column",
+      "line": 55,
+      "end": 62,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.043"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "test_histogram_last_bin_includes_right_endpoint",
+      "line": 65,
+      "end": 73,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.043"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "test_internal_bucket_boundaries_match_numpy_semantics",
+      "line": 76,
+      "end": 89,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.043"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_detect_columns_stdlib_20261124.py",
+      "symbol": "test_vacant_region_dependency_warning_emitted_once_per_document",
+      "line": 92,
+      "end": 103,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.043"
       ],
       "mapping": "直接引用"
     }
