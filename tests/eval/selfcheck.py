@@ -186,6 +186,12 @@ def main() -> int:
         check("find_pred_files 同时发现两种布局", len(found) == 3, str(sorted(found)))
         check("带空格目录名归一化为下划线",
               "Qwen3-Omni_Technical_Report" in found, str(sorted(found)))
+        single = find_pred_files(formal_dir / "index.json")
+        check(
+            "单文件正式 index.json 文档键取 document_id 而非 images",
+            "DeepSeek_V3_2" in single and "images" not in single,
+            str(sorted(single)),
+        )
 
         preds = load_preds(found["DeepSeek_V3_2"], "DeepSeek_V3_2")
         check("load_preds 识别 items 键", len(preds) == 2, str(len(preds)))

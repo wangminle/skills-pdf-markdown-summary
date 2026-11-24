@@ -49,6 +49,8 @@ QA-01 统一测试入口
 23. table_refine 边界测试 (test_table_refine_boundaries_20260930.py)
 24. 零 BUG 功能覆盖抽查 (test_zero_bug_coverage_20260930.py)
 25. 复核修复回归测试 (test_bugfix_20261001.py)
+26. issue 回归测试 (test_issue_regressions_20261006.py)
+27. BUG-154~160 回归测试 (test_bugfix_20261123.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -393,6 +395,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "name": "中文章节标题识别回归测试",
         "path": TESTS_SCRIPTS_DIR / "test_text_extract_headings.py",
     })
+    test_suites.append({
+        "name": "Markdown 结构修复回归 (20261123)",
+        "path": TESTS_SCRIPTS_DIR / "test_markdown_structure_20261123.py",
+    })
     # 2026-09-29 并行会话产物：由 PARADISE / SASSI 真实排版缩减得到的布局回归
     test_suites.append({
         "name": "真实排版布局回归 (20260929)",
@@ -427,6 +433,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     test_suites.append({
         "name": "issue 回归测试 (20261006)",
         "path": TESTS_SCRIPTS_DIR / "test_issue_regressions_20261006.py",
+    })
+
+    # 2026-11-23 BUG-154~160：源路径覆盖、共用清理、旋转坐标、空正文状态、
+    # 强制方向、摘要复用类型、评测单文件键
+    test_suites.append({
+        "name": "安全与评测回归 (20261123)",
+        "path": TESTS_SCRIPTS_DIR / "test_bugfix_20261123.py",
     })
 
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，

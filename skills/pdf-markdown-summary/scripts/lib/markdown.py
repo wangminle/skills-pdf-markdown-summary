@@ -20,11 +20,15 @@ class MarkdownBlock:
     path: str = ""
     caption: str = ""
     meta: Dict[str, Any] = field(default_factory=dict)
+    # paragraph 专用的行内 Markdown 粗斜体文本，只在渲染时使用；
+    # text 保持纯文本，题注匹配等逻辑一律读 text。
+    rich_text: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": self.type,
             "text": self.text,
+            "rich_text": self.rich_text,
             "level": self.level,
             "page": self.page,
             "path": self.path,
@@ -75,6 +79,8 @@ def render_block(block: MarkdownBlock) -> str:
         page = block.page if block.page is not None else ""
         return f"<!-- page {page} -->".strip()
 
+    if block.type == "paragraph" and block.rich_text.strip():
+        return block.rich_text.strip()
     return block.text.strip()
 
 

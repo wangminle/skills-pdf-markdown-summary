@@ -22,7 +22,7 @@ import logging
 import os
 import tempfile
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 # 避免循环导入
 if TYPE_CHECKING:
@@ -79,24 +79,59 @@ def _nearest_existing_ancestor(path: str) -> Optional[str]:
     return None
 
 
-def validate_output_targets(checks) -> List[str]:
+def validate_output_targets(checks, *, protected_paths=None) -> List[str]:
     """校验输出路径与已存在的文件/目录是否类型冲突（写盘前前置检查）。
 
     Args:
         checks: (path, expect_dir, label) 序列。
             - expect_dir=True：该路径必须是目录，已存在同名文件即冲突；
             - expect_dir=False：该路径必须是文件，已存在同名目录即冲突。
+        protected_paths: 禁止覆盖的源路径（如输入 PDF）。任一输出与之同
+            一路径身份时直接报错，避免把原件写成 Markdown/文本；符号链接、
+            硬链接与已存在文件均按真实路径或设备/inode 身份识别。
         除目标自身外，还会沿父链找到最近的存在祖先：若该祖先是文件，
         则任何 makedirs/open 都只会在写盘阶段抛裸 FileExistsError，
-        这里提前报告。
+        这里提前报告。多个输出之间若为同一路径身份，也一并拒绝。
 
     Returns:
         中文错误信息列表；空列表表示全部通过。
     """
     problems: List[str] = []
+    protected_list = [p for p in (protected_paths or []) if p]
+    protected_real = {
+        os.path.realpath(os.path.abspath(p)) for p in protected_list
+    }
+    protected_ids = set()
+    for protected in protected_list:
+        try:
+            st = os.stat(protected)
+            protected_ids.add((st.st_dev, st.st_ino))
+        except OSError:
+            continue
+    seen_outputs: Dict[str, str] = {}
+    seen_output_ids: Dict[Tuple[int, int], str] = {}
     for path, expect_dir, label in checks:
         if not path:
             continue
+        abs_path = os.path.abspath(path)
+        real_path = os.path.realpath(abs_path)
+        file_id = None
+        try:
+            st = os.stat(path)
+            file_id = (st.st_dev, st.st_ino)
+        except OSError:
+            pass
+        if real_path in protected_real or file_id in protected_ids:
+            problems.append(f"{label}不能与源文件相同: {path}")
+        previous_label = seen_outputs.get(real_path)
+        if previous_label is None and file_id is not None:
+            previous_label = seen_output_ids.get(file_id)
+        if previous_label is not None:
+            problems.append(f"{label}与{previous_label}指向同一路径: {path}")
+        else:
+            seen_outputs[real_path] = label
+            if file_id is not None:
+                seen_output_ids[file_id] = label
         if expect_dir:
             if os.path.exists(path) and not os.path.isdir(path):
                 problems.append(f"{label}已存在同名文件，无法创建目录: {path}")
@@ -196,8 +231,59 @@ def snapshot_prunable_images(out_dir: str) -> Dict[str, Tuple[int, int, int, int
     return result
 
 
+def _pdf_content_hash16(pdf_path: str) -> Optional[str]:
+    """与 write_index_json 一致的短内容哈希（sha256 前 16 位）。"""
+    try:
+        hasher = hashlib.sha256()
+        with open(pdf_path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()[:16]
+    except OSError:
+        return None
+
+
+def load_owned_prunable_images(index_json_path: str, pdf_path: str) -> Set[str]:
+    """读取「覆盖前」index.json 中属于当前 PDF 的图片绝对路径。
+
+    共用资源目录时，目录里会残留其他文档的 Figure_*/Table_* PNG。
+    仅当现有 index 确属当前 PDF（文件名 + 内容哈希一致）时，才把其中引用的
+    图片视为本轮可清理的陈旧产物；同名不同内容或缺少哈希时返回空集，
+    禁止误删他文档资源。
+    """
+    if not index_json_path or not pdf_path or not os.path.isfile(index_json_path):
+        return set()
+    try:
+        with open(index_json_path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if not isinstance(data, dict):
+            return set()
+        meta = data.get("meta")
+        if not isinstance(meta, dict):
+            return set()
+        if meta.get("pdf") != os.path.basename(pdf_path):
+            return set()
+        indexed_hash = meta.get("pdf_hash")
+        if not isinstance(indexed_hash, str) or not indexed_hash.startswith("sha256:"):
+            return set()
+        expected = indexed_hash.removeprefix("sha256:")
+        actual = _pdf_content_hash16(pdf_path)
+        if actual is None or actual != expected:
+            return set()
+        base_dir = os.path.dirname(os.path.abspath(index_json_path))
+        owned: Set[str] = set()
+        for item in load_index_json_items(index_json_path):
+            rel = (item.get("file") or "").replace("\\", "/")
+            if rel:
+                owned.add(os.path.abspath(os.path.join(base_dir, rel)))
+        return owned
+    except Exception:
+        return set()
+
+
 def prune_unindexed_images(*, out_dir: str, index_json_path: str,
-                           preexisting: Optional[Dict[str, Tuple[int, int, int, int]]] = None) -> int:
+                           preexisting: Optional[Dict[str, Tuple[int, int, int, int]]] = None,
+                           owned: Optional[Set[str]] = None) -> int:
     """
     只删除运行前已存在、身份未变且未被 index.json 引用的 Figure_*/Table_* PNG。
     无运行前快照时不执行删除；无效索引也不触发清理。
@@ -205,6 +291,10 @@ def prune_unindexed_images(*, out_dir: str, index_json_path: str,
     Args:
         out_dir: 图片输出目录
         index_json_path: index.json 文件路径
+        preexisting: 运行前图片身份快照
+        owned: 本 PDF 上一轮 index 声明拥有的图片绝对路径集合。传入时（含空集）
+            只清理该集合内的陈旧文件，避免共用目录误删他文档图片；
+            为 None 时保持旧行为（凡快照内未引用者均可删，仅用于单测）。
 
     Returns:
         删除的文件数量
@@ -234,6 +324,8 @@ def prune_unindexed_images(*, out_dir: str, index_json_path: str,
                 continue
             abs_path = os.path.abspath(os.path.join(out_dir, name))
             if abs_path in referenced_abs or abs_path not in preexisting:
+                continue
+            if owned is not None and abs_path not in owned:
                 continue
             try:
                 st = os.stat(abs_path, follow_symlinks=False)

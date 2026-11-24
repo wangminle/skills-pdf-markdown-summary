@@ -40,7 +40,13 @@ from lib.extract_tables import extract_tables
 from lib.figure_contexts import build_figure_contexts
 from lib.layout_model import should_enable_layout_driven
 from lib.models import AttachmentRecord, DocumentLayoutModel, GatheredText
-from lib.output import snapshot_prunable_images, prune_unindexed_images, write_index_json, write_manifest
+from lib.output import (
+    load_owned_prunable_images,
+    snapshot_prunable_images,
+    prune_unindexed_images,
+    write_index_json,
+    write_manifest,
+)
 from lib.assess import finalize_caption_inventory
 from lib.text_extract import gather_structured_text, pre_validate_pdf, try_extract_text
 
@@ -295,23 +301,27 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     if getattr(args, "log_jsonl", None) is None:
         args.log_jsonl = os.path.join(out_dir, "run.log.jsonl")
 
-    run_id = configure_logging(level=args.log_level, log_file=args.log_file, log_jsonl=args.log_jsonl)
-
-    # 输出路径与已存在的文件/目录类型冲突时提前报错，避免在写盘阶段
-    # 抛裸 IsADirectoryError / FileExistsError（ISSUE-7，rc=2）。
+    # 输出与日志路径必须在初始化文件 handler 前校验，避免追加日志也改动源 PDF。
     from lib.output import validate_output_targets
 
-    output_problems = validate_output_targets([
-        (out_dir, True, "输出目录"),
-        (text_dir, True, "文本目录"),
-        (out_text, False, "输出文本"),
-        (index_json, False, "index JSON"),
-        (manifest_path, False, "manifest CSV"),
-    ])
+    output_problems = validate_output_targets(
+        [
+            (out_dir, True, "输出目录"),
+            (text_dir, True, "文本目录"),
+            (out_text, False, "输出文本"),
+            (index_json, False, "index JSON"),
+            (manifest_path, False, "manifest CSV"),
+            (args.log_file, False, "文本日志"),
+            (args.log_jsonl, False, "JSONL 日志"),
+        ],
+        protected_paths=[pdf_path],
+    )
     if output_problems:
         for problem in output_problems:
             logger.error(problem)
         return 2
+
+    run_id = configure_logging(level=args.log_level, log_file=args.log_file, log_jsonl=args.log_jsonl)
 
     try:
         os.makedirs(out_dir, exist_ok=True)
@@ -613,6 +623,10 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     except Exception as e:
         logger.warning("Caption inventory finalize failed: %s", e)
 
+    # 必须在覆盖 index.json 之前读取归属：共用资源目录时，只有上一轮
+    # 属于当前 PDF 的图片才可被 prune；他文档残留一律保留。
+    owned_images = load_owned_prunable_images(index_json, pdf_path)
+
     try:
         write_manifest(records, manifest_path)
         write_index_json(
@@ -631,7 +645,12 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
         return 2
 
     if args.prune_images:
-        pruned = prune_unindexed_images(out_dir=out_dir, index_json_path=index_json, preexisting=preexisting_images)
+        pruned = prune_unindexed_images(
+            out_dir=out_dir,
+            index_json_path=index_json,
+            preexisting=preexisting_images,
+            owned=owned_images,
+        )
         if pruned:
             logger.info(f"Pruned {pruned} unindexed images")
 

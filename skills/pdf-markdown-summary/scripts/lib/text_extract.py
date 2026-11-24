@@ -20,6 +20,8 @@ import json
 import logging
 import os
 import re
+import string
+import unicodedata
 from collections import Counter
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -115,6 +117,404 @@ def looks_like_structural_heading(text: str, *, is_bold: bool, font_size: float)
     if re.search(r"[.。]\s+\S", stripped):
         return False
     return True
+
+
+_NUMBERED_HEADING_LEVEL_RE = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")
+_CJK_CHAPTER_LEVEL_RE = re.compile(r"^第[0-9一二三四五六七八九十百]+[章节篇部]")
+_ROMAN_HEADING_LEVEL_RE = re.compile(r"^[IVXLCDM]{1,5}\.\s+[A-Za-z]")
+_ALPHA_HEADING_LEVEL_RE = re.compile(r"^[A-Z]\.\s+[A-Za-z]")
+
+
+def infer_heading_level(
+    text: str,
+    *,
+    font_size: float = 10.0,
+    typical_font_size: float = 10.0,
+) -> int:
+    """从编号深度或字号比推断 Markdown 标题层级（1..6）。
+
+    阿拉伯数字：``3``→2、``3.2``→3、``3.2.1``→4（深度+1，文档标题留给 H1）。
+    罗马章节 ``I.``→2；字母小节 ``A.``→3。无编号时按相对正文字号回退。
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return 2
+    numbered = _NUMBERED_HEADING_LEVEL_RE.match(stripped)
+    if numbered:
+        depth = len(numbered.group(1).split("."))
+        return min(6, max(2, depth + 1))
+    if _CJK_CHAPTER_LEVEL_RE.match(stripped):
+        return 2
+    cjk_numbered = re.match(r"^(\d+(?:\.\d+)*)\s+(?=[\u4e00-\u9fff])", stripped)
+    if cjk_numbered:
+        depth = len(cjk_numbered.group(1).split("."))
+        return min(6, max(2, depth + 1))
+    if _ROMAN_HEADING_LEVEL_RE.match(stripped):
+        return 2
+    if _ALPHA_HEADING_LEVEL_RE.match(stripped):
+        return 3
+    # 无编号标题：明显大于正文 → H1，其余默认 H2（避免字号噪声切成 H3）
+    if typical_font_size > 0:
+        ratio = float(font_size) / float(typical_font_size)
+        if ratio > 1.45:
+            return 1
+    return 2
+
+
+def _span_has_bold_flag(span: Dict[str, Any]) -> bool:
+    """结构判定用的粗体：只认 PDF 粗体标志位（flags bit 4）。
+
+    标题分类与版式模型字重必须用它。字体名启发式会把图内的 DejaVuSans-Bold
+    标签也算作粗体，进而被分类为 title_h3 并改变裁剪依据；它只服务于
+    行内 Markdown 样式（_span_is_bold）。
+    """
+    return bool(int(span.get("flags", 0) or 0) & (1 << 4))
+
+
+def _span_is_bold(span: Dict[str, Any]) -> bool:
+    """行内样式用的粗体：标志位或字体名。"""
+    flags = int(span.get("flags", 0) or 0)
+    font = str(span.get("font", "") or "").lower()
+    return bool(flags & (1 << 4)) or any(
+        token in font for token in ("bold", "black", "heavy", "medi")
+    )
+
+
+def _span_is_italic(span: Dict[str, Any]) -> bool:
+    """行内样式用的斜体：标志位或字体名。"""
+    flags = int(span.get("flags", 0) or 0)
+    font = str(span.get("font", "") or "").lower()
+    return bool(flags & (1 << 1)) or any(
+        token in font for token in ("italic", "oblique")
+    )
+
+
+_STYLE_MARKERS = {"b": "**", "i": "*", "bi": "***"}
+
+
+def _ends_with_odd_backslashes(text: str) -> bool:
+    count = 0
+    for ch in reversed(text):
+        if ch != "\\":
+            break
+        count += 1
+    return count % 2 == 1
+
+
+def _char_class(ch: str) -> str:
+    """CommonMark 侧翼判定用的字符类别。
+
+    space（含行首、行尾）、punct（确定的标点）、symbol（数学符号、emoji 等：
+    各渲染器对它们是否按标点处理并不一致）、word（字母、数字、组合符号、
+    控制字符等其余非空白字符）。
+    """
+    if not ch or ch.isspace():
+        return "space"
+    category = unicodedata.category(ch)
+    if ch in string.punctuation or category.startswith("P"):
+        return "punct"
+    if category.startswith("S"):
+        return "symbol"
+    return "word"
+
+
+def _star_marker_is_unambiguous(
+    prev: str, first: str, last: str, after: str, joined_last: str = ""
+) -> bool:
+    """样式 run 的星号标记能否被 CommonMark 唯一解析。
+
+    prev / after 是标记外的相邻字符（行首、行尾为空串）；joined_last 非空表示
+    本 run 紧跟在一个不同样式的星号 run 之后，两个标记会连成 "***"。
+
+    - 开标记后不是文字字符时，外侧须是间隔或确定的标点；
+    - 闭标记前不是文字字符时，后面须是间隔或确定的标点；
+    - 与另一个星号 run 紧邻时，交界两侧必须都是文字字符。
+    """
+    if joined_last and not (
+        _char_class(joined_last) == "word" and _char_class(first) == "word"
+    ):
+        return False
+    opener_ok = _char_class(first) == "word" or _char_class(prev) in ("space", "punct")
+    closer_ok = _char_class(last) == "word" or _char_class(after) in ("space", "punct")
+    return opener_ok and closer_ok
+
+
+def _trailing_marker_char_needs_escape(text: str) -> str:
+    """段尾紧贴开标记的字面星号/下划线（已转义的除外），无需转义时返回空串。"""
+    if not text or text[-1] not in "*_" or _ends_with_odd_backslashes(text[:-1]):
+        return ""
+    return text[-1]
+
+
+def strip_inline_markdown(rich: str) -> str:
+    """还原 format_spans_as_markdown 输出对应的纯文本（保真自检用，不参与渲染）。"""
+    out: List[str] = []
+    i, n = 0, len(rich)
+    while i < n:
+        ch = rich[i]
+        if ch == "\\" and i + 1 < n and rich[i + 1] in "\\*_":
+            out.append(rich[i + 1])
+            i += 2
+            continue
+        if ch == "*":
+            j = i
+            while j < n and rich[j] == "*":
+                j += 1
+            before = rich[i - 1] if i else ""
+            after = rich[j] if j < n else ""
+            touches_text = (after and not after.isspace()) or (before and not before.isspace())
+            if j - i <= 3 and touches_text:
+                i = j  # 样式标记
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def format_spans_as_markdown(spans: List[Dict[str, Any]]) -> str:
+    """将同行 spans 序列化为带行内粗斜体的 Markdown 片段。
+
+    渲染后的文字必须与 spans 原文逐字一致，只多出样式：
+    - 相邻同样式的 span 先合并，避免「* d**k*」这类断裂标记；
+    - 标记只包住非空白字符，span 自带的首尾空白留在标记外
+      （CommonMark 不把「** x **」识别为粗体）；
+    - 标记会与相邻字符粘连、无法被唯一解析的 run 退回纯文本
+      （见 _star_marker_is_unambiguous）：只丢样式，不丢字；
+    - 样式 run 内的字面星号与反斜杠做转义；常规文本里紧贴标记的星号、下划线
+      与反斜杠同样转义，否则标记会改变它们在 CommonMark 中的含义。
+    """
+    runs: List[List[Any]] = []
+    for span in spans or []:
+        text = str(span.get("text", "") or "")
+        if not text:
+            continue
+        style = ("b" if _span_is_bold(span) else "") + ("i" if _span_is_italic(span) else "")
+        if runs and runs[-1][0] == style:
+            runs[-1][1] += text
+        else:
+            runs.append([style, text])
+
+    parts: List[str] = []
+    open_marker = False  # 输出正好停在一个样式 run 的闭标记上
+
+    for idx, (style, raw) in enumerate(runs):
+        lead = trail = ""
+        core = raw
+        if style:
+            core = raw.strip()
+            if core:
+                lead = raw[: len(raw) - len(raw.lstrip())]
+                trail = raw[len(raw.rstrip()):]
+            else:
+                style = ""  # 纯空白的样式 span 原样输出
+                core = raw
+
+        if lead:
+            parts.append(lead)
+            open_marker = False
+
+        if style:
+            # run 之后紧跟的字符：自身尾随空白，否则是下一个 run 的首字符
+            after = trail[:1]
+            if not after and idx + 1 < len(runs):
+                after = runs[idx + 1][1][:1]
+            prev = parts[-1][-1] if parts and parts[-1] else ""
+            joined_last = ""
+            if not lead and open_marker:
+                joined_last = runs[idx - 1][1].rstrip()[-1:]
+            if _star_marker_is_unambiguous(prev, core[0], core[-1], after, joined_last):
+                core = core.replace("\\", "\\\\").replace("*", "\\*")
+                marker = _STYLE_MARKERS[style]
+                if parts and _ends_with_odd_backslashes(parts[-1]):
+                    parts[-1] += "\\"  # 行尾反斜杠会转义开标记
+                elif not open_marker and parts:
+                    ch = _trailing_marker_char_needs_escape(parts[-1])
+                    if ch:
+                        parts[-1] = parts[-1][:-1] + "\\" + ch  # 会并入开标记
+                parts.append(marker + core + marker)
+                open_marker = True
+                core = ""
+
+        if core:
+            if open_marker and core[0] in "*_":
+                core = "\\" + core[0] + core[1:]  # 会并入闭标记
+            parts.append(core)
+            open_marker = False
+
+        if trail:
+            parts.append(trail)
+            open_marker = False
+
+    return "".join(parts)
+
+
+def plain_text_from_lines(lines: List[Dict[str, Any]]) -> str:
+    """拼接块内各行为纯文本（无 Markdown 标记）。"""
+    chunks: List[str] = []
+    for line in lines or []:
+        line_text = "".join(sp.get("text", "") for sp in line.get("spans", []))
+        if line_text.strip():
+            chunks.append(line_text)
+    return "\n".join(chunks).strip()
+
+
+def rich_text_from_lines(lines: List[Dict[str, Any]]) -> str:
+    """拼接块内各行为行内 Markdown 文本。"""
+    chunks: List[str] = []
+    for line in lines or []:
+        line_text = format_spans_as_markdown(line.get("spans", []))
+        if line_text.strip():
+            chunks.append(line_text)
+    return "\n".join(chunks).strip()
+
+
+def iter_native_text_blocks(doc: Any) -> List[Dict[str, Any]]:
+    """共享底层：按页收集原生文本块（bbox / lines / spans）。
+
+    Markdown gathering 与版式模型提取共用此入口，避免各走一套 get_text('dict')。
+    """
+    blocks_out: List[Dict[str, Any]] = []
+    page_count = len(doc)
+    for pno in range(page_count):
+        page = doc[pno]
+        page_dict = page.get_text("dict") if hasattr(page, "get_text") else page.raw.get_text("dict")
+        page_rect = page.rect if hasattr(page, "rect") else page.raw.rect
+        for block in page_dict.get("blocks", []):
+            if block.get("type") != 0:
+                continue
+            lines = block.get("lines", [])
+            if not lines:
+                continue
+            plain = plain_text_from_lines(lines)
+            if not plain:
+                continue
+            bbox = tuple(block.get("bbox", (0, 0, 0, 0)))
+            blocks_out.append({
+                "page": pno + 1,
+                "page_index": pno,
+                "bbox": bbox,
+                "text": plain,
+                "rich_text": rich_text_from_lines(lines),
+                "lines": lines,
+                "page_width": float(page_rect.width),
+                "page_height": float(page_rect.height),
+            })
+    return blocks_out
+
+
+def classify_block_column(
+    bbox: Tuple[float, float, float, float],
+    page_width: float,
+    *,
+    is_dual_column: bool,
+) -> Tuple[int, bool]:
+    """返回 (column, is_full_width)。双栏通栏记 column=-1。"""
+    if not is_dual_column or page_width <= 0:
+        return -1, False
+    x0, _y0, x1, _y1 = bbox
+    width = max(0.0, x1 - x0)
+    mid = page_width * 0.5
+    spans_mid = x0 < mid - 8.0 and x1 > mid + 8.0
+    wide = width >= page_width * 0.55
+    if spans_mid or wide:
+        return -1, True
+    x_center = (x0 + x1) / 2.0
+    return (0 if x_center < mid else 1), False
+
+
+def sort_paragraphs_reading_order(
+    paragraphs: List[Any],
+    *,
+    is_dual_column: bool,
+) -> List[Any]:
+    """双栏阅读顺序：通栏块按 y 切开栏带，带内先左后右。"""
+    if not is_dual_column or not paragraphs:
+        return sorted(paragraphs, key=lambda p: (p.page, p.bbox[1], p.bbox[0]))
+
+    from collections import defaultdict
+
+    by_page: Dict[int, List[Any]] = defaultdict(list)
+    for para in paragraphs:
+        by_page[para.page].append(para)
+
+    ordered: List[Any] = []
+    for page in sorted(by_page):
+        page_paras = by_page[page]
+        tagged: List[Tuple[Any, int]] = []
+        for para in page_paras:
+            col = getattr(para, "column", -1)
+            if getattr(para, "is_full_width", False):
+                col = -1
+            tagged.append((para, col))
+        tagged.sort(key=lambda item: (item[0].bbox[1], item[0].bbox[0]))
+
+        idx = 0
+        while idx < len(tagged):
+            para, col = tagged[idx]
+            if col == -1:
+                ordered.append(para)
+                idx += 1
+                continue
+            band: List[Tuple[Any, int]] = []
+            while idx < len(tagged) and tagged[idx][1] != -1:
+                band.append(tagged[idx])
+                idx += 1
+            left = sorted(
+                (p for p, c in band if c == 0),
+                key=lambda p: (p.bbox[1], p.bbox[0]),
+            )
+            right = sorted(
+                (p for p, c in band if c == 1),
+                key=lambda p: (p.bbox[1], p.bbox[0]),
+            )
+            ordered.extend(left)
+            ordered.extend(right)
+    return ordered
+
+
+def collect_structure_warnings(paragraphs: List[Any], *, is_dual_column: bool) -> List[str]:
+    """结构质量告警：编号标题层级塌缩、双栏通栏疑似错序。"""
+    warnings: List[str] = []
+    headings = [p for p in paragraphs if getattr(p, "is_heading", False)]
+    depths: List[int] = []
+    levels: List[int] = []
+    for para in headings:
+        text = (para.text or "").strip()
+        match = _NUMBERED_HEADING_LEVEL_RE.match(text)
+        if not match:
+            continue
+        depths.append(len(match.group(1).split(".")))
+        levels.append(int(getattr(para, "heading_level", 0) or 0))
+    if len(set(depths)) >= 2 and levels and len(set(levels)) == 1:
+        warnings.append("heading_level_collapsed")
+
+    if is_dual_column:
+        from collections import defaultdict
+
+        by_page: Dict[int, List[Any]] = defaultdict(list)
+        for para in paragraphs:
+            by_page[para.page].append(para)
+        for page, page_paras in by_page.items():
+            full = [p for p in page_paras if getattr(p, "is_full_width", False)]
+            left = [
+                p for p in page_paras
+                if getattr(p, "column", None) == 0 and not getattr(p, "is_full_width", False)
+            ]
+            if not full or not left:
+                continue
+            # 通栏块 y 明显在左栏之上，却排在任一左栏段落后 → 阅读顺序告警
+            min_left_y = min(p.bbox[1] for p in left)
+            page_order = {id(p): i for i, p in enumerate(page_paras)}
+            for span in full:
+                if span.bbox[1] + 2.0 < min_left_y:
+                    left_before = [
+                        p for p in left
+                        if page_order.get(id(p), 0) < page_order.get(id(span), 0)
+                    ]
+                    if left_before:
+                        warnings.append(f"reading_order_full_width_page_{page}")
+                        break
+    return warnings
 
 
 # ============================================================================
@@ -326,48 +726,28 @@ def gather_structured_text(
     doc = _doc
     page_count = doc.page_count
 
-    all_blocks: List[Dict[str, Any]] = []
+    all_blocks = iter_native_text_blocks(doc)
     header_candidates: List[str] = []
     footer_candidates: List[str] = []
+    font_sizes: List[float] = []
 
-    for pno in range(page_count):
-        page = doc[pno]
-        page_rect = page.rect
-        page_height = page_rect.height
-
-        blocks = page.get_text("dict")["blocks"]
-
-        for block in blocks:
-            if block.get("type") != 0:
-                continue
-
-            bbox = block.get("bbox", (0, 0, 0, 0))
-            lines = block.get("lines", [])
-
-            block_text = ""
-            for line in lines:
-                for span in line.get("spans", []):
-                    block_text += span.get("text", "")
-                block_text += "\n"
-            block_text = block_text.strip()
-
-            if not block_text:
-                continue
-
-            y_center = (bbox[1] + bbox[3]) / 2
-            if y_center < page_height * 0.05:
-                if len(block_text) < 100:
-                    header_candidates.append(block_text)
-            elif y_center > page_height * 0.95:
-                if len(block_text) < 100:
-                    footer_candidates.append(block_text)
-
-            all_blocks.append({
-                "page": pno + 1,
-                "bbox": bbox,
-                "text": block_text,
-                "lines": lines
-            })
+    for block in all_blocks:
+        block_text = block["text"]
+        bbox = block["bbox"]
+        page_height = float(block.get("page_height") or doc[0].rect.height)
+        y_center = (bbox[1] + bbox[3]) / 2
+        if y_center < page_height * 0.05:
+            if len(block_text) < 100:
+                header_candidates.append(block_text)
+        elif y_center > page_height * 0.95:
+            if len(block_text) < 100:
+                footer_candidates.append(block_text)
+        lines = block.get("lines") or []
+        for line in lines:
+            for span in line.get("spans", []):
+                size = float(span.get("size", 0) or 0)
+                if 8.0 <= size <= 14.0:
+                    font_sizes.append(size)
 
     header_counter = Counter(header_candidates)
     footer_counter = Counter(footer_candidates)
@@ -382,64 +762,98 @@ def gather_structured_text(
 
     x_centers = [(b["bbox"][0] + b["bbox"][2]) / 2 for b in all_blocks]
     if x_centers:
-        page_width = doc[0].rect.width
+        page_width = float(all_blocks[0].get("page_width") or doc[0].rect.width)
         left_count = sum(1 for x in x_centers if x < page_width * 0.45)
         right_count = sum(1 for x in x_centers if x > page_width * 0.55)
         is_dual_column = left_count > len(x_centers) * 0.3 and right_count > len(x_centers) * 0.3
     else:
         is_dual_column = False
 
+    typical_font_size = (
+        sum(font_sizes) / len(font_sizes) if font_sizes else 10.0
+    )
+
     if debug:
         print(f"[DEBUG] Dual column detected: {is_dual_column}")
+        print(f"[DEBUG] Typical font size: {typical_font_size:.2f}")
 
     paragraphs: List[GatheredParagraph] = []
 
     for block in all_blocks:
-        text = block["text"]
+        plain = block["text"]
 
-        if text in headers_to_remove or text in footers_to_remove:
+        if plain in headers_to_remove or plain in footers_to_remove:
             continue
 
-        bbox = block["bbox"]
-        page = block["page"]
-
-        if is_dual_column:
-            page_width = doc[0].rect.width
-            x_center = (bbox[0] + bbox[2]) / 2
-            column = 0 if x_center < page_width * 0.5 else 1
-        else:
-            column = 0
+        bbox = tuple(block["bbox"])
+        page = int(block["page"])
+        page_width = float(block.get("page_width") or doc[0].rect.width)
+        column, is_full_width = classify_block_column(
+            bbox, page_width, is_dual_column=is_dual_column
+        )
 
         lines = block.get("lines", [])
         first_span = lines[0]["spans"][0] if lines and lines[0].get("spans") else {}
-        font_size = first_span.get("size", 10)
-        font_flags = first_span.get("flags", 0)
-        is_bold = bool(font_flags & 2 ** 4)
+        font_size = float(first_span.get("size", 10) or 10)
+        is_bold = _span_has_bold_flag(first_span) if first_span else False
 
-        if looks_like_structural_heading(text, is_bold=is_bold, font_size=font_size):
+        if looks_like_structural_heading(plain, is_bold=is_bold, font_size=font_size):
             para_type = "heading"
-        elif text.lower().startswith(("figure", "fig.", "table", "图", "表")):
+        elif plain.lower().startswith(("figure", "fig.", "table", "图", "表")):
             para_type = "caption"
-        elif text.startswith(("•", "-", "*", "1.", "2.", "(1)", "(a)")):
+        elif plain.startswith(("•", "-", "*", "1.", "2.", "(1)", "(a)")):
             para_type = "list"
         else:
             para_type = "body"
 
+        is_heading = para_type == "heading"
+        heading_level = (
+            infer_heading_level(
+                plain, font_size=font_size, typical_font_size=typical_font_size
+            )
+            if is_heading
+            else 0
+        )
+        # text 始终是纯文本：题注匹配、正文引用检索等下游都按原文比对。
+        # 行内样式只放在 rich_text，供 Markdown 渲染正文段落时使用；
+        # 与纯文本对不上时宁可不加样式，保证正文一字不差。
+        rich_text = ""
+        if not is_heading:
+            candidate = (block.get("rich_text") or "").strip()
+            if (
+                candidate != plain.strip()
+                and strip_inline_markdown(candidate) == plain.strip()
+            ):
+                rich_text = candidate
+
         paragraphs.append(GatheredParagraph(
             page=page,
-            text=text,
+            text=plain,
+            rich_text=rich_text,
             bbox=bbox,
-            is_heading=(para_type == "heading")
+            is_heading=is_heading,
+            heading_level=heading_level,
+            column=column,
+            font_size=font_size,
+            is_bold=is_bold,
+            is_full_width=is_full_width,
         ))
 
-    paragraphs.sort(key=lambda p: (p.page, 0 if is_dual_column and (p.bbox[0] + p.bbox[2]) / 2 < doc[0].rect.width * 0.5 else 1, p.bbox[1]))
+    paragraphs = sort_paragraphs_reading_order(
+        paragraphs, is_dual_column=is_dual_column
+    )
+    structure_warnings = collect_structure_warnings(
+        paragraphs, is_dual_column=is_dual_column
+    )
 
     result = GatheredText(
-        version="1.0",
+        version="1.1",
         is_dual_column=is_dual_column,
         headers_removed=list(headers_to_remove),
         footers_removed=list(footers_to_remove),
-        paragraphs=paragraphs
+        paragraphs=paragraphs,
+        structure_warnings=structure_warnings,
+        typical_font_size=typical_font_size,
     )
 
     if out_json:
@@ -448,12 +862,20 @@ def gather_structured_text(
             "is_dual_column": result.is_dual_column,
             "headers_removed": result.headers_removed,
             "footers_removed": result.footers_removed,
+            "structure_warnings": result.structure_warnings,
+            "typical_font_size": result.typical_font_size,
             "paragraphs": [
                 {
                     "text": p.text,
+                    "rich_text": p.rich_text,
                     "page": p.page,
                     "bbox": list(p.bbox),
-                    "is_heading": p.is_heading
+                    "is_heading": p.is_heading,
+                    "heading_level": p.heading_level,
+                    "column": p.column,
+                    "font_size": p.font_size,
+                    "is_bold": p.is_bold,
+                    "is_full_width": p.is_full_width,
                 }
                 for p in result.paragraphs
             ]
@@ -546,18 +968,20 @@ def extract_text_with_format(
     else:
         typical_font_name = "Times"
 
-    # 提取每页的增强文本单元
+    # 提取每页的增强文本单元（与 gather 共用原生块底层）
     all_units: Dict[int, List[EnhancedTextUnit]] = {}
     num_pages = len(doc) if sample_pages is None else min(sample_pages, len(doc))
+    native_blocks = [
+        block for block in iter_native_text_blocks(doc)
+        if int(block["page_index"]) < num_pages
+    ]
+    blocks_by_page: Dict[int, List[Dict[str, Any]]] = {}
+    for block in native_blocks:
+        blocks_by_page.setdefault(int(block["page_index"]), []).append(block)
 
     for pno in range(num_pages):
-        page = doc[pno]
-        dict_data = page.get_text("dict")
-
         units = []
-        for blk_idx, blk in enumerate(dict_data.get("blocks", [])):
-            if blk.get("type") != 0:
-                continue
+        for blk_idx, blk in enumerate(blocks_by_page.get(pno, [])):
             for ln_idx, ln in enumerate(blk.get("lines", [])):
                 spans = ln.get("spans", [])
                 if not spans:
@@ -572,7 +996,7 @@ def extract_text_with_format(
                 font_flags = main_span.get("flags", 0)
                 color = main_span.get("color", 0)
 
-                font_weight = 'bold' if (font_flags & (1 << 4)) else 'regular'
+                font_weight = 'bold' if _span_has_bold_flag(main_span) else 'regular'
 
                 if isinstance(color, int):
                     color_rgb = ((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF)

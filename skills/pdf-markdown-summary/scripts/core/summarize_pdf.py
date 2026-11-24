@@ -47,19 +47,30 @@ def main(argv: Optional[List[str]] = None) -> int:
     text_path = os.path.abspath(args.text_path or os.path.join(pdf_dir, "text", stem + ".txt"))
 
     if args.reuse_existing:
+        index_path = os.path.join(out_dir, "index.json")
         missing = [
             path
-            for path in (os.path.join(out_dir, "index.json"), text_path)
+            for path in (index_path, text_path)
             if not os.path.exists(path)
         ]
         if missing:
             print(f"Cannot reuse summary assets; missing: {', '.join(missing)}", file=sys.stderr)
             return 1
+        not_files = [
+            path
+            for path in (index_path, text_path)
+            if not os.path.isfile(path)
+        ]
+        if not_files:
+            print(
+                f"Cannot reuse summary assets; not a regular file: {', '.join(not_files)}",
+                file=sys.stderr,
+            )
+            return 1
         # 存在性不够：默认 out_dir 是 <pdf_dir>/images，同目录放第二份 PDF 时
         # 上一份的 index.json 依然「存在」，会被静默当成当前 PDF 的产物复用。
         # 用 index.json 里记录的源 PDF 名核对，串档时直接报错而不是给出
         # 属于另一篇文档的文本与图片。
-        index_path = os.path.join(out_dir, "index.json")
         try:
             with open(index_path, "r", encoding="utf-8") as fh:
                 index_data = json.load(fh)

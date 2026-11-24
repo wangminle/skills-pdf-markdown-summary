@@ -404,7 +404,7 @@ class DocumentLayoutModel:
             'vacant_regions_count': {str(k): len(v) for k, v in self.vacant_regions.items()}
         }
 
-        # 可选：落盘 text_blocks 的 bbox/type 细节
+        # 可选：落盘 text_blocks 与逐行格式细节（供 Markdown 与验收复用）
         if include_details:
             text_blocks_detail = {}
             for page_num, blocks in self.text_blocks.items():
@@ -417,10 +417,26 @@ class DocumentLayoutModel:
                         'column': block.column,
                         'units_count': len(block.units),
                     }
-                    # 只保存前 100 字符的文本样本
-                    sample_text = ' '.join(u.text[:50] for u in block.units[:2]).strip()
-                    if sample_text:
-                        block_info['sample'] = sample_text[:100]
+                    # 完整文本（截断防爆）+ 逐行字号/字重，避免只剩 100 字符样本
+                    full_text = ' '.join(u.text for u in block.units).strip()
+                    if full_text:
+                        block_info['text'] = full_text[:2000]
+                        block_info['sample'] = full_text[:100]
+                    block_info['units'] = [
+                        {
+                            'text': u.text[:200],
+                            'bbox': [round(u.bbox.x0, 2), round(u.bbox.y0, 2),
+                                     round(u.bbox.x1, 2), round(u.bbox.y1, 2)],
+                            'font_name': u.font_name,
+                            'font_size': round(float(u.font_size), 2),
+                            'font_weight': u.font_weight,
+                            'font_flags': int(u.font_flags),
+                            'color': list(u.color) if u.color is not None else None,
+                            'text_type': u.text_type,
+                            'column': u.column,
+                        }
+                        for u in block.units
+                    ]
                     page_blocks.append(block_info)
                 text_blocks_detail[str(page_num)] = page_blocks
             result['text_blocks'] = text_blocks_detail
@@ -438,15 +454,27 @@ class GatheredParagraph:
     结构化段落。
 
     Attributes:
-        page: 页码
-        text: 段落文本
+        page: 页码（1-based）
+        text: 段落纯文本（题注匹配、引用检索都按它比对）
         bbox: 边界框 (x0, y0, x1, y1)
         is_heading: 是否为标题
+        heading_level: Markdown 标题层级 1..6；非标题为 0
+        column: 栏位（0=左, 1=右, -1=单栏或通栏）
+        font_size: 首行主 span 字号
+        is_bold: 首行是否粗体（只认 PDF 粗体标志位）
+        is_full_width: 双栏页上是否通栏（跨中线或宽度占比大）
+        rich_text: 正文行内 Markdown 粗斜体文本，仅供渲染；标题或无样式时为空串
     """
     page: int
     text: str
     bbox: Tuple[float, float, float, float]
     is_heading: bool
+    heading_level: int = 0
+    column: int = -1
+    font_size: float = 0.0
+    is_bold: bool = False
+    is_full_width: bool = False
+    rich_text: str = ""
 
 
 @dataclass
@@ -460,12 +488,16 @@ class GatheredText:
         headers_removed: 移除的页眉列表
         footers_removed: 移除的页脚列表
         paragraphs: 段落列表
+        structure_warnings: 结构质量告警（阅读顺序、标题层级等）
+        typical_font_size: 估计的正文字号
     """
     version: str
     is_dual_column: bool
     headers_removed: List[str]
     footers_removed: List[str]
     paragraphs: List[GatheredParagraph]
+    structure_warnings: List[str] = field(default_factory=list)
+    typical_font_size: float = 10.0
 
 
 # ============================================================================

@@ -43,7 +43,7 @@
     {
       "id": "F05",
       "name": "文本提取与结构化",
-      "count": 15
+      "count": 19
     },
     {
       "id": "F06",
@@ -103,7 +103,7 @@
     {
       "id": "F17",
       "name": "题注清单对账",
-      "count": 10
+      "count": 12
     },
     {
       "id": "F18",
@@ -148,28 +148,28 @@
     {
       "id": "F26",
       "name": "测试保障与批次诊断",
-      "count": 37
+      "count": 38
     }
   ],
   "stats": {
     "runtime_files": 55,
-    "testing_files": 36,
-    "runtime_features": 339,
-    "testing_features": 61,
-    "definitions": 1408,
-    "definition_coverage": 1408
+    "testing_files": 38,
+    "runtime_features": 345,
+    "testing_features": 62,
+    "definitions": 1468,
+    "definition_coverage": 1468
   },
   "source_sha256": {
-    "skills/pdf-markdown-summary/scripts/__init__.py": "6e8be88e3c38540f7fb59d6e736130700465618f57bd301f2239222073ace506",
+    "skills/pdf-markdown-summary/scripts/__init__.py": "99b057e771b63f2590342366bdb3ebd4b113a5aede9da811614a97e472547215",
     "skills/pdf-markdown-summary/scripts/core/__init__.py": "873a743bfba2d72093fb14483ed6edff8d3c4cfac0139f1e0174fa13510538b5",
-    "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py": "de8aaff69e4d7e42ecde8545418bf51b645f50f71e626de10141b8bb94ab3499",
-    "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py": "51a2482bc0003ca14b982672695f4be73935c5a7eda1e5c04a2d5eb6bc470c7c",
+    "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py": "b5be376c16fabac23346e6d0fed37d2005449c043e4b4a7b3d0da72973afc29f",
+    "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py": "d5f6d4b4b2b223159d294892335cbe8f6e49e65291913acd7d216f2d72119074",
     "skills/pdf-markdown-summary/scripts/core/process_pdf.py": "c7a6f7a24580d966eb9b65b6555fbf2b0773e5d9178a4690a3fc7db58208ee07",
-    "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py": "7f73abe315840d1859480c9d9c62e1d60534a0f737648c7012ea28f1616913ae",
+    "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py": "04a6f900fa54078c21e49199b282ff64d3d4939450a6d1a12d7cd19d84789538",
     "skills/pdf-markdown-summary/scripts/extract_pdf_assets.py": "cf9b9b9178944e5bf9649a96ed36850be07703839d896cea06b6af161b0dd5ad",
-    "skills/pdf-markdown-summary/scripts/lib/__init__.py": "a901f7e177f5dbb289f71d5d725f8c2c858c47117751ffab5ea27089817f9588",
+    "skills/pdf-markdown-summary/scripts/lib/__init__.py": "cd091987580990935018224ea5fb32d99917cc5bdaabe0e672718161da42f090",
     "skills/pdf-markdown-summary/scripts/lib/acceptance.py": "aea88ab4e630d299037ac81a2ea22750ae2586a806a8ce0db8693c2ce920fbfb",
-    "skills/pdf-markdown-summary/scripts/lib/assess.py": "f0d4e9638c4551487ec64fdc78764f9a3c3a736e63c7508d2ab70700cbcd151c",
+    "skills/pdf-markdown-summary/scripts/lib/assess.py": "3c3d06a8c75fd80499bc25d393ac40f347018940a09d9568faab681f12027ee2",
     "skills/pdf-markdown-summary/scripts/lib/assets.py": "94d69fa20e99864b48b3c252ed1899f407a44c486b59806a94910cfa57cdb835",
     "skills/pdf-markdown-summary/scripts/lib/backends/__init__.py": "cff6450e9003d8a1596988e451334fe9ab9876cea0267b24f8bf17be7c3c42fe",
     "skills/pdf-markdown-summary/scripts/lib/backends/base.py": "8fedf1dbc64c35521ede91999118d86dfd2f73cc28d020f47bb8875d311a876f",
@@ -179,7 +179,7 @@
     "skills/pdf-markdown-summary/scripts/lib/debug_visual.py": "eb36a3f2eaf653cd5d30d3454a64f90b5a88bb283ac6032374d9588ea16f3e57",
     "skills/pdf-markdown-summary/scripts/lib/direction.py": "0a2d6b27c7209aaab8b8bae0caa8219617e4b4109d1a65552a03686e89c1afc1",
     "skills/pdf-markdown-summary/scripts/lib/env_priority.py": "563a7bf493027261877397b2a9107d6cba135c38e53f9a36a74de396d5ef2b17",
-    "skills/pdf-markdown-summary/scripts/lib/extract_figures.py": "827cbc09dcde721841abc27c1fff2f4d205b851c0132037f606d1096f5d082a1",
+    "skills/pdf-markdown-summary/scripts/lib/extract_figures.py": "1add55e3c0c3be370276d9bb1c14953ccdcee6cfb2182a4b3562fdab695fdb6c",
     "skills/pdf-markdown-summary/scripts/lib/extract_helpers.py": "59178b4f92f4352639642c9c80884ddc7f4ea51e6bf50fc68760d14437f26835",
     "skills/pdf-markdown-summary/scripts/lib/extract_tables.py": "5158f9072bb0b4e0d29bf23719059e9dfcc7991376097317af7638eea9586635",
     "skills/pdf-markdown-summary/scripts/lib/extraction_logger.py": "ee90ad0fdc27930b12526fd7f6fbe9c7953ced6276183e0b19f8852986a4fde8",
@@ -189,15 +189,15 @@
     "skills/pdf-markdown-summary/scripts/lib/idents.py": "f86e0be791dda34749ce2766c19d83695fcf5c87c4ad1e94cf8aa78b5b6e65f2",
     "skills/pdf-markdown-summary/scripts/lib/layout_integration.py": "6151370c7de69a2f4ca7eae1e7b31fcfa1709cb31b4dbb0b2ea53f408fb4ac13",
     "skills/pdf-markdown-summary/scripts/lib/layout_model.py": "048ef07723e08b94a9b3d5f1d992538e28cd61ca6b692ddea3511ed6bcd2ebc7",
-    "skills/pdf-markdown-summary/scripts/lib/markdown.py": "5beeb246a7ba3c0749c0b8c90e3d26c632e9c89623122e29ee01e82ec24db947",
+    "skills/pdf-markdown-summary/scripts/lib/markdown.py": "453fd10abd189caccd6debcdb943e44a87e841dc5d0dbff9da22cfaac5916e85",
     "skills/pdf-markdown-summary/scripts/lib/markdown_models.py": "badeabae85a9562103ab960bb1af6fe6f755730aa2ddc17fb1020021a8e3ea56",
     "skills/pdf-markdown-summary/scripts/lib/markdown_render.py": "9399ecdbba0a7cd1d7fa23e8d01fb341537d883fbd3a33370c183dbd9f0ef720",
-    "skills/pdf-markdown-summary/scripts/lib/models.py": "35fdf86ec42e27b9e8ae8153f111f540fa02ad15de38bb434bd1a6e75bee44a1",
+    "skills/pdf-markdown-summary/scripts/lib/models.py": "60139e18ac3e6a5210f8147e521660d86e7d96c1847006ce038c0379576fac76",
     "skills/pdf-markdown-summary/scripts/lib/object_refine.py": "b54cb6f9c485bca38b39e0710079b4b5cf24432f6f43a666717ca982852d22db",
-    "skills/pdf-markdown-summary/scripts/lib/output.py": "0acf0c77b1ba312f0438d69fef380a390bf226e5288d16789a4d952816b8cd6c",
+    "skills/pdf-markdown-summary/scripts/lib/output.py": "f40921e1ab2f59dc8702fa0abd3a7b733790c3c279eb3d5c54e9114794eedf81",
     "skills/pdf-markdown-summary/scripts/lib/page_scene.py": "f339ff036935a53896da1a209756adab11b525ccf0be1a588a5125dcbd2f35bc",
     "skills/pdf-markdown-summary/scripts/lib/pairing.py": "238a8c552068e2dce4e57f666285f63110fbef4ae4b29ca53ee590ad4dcb67e6",
-    "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py": "d32b3a771502f95ed8462506cdcef5577ea2158b0d371da955de3230195e7470",
+    "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py": "3b551d03bd2e7828fdb0c4332e9ce58609fde4f9dcc79fd555c5b22ce5f5c8d9",
     "skills/pdf-markdown-summary/scripts/lib/pipeline.py": "0037a3f723f0ef0505e10ba7805270f6cbcc88c29bf59904c00d520b76a02d8d",
     "skills/pdf-markdown-summary/scripts/lib/pixel_detect.py": "06934111607e6bf6152a1bdaacb81fa228e22fd0cf9c7f3a9c8a359a7bda90ca",
     "skills/pdf-markdown-summary/scripts/lib/quality.py": "9e394f7de212d59ed921f854c91fcf107587284a5964484cd863b8cfbd6b32e6",
@@ -209,14 +209,14 @@
     "skills/pdf-markdown-summary/scripts/lib/regions.py": "12a964305b1fed95f2ab7992ecf43f92ff5b722707dad7e31ec659ef39516fc5",
     "skills/pdf-markdown-summary/scripts/lib/table_continuation.py": "0840de0d4a375fcbf5d0856a66dd1417298240aecf5dca3a3e6a19f934c9ac30",
     "skills/pdf-markdown-summary/scripts/lib/table_refine.py": "182dfa7239ce509615fb3ef813302967d2653a4c614e93e0f3e530e5f29b0418",
-    "skills/pdf-markdown-summary/scripts/lib/text_extract.py": "459c623dd2ff6b4327dfb115f1a38491212c44a0681f00f1c716f6be20d4c146",
+    "skills/pdf-markdown-summary/scripts/lib/text_extract.py": "a84a38fa7544559858f7eeb83648b7c84fb6cb85e6a4b8483f94065ad78c58d6",
     "skills/pdf-markdown-summary/scripts/lib/text_trim.py": "2865da52cfd2b137455ab6e61c40df61c32448e061ced35f17b508ece201d2b0",
     "skills/pdf-markdown-summary/scripts/pdf_to_markdown.py": "3c03f99052ba0ec8346487422cd96f9cef8e1b30b297875d30f377253e6f9d81",
     "skills/pdf-markdown-summary/scripts/process_pdf.py": "e70a46f51a3d26d4537bbb8cd2df7a0b2c9b827b1356e9de27174eba6f4f6b80",
     "skills/pdf-markdown-summary/scripts/summarize_pdf.py": "60f545934dfe142c2b4b41314d5033b2ab7001d16ffa945bf635a3e884884379",
     "tests/scripts/analyze_debug_batch.py": "546bfcc8c63171416d19af387597e0c89af2554d4ff1c5295062263eb3cdb255",
     "tests/scripts/conftest.py": "258a041d92fea78cb0243ed48b55c7abf29c3c80a32af252a59aafd460db13dd",
-    "tests/scripts/run_all.py": "f390a8740b8904848064f6a1a6a9e70532dc6c5bc2178578912ea7492ee709c9",
+    "tests/scripts/run_all.py": "5d5b2ad01b6d762d12d4df241e976f80a8d1ccbb25a091b72ad857760a412bc5",
     "tests/scripts/test_a2_a3_fixes.py": "26c4910aac42549da5aeefb1977fb38b67f4408897151b2415b0e45a0ee3a325",
     "tests/scripts/test_analyze_debug_batch.py": "53246d0b21e6902ebb8e590d97a2c5440f121883ee34f9191674524180ffcd62",
     "tests/scripts/test_bugfix_20260928.py": "c321dd9fdb87df982a47e9782c9b9bbe3293d7c30020cb93f41fa29c56941de8",
@@ -243,14 +243,16 @@
     "tests/eval/convert_labelme_to_gt.py": "58edda89352fdd640f20e53c454415f4b83702e9a290c03a7e9e1d0ef3bbfa5c",
     "tests/eval/keys.py": "6fe476f0d08ae4cf14768f0d1d93eab3f8ed20546f9223178e7dc46b6425bdd4",
     "tests/eval/metrics.py": "a850434219ef9e39fb3a61b8cab498a6fd13d18bfb4abdd287786a41125299b1",
-    "tests/eval/run_eval.py": "610cb1ca190c3409c0de101270f9d9d7eb61d130a012fd476314303ec60e56fa",
-    "tests/eval/selfcheck.py": "39237a85d749cc12cf261eb7710018d712d611decd1f06d9e9bcafa268afab6e",
+    "tests/eval/run_eval.py": "04be836d3dc269c3c88b301370ccc11be64a649e36be9ce7fab0fc1680383765",
+    "tests/eval/selfcheck.py": "b5d486ffb40351539523ff6bc2dfb60c925aa4bbf3e82c87e178d8fce85e2ed4",
     "tests/scripts/test_bugfix_20260930.py": "a8ba1a9e72a18a085ce8fe5f9d911b1229ca89555e38484c01ac592894599c9f",
     "tests/scripts/test_table_refine_boundaries_20260930.py": "9bbf4fd91bc874b3e747c8c9264abae6ae219fb70ac288eaf68990efbd97b8f9",
     "tests/scripts/test_zero_bug_coverage_20260930.py": "497ad2197e8be90824b2d321225c3bbac83d6edf3cefe13b83c2049b1eadb4ed",
     "tests/scripts/test_bugfix_20261001.py": "817a7ffe31432b4cb850bcfdeb3129c1342da894b047707d62090e4e113bbc62",
     "skills/pdf-markdown-summary/scripts/lib/equation_regions.py": "444526cffe7777b9e23371328c48e9431ca75f1b1d267453097951becf13e992",
-    "tests/scripts/test_issue_regressions_20261006.py": "21c6532771e3fd7a79b6b5d8977907fb88aed0fcf19a21b67b5824d94607ba2f"
+    "tests/scripts/test_issue_regressions_20261006.py": "21c6532771e3fd7a79b6b5d8977907fb88aed0fcf19a21b67b5824d94607ba2f",
+    "tests/scripts/test_bugfix_20261123.py": "3b3b4d920961ff7f31209e4a9b15fa5130d7c03f94247e48e0c12a6dde89d41a",
+    "tests/scripts/test_markdown_structure_20261123.py": "fde456a0004d07d1084e12960b8a37a7a622394ddb6e16ea76a36a84434f0970"
   },
   "features": [
     {
@@ -261,32 +263,32 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "_positive_int",
-          "line": 72,
-          "end": 77
+          "line": 78,
+          "end": 83
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "_positive_float",
-          "line": 80,
-          "end": 89
+          "line": 86,
+          "end": 95
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "build_parser_modular",
-          "line": 92,
-          "end": 247
+          "line": 98,
+          "end": 253
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "parse_args_modular",
-          "line": 250,
-          "end": 260
+          "line": 256,
+          "end": 266
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "parse_args",
-          "line": 690,
-          "end": 694
+          "line": 709,
+          "end": 713
         }
       ],
       "inputs": "CLI argv",
@@ -305,14 +307,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main",
-          "line": 697,
-          "end": 701
+          "line": 716,
+          "end": 720
         }
       ],
       "inputs": "PDF+CLI",
@@ -331,8 +333,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "参数、PDF路径",
@@ -351,8 +353,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "输出参数",
@@ -371,8 +373,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "PDF",
@@ -391,8 +393,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "PDF、on/auto/off",
@@ -411,8 +413,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "后端选择、PDF",
@@ -431,8 +433,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "PDF、规则配置",
@@ -451,8 +453,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "结构化文本、records",
@@ -471,8 +473,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "LayoutResult、records",
@@ -491,8 +493,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "main_modular",
-          "line": 263,
-          "end": 669
+          "line": 269,
+          "end": 688
         }
       ],
       "inputs": "records、用户范围、快照",
@@ -564,7 +566,7 @@
           "file": "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py",
           "symbol": "main",
           "line": 37,
-          "end": 122
+          "end": 133
         }
       ],
       "inputs": "PDF、CLI",
@@ -578,13 +580,13 @@
     {
       "group": "01",
       "name": "摘要材料复用完整性检查",
-      "description": "复用必须同时存在index.json和文本；JSON必须有dict meta，缺项或不可读返回1。",
+      "description": "复用必须同时存在index.json和文本，且二者均为普通文件（目录不算）；JSON必须有dict meta，缺项、不可读或类型不符返回1。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py",
           "symbol": "main",
           "line": 37,
-          "end": 122
+          "end": 133
         }
       ],
       "inputs": "已有index和TXT",
@@ -604,7 +606,7 @@
           "file": "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py",
           "symbol": "main",
           "line": 37,
-          "end": 122
+          "end": 133
         }
       ],
       "inputs": "PDF、index.meta",
@@ -624,7 +626,7 @@
           "file": "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py",
           "symbol": "main",
           "line": 37,
-          "end": 122
+          "end": 133
         }
       ],
       "inputs": "准备完成的材料",
@@ -826,13 +828,13 @@
     {
       "group": "03",
       "name": "PDF 安全打开与错误归一",
-      "description": "验证路径存在，封装 fitz.open 异常并返回保留 raw 的文档适配对象。",
+      "description": "验证路径存在，封装 fitz.open 异常并返回保留 raw 的文档适配对象；打开后对每页执行 set_rotation(0)，统一文本/对象/渲染坐标，避免旋转页裁剪纯白。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "open_pdf",
           "line": 283,
-          "end": 312
+          "end": 320
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
@@ -919,8 +921,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "managed_pdf_document",
-          "line": 315,
-          "end": 322
+          "line": 323,
+          "end": 330
         }
       ],
       "inputs": "PDFDocument 或接收 pdf_path 的函数",
@@ -1127,8 +1129,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "try_extract_tables_with_pdfplumber",
-          "line": 329,
-          "end": 379
+          "line": 337,
+          "end": 387
         }
       ],
       "inputs": "PDF、1-based 页码、table_settings",
@@ -1147,8 +1149,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "try_debug_tablefinder_with_pdfplumber",
-          "line": 382,
-          "end": 424
+          "line": 390,
+          "end": 432
         }
       ],
       "inputs": "PDF、页码、输出路径、设置",
@@ -1167,32 +1169,32 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "create_rect",
-          "line": 445,
-          "end": 458
+          "line": 453,
+          "end": 466
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "intersect_rects",
-          "line": 461,
-          "end": 471
+          "line": 469,
+          "end": 479
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "union_rects",
-          "line": 474,
-          "end": 484
+          "line": 482,
+          "end": 492
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "is_rect_empty",
-          "line": 487,
-          "end": 497
+          "line": 495,
+          "end": 505
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
           "symbol": "rect_to_list",
-          "line": 431,
-          "end": 442
+          "line": 439,
+          "end": 450
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_helpers.py",
@@ -1434,7 +1436,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "DocumentLayoutModel",
           "line": 344,
-          "end": 428
+          "end": 444
         }
       ],
       "inputs": "基础版式分析结果",
@@ -1454,7 +1456,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "DocumentLayoutModel.to_dict",
           "line": 380,
-          "end": 428
+          "end": 444
         }
       ],
       "inputs": "DocumentLayoutModel、include_details",
@@ -1468,19 +1470,19 @@
     {
       "group": "04",
       "name": "结构化段落与全文契约",
-      "description": "段落记录文字、1-based 页码、bbox、is_heading；全文记录版本、双栏状态和被移除页眉页脚。",
+      "description": "段落记录纯文本 text、正文行内 Markdown rich_text（仅供渲染）、1-based 页码、bbox、is_heading、heading_level 与栏位；全文记录版本、双栏状态、结构告警和被移除页眉页脚。text 恒为纯文本，题注匹配等下游都按它比对。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "GatheredParagraph",
-          "line": 436,
-          "end": 449
+          "line": 452,
+          "end": 477
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "GatheredText",
-          "line": 453,
-          "end": 468
+          "line": 481,
+          "end": 500
         }
       ],
       "inputs": "整理后的文本段落",
@@ -1499,14 +1501,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "FigureMention",
-          "line": 476,
-          "end": 487
+          "line": 508,
+          "end": 519
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "FigureContext",
-          "line": 491,
-          "end": 506
+          "line": 523,
+          "end": 538
         }
       ],
       "inputs": "图表正文关联证据",
@@ -1525,8 +1527,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "DebugStageInfo",
-          "line": 514,
-          "end": 527
+          "line": 546,
+          "end": 559
         }
       ],
       "inputs": "调试阶段记录",
@@ -1545,8 +1547,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
           "symbol": "AcceptanceThresholds",
-          "line": 531,
-          "end": 544
+          "line": 563,
+          "end": 576
         }
       ],
       "inputs": "验收参数",
@@ -1701,8 +1703,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "pre_validate_pdf",
-          "line": 160,
-          "end": 293
+          "line": 560,
+          "end": 693
         }
       ],
       "inputs": "PDF 路径",
@@ -1721,8 +1723,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "pre_validate_pdf",
-          "line": 160,
-          "end": 293
+          "line": 560,
+          "end": 693
         }
       ],
       "inputs": "加密文档",
@@ -1741,8 +1743,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "pre_validate_pdf",
-          "line": 160,
-          "end": 293
+          "line": 560,
+          "end": 693
         }
       ],
       "inputs": "文档采样页",
@@ -1761,8 +1763,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "pre_validate_pdf",
-          "line": 160,
-          "end": 293
+          "line": 560,
+          "end": 693
         }
       ],
       "inputs": "页数、体积",
@@ -1781,8 +1783,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "try_extract_text",
-          "line": 124,
-          "end": 153
+          "line": 524,
+          "end": 553
         }
       ],
       "inputs": "PDF、可选文本路径",
@@ -1801,8 +1803,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "gather_structured_text",
-          "line": 301,
-          "end": 470
+          "line": 701,
+          "end": 892
         }
       ],
       "inputs": "PDF 结构字典",
@@ -1821,8 +1823,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "gather_structured_text",
-          "line": 301,
-          "end": 470
+          "line": 701,
+          "end": 892
         }
       ],
       "inputs": "全文块、页面尺寸",
@@ -1836,13 +1838,25 @@
     {
       "group": "05",
       "name": "双栏正文读取顺序重排",
-      "description": "通过块中心左右分布判断双栏；按页、左栏/右栏、纵坐标排序正文段落。此能力与增强 Layout 的 x0 峰值判栏不同。",
+      "description": "双栏通栏按 y 切开栏带，带内先左后右。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "classify_block_column",
+          "line": 405,
+          "end": 422
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "sort_paragraphs_reading_order",
+          "line": 425,
+          "end": 472
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "gather_structured_text",
-          "line": 301,
-          "end": 470
+          "line": 701,
+          "end": 892
         }
       ],
       "inputs": "段落 bbox、页面宽度",
@@ -1851,24 +1865,53 @@
       "depends": [],
       "key": "05/双栏正文读取顺序重排",
       "scope": "runtime",
-      "id": "F05.008"
-    },
-    {
-      "group": "05",
-      "name": "中英章节标题识别与伪标题排除",
-      "description": "粗体与长度/字号检查结合数字、中文、罗马和字母章节模式，排除页码、公式片段及小字号统计表头。",
-      "refs": [
+      "id": "F05.008",
+      "implementations": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
-          "symbol": "looks_like_structural_heading",
-          "line": 77,
-          "end": 117
+          "symbol": "sort_paragraphs_reading_order",
+          "line": 272
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "classify_block_column",
+          "line": 252
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "gather_structured_text",
-          "line": 301,
-          "end": 470
+          "line": 548
+        }
+      ]
+    },
+    {
+      "group": "05",
+      "name": "中英章节标题识别与伪标题排除",
+      "description": "粗体与长度/字号检查结合数字、中文、罗马和字母章节模式，排除页码、公式片段及小字号统计表头；粗体只认 PDF 粗体标志位，不用字体名启发式，图内 DejaVuSans-Bold 标签不会升为标题。",
+      "refs": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "looks_like_structural_heading",
+          "line": 79,
+          "end": 119
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_span_has_bold_flag",
+          "line": 164,
+          "end": 171
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_span_is_bold",
+          "line": 174,
+          "end": 180
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "gather_structured_text",
+          "line": 701,
+          "end": 892
         }
       ],
       "inputs": "段落文本、粗体、字号",
@@ -1887,8 +1930,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "gather_structured_text",
-          "line": 301,
-          "end": 470
+          "line": 701,
+          "end": 892
         }
       ],
       "inputs": "段落首行及文本",
@@ -1907,8 +1950,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "gather_structured_text",
-          "line": 301,
-          "end": 470
+          "line": 701,
+          "end": 892
         }
       ],
       "inputs": "GatheredText、输出路径",
@@ -1927,8 +1970,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "extract_text_with_format",
-          "line": 487,
-          "end": 649
+          "line": 909,
+          "end": 1073
         }
       ],
       "inputs": "PDF、sample_pages",
@@ -1947,14 +1990,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "_estimate_typical_metrics",
-          "line": 652,
-          "end": 697
+          "line": 1076,
+          "end": 1121
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "extract_text_with_format",
-          "line": 487,
-          "end": 649
+          "line": 909,
+          "end": 1073
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_helpers.py",
@@ -1979,8 +2022,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "extract_text_with_format",
-          "line": 487,
-          "end": 649
+          "line": 909,
+          "end": 1073
         }
       ],
       "inputs": "增强文本行及页面信息",
@@ -1994,13 +2037,25 @@
     {
       "group": "05",
       "name": "基础版式统计与 JSON 导出",
-      "description": "将版式模型可序列化投影写出文件，在 debug 时汇报单元、区块和留白区域数量。",
+      "description": "将版式模型可序列化投影写出文件，在 debug 时汇报单元、区块和留白区域数量；文字单元的字重只认 PDF 粗体标志位，字体名带 Bold 的图内标签仍是 regular，不会被分类为标题单元。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_span_has_bold_flag",
+          "line": 164,
+          "end": 171
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_span_is_bold",
+          "line": 174,
+          "end": 180
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
           "symbol": "extract_text_with_format",
-          "line": 487,
-          "end": 649
+          "line": 909,
+          "end": 1073
         }
       ],
       "inputs": "版式模型、可选输出路径",
@@ -2010,6 +2065,173 @@
       "key": "05/基础版式统计与 JSON 导出",
       "scope": "runtime",
       "id": "F05.015"
+    },
+    {
+      "group": "05",
+      "name": "共享原生文本块底层",
+      "description": "统一 `get_text(\"dict\")` 扫描，输出页码、bbox、纯文本、行内 Markdown 文本与 spans，供 gathering 与版式模型共用。",
+      "refs": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "plain_text_from_lines",
+          "line": 351,
+          "end": 358
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "iter_native_text_blocks",
+          "line": 371,
+          "end": 402
+        }
+      ],
+      "inputs": "PDF 文档。",
+      "outputs": "原生文本块列表",
+      "mode": "默认",
+      "depends": [],
+      "key": "05/共享原生文本块底层",
+      "scope": "runtime",
+      "id": "F05.016",
+      "implementations": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "iter_native_text_blocks",
+          "line": 218
+        }
+      ]
+    },
+    {
+      "group": "05",
+      "name": "章节标题层级推断",
+      "description": "按编号深度映射 Markdown 层级（`3`→H2、`3.2`→H3、`3.2.1`→H4）；罗马/字母章节与字号回退。",
+      "refs": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "infer_heading_level",
+          "line": 128,
+          "end": 161
+        }
+      ],
+      "inputs": "标题文本、字号、典型正文字号。",
+      "outputs": "heading_level 1..6",
+      "mode": "默认",
+      "depends": [],
+      "key": "05/章节标题层级推断",
+      "scope": "runtime",
+      "id": "F05.017",
+      "implementations": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "infer_heading_level",
+          "line": 126
+        }
+      ]
+    },
+    {
+      "group": "05",
+      "name": "行内粗斜体 Markdown 序列化",
+      "description": "按 span flags/字体名识别粗斜体并序列化为 Markdown：相邻同样式 span 先合并，首尾空白留在标记外，样式 run 内的字面星号与反斜杠转义；无法被 CommonMark 唯一解析的 run 退回纯文本（只丢样式、不丢字），strip_inline_markdown 用于保真自检。样式只写入 rich_text 供渲染，不进入 text；标题块保持纯文本。",
+      "refs": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_span_is_bold",
+          "line": 174,
+          "end": 180
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_span_is_italic",
+          "line": 183,
+          "end": 189
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_ends_with_odd_backslashes",
+          "line": 195,
+          "end": 201
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_char_class",
+          "line": 204,
+          "end": 218
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_star_marker_is_unambiguous",
+          "line": 221,
+          "end": 239
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "_trailing_marker_char_needs_escape",
+          "line": 242,
+          "end": 246
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "strip_inline_markdown",
+          "line": 249,
+          "end": 271
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "format_spans_as_markdown",
+          "line": 274,
+          "end": 348
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "rich_text_from_lines",
+          "line": 361,
+          "end": 368
+        }
+      ],
+      "inputs": "spans/lines。",
+      "outputs": "rich_text",
+      "mode": "默认",
+      "depends": [],
+      "key": "05/行内粗斜体 Markdown 序列化",
+      "scope": "runtime",
+      "id": "F05.018",
+      "implementations": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "format_spans_as_markdown",
+          "line": 178
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "rich_text_from_lines",
+          "line": 207
+        }
+      ]
+    },
+    {
+      "group": "05",
+      "name": "结构质量告警采集",
+      "description": "检测编号标题层级塌缩与双栏通栏错序，写入 GatheredText.structure_warnings，供转换报告降级为 review。",
+      "refs": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "collect_structure_warnings",
+          "line": 475,
+          "end": 517
+        }
+      ],
+      "inputs": "段落列表、双栏标志。",
+      "outputs": "structure_warnings",
+      "mode": "默认",
+      "depends": [],
+      "key": "05/结构质量告警采集",
+      "scope": "runtime",
+      "id": "F05.019",
+      "implementations": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+          "symbol": "collect_structure_warnings",
+          "line": 322
+        }
+      ]
     },
     {
       "group": "06",
@@ -3036,7 +3258,7 @@
     {
       "group": "08",
       "name": "裸标签及显式图题的邻图吸附纠正",
-      "description": "当前判 below 且下方有邻图题时，比较靠近题注的上下对象距离，必要时改 above，防下方大图抢占当前图题。",
+      "description": "当前判 below 且下方有邻图题时，比较靠近题注的上下对象距离，必要时改 above，防下方大图抢占当前图题；用户显式 --below/--above 时提取编排跳过本纠正，不得覆盖强制方向。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/direction.py",
@@ -3102,7 +3324,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3122,7 +3344,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3142,7 +3364,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3162,7 +3384,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3182,7 +3404,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3202,7 +3424,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3222,7 +3444,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3242,7 +3464,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3262,7 +3484,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3282,7 +3504,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
@@ -3308,7 +3530,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3328,7 +3550,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3348,7 +3570,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -3368,7 +3590,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
           "symbol": "extract_figures",
           "line": 103,
-          "end": 941
+          "end": 949
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5180,19 +5402,19 @@
     {
       "group": "16",
       "name": "正式验收输入输出契约",
-      "description": "承载引用/污染/截断/重复/开放表带等与四态、警告、启发式置信度。",
+      "description": "承载引用/污染/截断/重复/开放表带/空白渲染等与四态、警告、启发式置信度。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "AssessmentInput",
           "line": 33,
-          "end": 46
+          "end": 47
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "AssessmentResult",
-          "line": 50,
-          "end": 55
+          "line": 51,
+          "end": 56
         }
       ],
       "mode": "数据契约",
@@ -5206,13 +5428,13 @@
     {
       "group": "16",
       "name": "正式四态及启发式置信度",
-      "description": "正文引用/污染rejected，重复/截断/表头/远正文/弱锚点review，其余accepted；pairing/boundary为证据分档，不是校准概率。",
+      "description": "正文引用/污染/空白渲染rejected，重复/截断/表头/远正文/弱锚点review，其余accepted；pairing/boundary为证据分档，不是校准概率。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "assess_extraction",
-          "line": 108,
-          "end": 158
+          "line": 109,
+          "end": 162
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5231,8 +5453,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "apply_assessment",
-          "line": 161,
-          "end": 167
+          "line": 165,
+          "end": 171
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5251,8 +5473,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "markdown_insertable",
-          "line": 91,
-          "end": 105
+          "line": 92,
+          "end": 106
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5271,14 +5493,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "_outside_bands",
-          "line": 356,
-          "end": 384
+          "line": 453,
+          "end": 481
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "objects_truncated_on_far_side",
-          "line": 387,
-          "end": 456
+          "line": 484,
+          "end": 553
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5297,8 +5519,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "text_crosses_clip_boundary",
-          "line": 459,
-          "end": 479
+          "line": 556,
+          "end": 576
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5419,20 +5641,20 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "ExpectedCaption",
-          "line": 59,
-          "end": 65
+          "line": 60,
+          "end": 66
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "InventoryReport",
-          "line": 69,
-          "end": 88
+          "line": 70,
+          "end": 89
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "InventoryReport.to_dict",
-          "line": 75,
-          "end": 88
+          "line": 76,
+          "end": 89
         }
       ],
       "mode": "数据契约",
@@ -5451,8 +5673,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "expected_captions_from_index",
-          "line": 170,
-          "end": 195
+          "line": 174,
+          "end": 199
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
+          "symbol": "merge_expected_captions",
+          "line": 279,
+          "end": 292
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5471,8 +5699,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "select_index_candidate",
-          "line": 485,
-          "end": 502
+          "line": 582,
+          "end": 599
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5491,20 +5719,20 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "_record_key",
-          "line": 198,
-          "end": 199
+          "line": 295,
+          "end": 296
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "reconcile_inventory",
-          "line": 202,
-          "end": 226
+          "line": 299,
+          "end": 323
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "_sequence_gaps",
-          "line": 229,
-          "end": 246
+          "line": 326,
+          "end": 343
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5523,8 +5751,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "apply_unexpected_rejects",
-          "line": 339,
-          "end": 353
+          "line": 436,
+          "end": 450
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5543,14 +5771,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "_file_digest",
-          "line": 249,
-          "end": 256
+          "line": 346,
+          "end": 353
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "mark_duplicate_png_records",
-          "line": 316,
-          "end": 336
+          "line": 413,
+          "end": 433
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5569,14 +5797,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "_bbox_overlap_ratio",
-          "line": 259,
-          "end": 271
+          "line": 356,
+          "end": 368
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "mark_cross_kind_overlaps",
-          "line": 274,
-          "end": 313
+          "line": 371,
+          "end": 410
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5595,8 +5823,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "finalize_caption_inventory",
-          "line": 505,
-          "end": 606
+          "line": 602,
+          "end": 706
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5615,20 +5843,20 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "gap_clip_from_caption",
-          "line": 609,
-          "end": 617
+          "line": 709,
+          "end": 717
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "render_inventory_gap",
-          "line": 620,
-          "end": 669
+          "line": 720,
+          "end": 769
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "finalize_caption_inventory",
-          "line": 505,
-          "end": 606
+          "line": 602,
+          "end": 706
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
@@ -5653,8 +5881,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
           "symbol": "finalize_caption_inventory",
-          "line": 505,
-          "end": 606
+          "line": 602,
+          "end": 706
         }
       ],
       "mode": "默认（按参数或证据条件触发）",
@@ -5664,6 +5892,60 @@
       "key": "17/补裁后统计与最终可观测性",
       "scope": "runtime",
       "id": "F17.010"
+    },
+    {
+      "group": "17",
+      "name": "文本层独立题注期望扫描",
+      "description": "不依赖识别器评分索引，直接扫描页面文本行匹配 Figure/Table 显式题注，过滤正文引用；与识别器同口径剔除上角标 span（避免脚注编号与标签词融合成假题注），候选 rect 用 Rect 对象以供缺口补裁。",
+      "refs": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
+          "symbol": "expected_captions_from_page_text",
+          "line": 202,
+          "end": 276
+        }
+      ],
+      "inputs": "PDF 文档。",
+      "outputs": "ExpectedCaption 列表",
+      "mode": "默认",
+      "depends": [],
+      "key": "17/文本层独立题注期望扫描",
+      "scope": "runtime",
+      "id": "F17.011",
+      "implementations": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
+          "symbol": "expected_captions_from_page_text",
+          "line": 202
+        }
+      ]
+    },
+    {
+      "group": "17",
+      "name": "多路题注期望合并",
+      "description": "按 (kind, ident, page) 合并索引期望与文本层期望，保留较高分。",
+      "refs": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
+          "symbol": "merge_expected_captions",
+          "line": 279,
+          "end": 292
+        }
+      ],
+      "inputs": "多组 ExpectedCaption。",
+      "outputs": "去重合并列表",
+      "mode": "默认",
+      "depends": [],
+      "key": "17/多路题注期望合并",
+      "scope": "runtime",
+      "id": "F17.012",
+      "implementations": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
+          "symbol": "merge_expected_captions",
+          "line": 271
+        }
+      ]
     },
     {
       "group": "18",
@@ -7020,7 +7302,7 @@
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "parse_args",
           "line": 25,
-          "end": 40
+          "end": 54
         }
       ],
       "inputs": "CLI",
@@ -7039,8 +7321,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_resolve_outputs",
-          "line": 43,
-          "end": 65
+          "line": 57,
+          "end": 79
         }
       ],
       "inputs": "参数",
@@ -7054,13 +7336,19 @@
     {
       "group": "21",
       "name": "结构化段落转文档块",
-      "description": "预验证并获取正式结构化文本，按页插page_break，heading标h2否则paragraph，跳过空文本；段落 bbox 写入块 meta 供资产覆盖抑制；记录文本层和验证告警。 可接收调用方已有预验证结果复用，避免二次打开 PDF。",
+      "description": "标题使用 heading_level；正文块的行内样式写入 rich_text，与纯文本对不上时不加样式，text 恒为纯文本；结构告警进入 document.meta。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_paragraphs_to_document",
-          "line": 68,
-          "end": 104
+          "line": 82,
+          "end": 133
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+          "symbol": "_inline_rich_text",
+          "line": 136,
+          "end": 147
         }
       ],
       "inputs": "PDF、title",
@@ -7069,7 +7357,14 @@
       "depends": [],
       "key": "21/结构化段落转文档块",
       "scope": "runtime",
-      "id": "F21.003"
+      "id": "F21.003",
+      "implementations": [
+        {
+          "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+          "symbol": "_paragraphs_to_document",
+          "line": 82
+        }
+      ]
     },
     {
       "group": "21",
@@ -7079,14 +7374,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_filter_assets_by_mode",
-          "line": 107,
-          "end": 113
+          "line": 150,
+          "end": 156
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_split_assets_for_markdown",
-          "line": 116,
-          "end": 150
+          "line": 159,
+          "end": 193
         }
       ],
       "inputs": "items、参数",
@@ -7105,8 +7400,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_run_asset_extraction",
-          "line": 153,
-          "end": 188
+          "line": 196,
+          "end": 231
         }
       ],
       "inputs": "PDF、asset/text路径",
@@ -7125,14 +7420,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_caption_ident_for_kind",
-          "line": 191,
-          "end": 212
+          "line": 234,
+          "end": 255
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_asset_kind_matches_text",
-          "line": 239,
-          "end": 248
+          "line": 282,
+          "end": 291
         }
       ],
       "inputs": "kind、题注文本",
@@ -7151,8 +7446,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_block_is_caption_for_asset",
-          "line": 251,
-          "end": 276
+          "line": 294,
+          "end": 319
         }
       ],
       "inputs": "Markdown块、资产",
@@ -7171,8 +7466,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_make_image_block",
-          "line": 215,
-          "end": 236
+          "line": 258,
+          "end": 279
         }
       ],
       "inputs": "asset、MD/index位置",
@@ -7191,20 +7486,20 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_content_is_above_caption",
-          "line": 279,
-          "end": 284
+          "line": 322,
+          "end": 327
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_blocks_covered_by_assets",
-          "line": 300,
-          "end": 340
+          "line": 343,
+          "end": 383
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_place_assets_in_document",
-          "line": 485,
-          "end": 573
+          "line": 528,
+          "end": 616
         }
       ],
       "inputs": "文档、资产",
@@ -7223,8 +7518,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_append_asset_section",
-          "line": 287,
-          "end": 297
+          "line": 330,
+          "end": 340
         }
       ],
       "inputs": "无法锚定资产",
@@ -7243,8 +7538,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "main",
-          "line": 684,
-          "end": 826
+          "line": 727,
+          "end": 901
         }
       ],
       "inputs": "PDF、转换参数",
@@ -7258,13 +7553,13 @@
     {
       "group": "21",
       "name": "转换报告质量和失败传播",
-      "description": "提取失败=failed、有omitted=review、其余ready；报告含实际提取/插入数、embedded/inline/appendix 与 omitted_reasons 汇总；即使资产失败已写MD/报告，仍返回其非0码。 报告含 equations 段（检出/截图/文本合并/截图降级/待复核计数）；存在待复核公式时顶层状态为 review。",
+      "description": "提取失败=failed；有omitted、待复核公式或无可提取正文（仅剩标题）=review；其余ready。报告含实际提取/插入数、embedded/inline/appendix 与 omitted_reasons 汇总；即使资产失败已写MD/报告，仍返回其非0码。报告含 equations 段（检出/截图/文本合并/截图降级/待复核计数）。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "main",
-          "line": 684,
-          "end": 826
+          "line": 727,
+          "end": 901
         }
       ],
       "inputs": "转换过程结果",
@@ -7283,8 +7578,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "main",
-          "line": 684,
-          "end": 826
+          "line": 727,
+          "end": 901
         }
       ],
       "inputs": "OCR参数",
@@ -7304,13 +7599,13 @@
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "parse_args",
           "line": 25,
-          "end": 40
+          "end": 54
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_run_asset_extraction",
-          "line": 153,
-          "end": 188
+          "line": 196,
+          "end": 231
         }
       ],
       "inputs": "tables模式",
@@ -7324,31 +7619,31 @@
     {
       "group": "21",
       "name": "Markdown块与文档数据契约",
-      "description": "块携类型/文本/层级/页/路径/题注/meta；文档携标题/source/meta和顺序块，支持字典JSON序列化。",
+      "description": "块携类型/文本/层级/页/路径/题注/meta，paragraph 块另可带仅供渲染的行内 Markdown rich_text；文档携标题/source/meta和顺序块，支持字典JSON序列化。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "MarkdownBlock",
           "line": 13,
-          "end": 33
+          "end": 37
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "MarkdownBlock.to_dict",
-          "line": 24,
-          "end": 33
+          "line": 27,
+          "end": 37
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "MarkdownDocument",
-          "line": 37,
-          "end": 51
+          "line": 41,
+          "end": 55
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "MarkdownDocument.to_dict",
-          "line": 45,
-          "end": 51
+          "line": 49,
+          "end": 55
         }
       ],
       "inputs": "段落和资产信息",
@@ -7362,13 +7657,13 @@
     {
       "group": "21",
       "name": "标题与普通文本渲染",
-      "description": "heading层级夹在1..6，默认2；标题内部换行/连续空白归一为单行（编号与标题文本被排版拆成两行时后半段不掉入正文），普通块保留内部换行仅去首尾空白。",
+      "description": "heading层级夹在1..6，默认2；标题内部换行/连续空白归一为单行（编号与标题文本被排版拆成两行时后半段不掉入正文），普通块带 rich_text 时按它渲染行内粗斜体，否则用 text，并保留内部换行仅去首尾空白。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "render_block",
-          "line": 54,
-          "end": 78
+          "line": 58,
+          "end": 84
         }
       ],
       "inputs": "MarkdownBlock",
@@ -7387,8 +7682,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "render_block",
-          "line": 54,
-          "end": 78
+          "line": 58,
+          "end": 84
         }
       ],
       "inputs": "image/table块",
@@ -7407,20 +7702,20 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "render_block",
-          "line": 54,
-          "end": 78
+          "line": 58,
+          "end": 84
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "render_markdown",
-          "line": 81,
-          "end": 88
+          "line": 87,
+          "end": 94
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
           "symbol": "render_blocks",
-          "line": 91,
-          "end": 93
+          "line": 97,
+          "end": 99
         }
       ],
       "inputs": "文档或块集合",
@@ -7439,8 +7734,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_blocks_covered_by_assets",
-          "line": 300,
-          "end": 340
+          "line": 343,
+          "end": 383
         }
       ],
       "inputs": "文档块、插入资产 final_bbox",
@@ -7461,26 +7756,26 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_annotate_and_persist_embed_status",
-          "line": 576,
-          "end": 602
+          "line": 619,
+          "end": 645
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_persist_embed_status_to_index",
-          "line": 605,
-          "end": 659
+          "line": 648,
+          "end": 702
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_persist_embed_status_to_index.key_of",
-          "line": 616,
-          "end": 622
+          "line": 659,
+          "end": 665
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_summarize_embed_status",
-          "line": 662,
-          "end": 681
+          "line": 705,
+          "end": 724
         }
       ],
       "inputs": "放置摘要、资产结果、index.json",
@@ -7501,8 +7796,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
           "symbol": "_preserve_equation_regions",
-          "line": 343,
-          "end": 482
+          "line": 386,
+          "end": 525
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/equation_regions.py",
@@ -7687,8 +7982,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "get_unique_path",
-          "line": 259,
-          "end": 284
+          "line": 351,
+          "end": 376
         }
       ],
       "inputs": "正文段落块（bbox/页码/文本）、已嵌入资产 final_bbox、PDF 原页",
@@ -7816,8 +8111,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "write_manifest",
-          "line": 113,
-          "end": 143
+          "line": 148,
+          "end": 178
         }
       ],
       "inputs": "records、manifest路径",
@@ -7836,8 +8131,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "load_index_json_items",
-          "line": 150,
-          "end": 179
+          "line": 185,
+          "end": 214
         }
       ],
       "inputs": "index.json",
@@ -7851,19 +8146,31 @@
     {
       "group": "22",
       "name": "旧图片身份快照与安全清理",
-      "description": "仅运行前存在、inode/大小/mtime/ctime未变、未被有效dict/items索引file引用的Figure_/Table_ PNG能删除；无快照/无效索引/异常保守不删除，本轮新/改写不清理。",
+      "description": "仅运行前存在、inode/大小/mtime/ctime未变、未被有效dict/items索引file引用、且归属当前PDF上一轮index（meta.pdf+pdf_hash一致）的Figure_/Table_ PNG能删除；共用目录他文档图片、无快照/无效索引/异常保守不删除，本轮新/改写不清理。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "snapshot_prunable_images",
-          "line": 182,
-          "end": 196
+          "line": 217,
+          "end": 231
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
+          "symbol": "_pdf_content_hash16",
+          "line": 234,
+          "end": 243
+        },
+        {
+          "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
+          "symbol": "load_owned_prunable_images",
+          "line": 246,
+          "end": 281
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "prune_unindexed_images",
-          "line": 199,
-          "end": 252
+          "line": 284,
+          "end": 344
         }
       ],
       "inputs": "旧快照、最终index",
@@ -7882,8 +8189,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "get_unique_path",
-          "line": 259,
-          "end": 284
+          "line": 351,
+          "end": 376
         }
       ],
       "inputs": "目标路径",
@@ -7902,14 +8209,14 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "get_run_id",
-          "line": 295,
-          "end": 300
+          "line": 387,
+          "end": 392
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "set_run_id",
-          "line": 303,
-          "end": 306
+          "line": 395,
+          "end": 398
         }
       ],
       "inputs": "可选run_id",
@@ -7928,8 +8235,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "write_index_json",
-          "line": 309,
-          "end": 470
+          "line": 401,
+          "end": 562
         }
       ],
       "inputs": "records",
@@ -7948,8 +8255,8 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "write_index_json",
-          "line": 309,
-          "end": 470
+          "line": 401,
+          "end": 562
         }
       ],
       "inputs": "PDF、配置、验证、版式、inventory",
@@ -7963,7 +8270,7 @@
     {
       "group": "22",
       "name": "输出路径类型冲突前置校验",
-      "description": "写盘前校验输出目标与父链：目标自身撞已存在文件/目录、或最近存在祖先是文件（后续 makedirs/open 只会在写盘阶段抛裸 FileExistsError）时提前返回中文错误。两个正式入口命中即退出 2 并保留既有文件内容；覆盖显式与隐式输出（out/asset/text/blocks/report/index/manifest）。",
+      "description": "写盘前校验输出目标与父链：目标自身撞已存在文件/目录、最近存在祖先是文件、输出与源PDF同一路径身份、或多项输出互撞时提前返回中文错误。真实路径结合设备/inode 识别符号链接与硬链接；两个正式入口命中即退出 2 并保留源文件及既有输出内容。覆盖显式与隐式输出（out/asset/text/blocks/report/index/manifest）及 log-file/log-jsonl，日志文件 handler 必须在校验通过后初始化。",
       "refs": [
         {
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
@@ -7975,7 +8282,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
           "symbol": "validate_output_targets",
           "line": 82,
-          "end": 111
+          "end": 146
         }
       ],
       "inputs": "(路径, 期望目录/文件, 标签) 检查表",
@@ -8363,20 +8670,20 @@
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "configure_logging",
-          "line": 55,
-          "end": 60
+          "line": 61,
+          "end": 66
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "get_logger",
-          "line": 62,
-          "end": 63
+          "line": 68,
+          "end": 69
         },
         {
           "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
           "symbol": "log_event",
-          "line": 65,
-          "end": 66
+          "line": 71,
+          "end": 72
         }
       ],
       "inputs": "日志模块导入失败 / 日志配置",
@@ -8576,7 +8883,7 @@
           "file": "skills/pdf-markdown-summary/scripts/lib/__init__.py",
           "symbol": "<module>",
           "line": 1,
-          "end": 304
+          "end": 312
         }
       ],
       "inputs": "包import",
@@ -9056,7 +9363,7 @@
     {
       "group": "25",
       "name": "GT 与预测文件发现",
-      "description": "搜索 document_id/gt.json、legacy predictions 与递归 images/index；预测可以直接指定 JSON 文件。",
+      "description": "搜索 document_id/gt.json、legacy predictions 与递归 images/index；预测可以直接指定 JSON 文件；单文件正式 images/index.json 的文档键取 document_id，不得误用父目录名 images。",
       "refs": [
         {
           "file": "tests/eval/run_eval.py",
@@ -9066,9 +9373,15 @@
         },
         {
           "file": "tests/eval/run_eval.py",
-          "symbol": "find_pred_files",
+          "symbol": "_pred_doc_key_from_file",
           "line": 54,
-          "end": 70
+          "end": 58
+        },
+        {
+          "file": "tests/eval/run_eval.py",
+          "symbol": "find_pred_files",
+          "line": 61,
+          "end": 78
         }
       ],
       "inputs": "目录或预测 JSON 路径",
@@ -9087,14 +9400,14 @@
         {
           "file": "tests/eval/run_eval.py",
           "symbol": "load_gt",
-          "line": 73,
-          "end": 76
+          "line": 81,
+          "end": 84
         },
         {
           "file": "tests/eval/run_eval.py",
           "symbol": "load_preds",
-          "line": 79,
-          "end": 87
+          "line": 87,
+          "end": 95
         }
       ],
       "inputs": "GT / 预测 JSON",
@@ -9113,8 +9426,8 @@
         {
           "file": "tests/eval/run_eval.py",
           "symbol": "make_lines_provider",
-          "line": 90,
-          "end": 115
+          "line": 98,
+          "end": 123
         }
       ],
       "inputs": "PDF root / document_id / page",
@@ -9133,8 +9446,8 @@
         {
           "file": "tests/eval/run_eval.py",
           "symbol": "main",
-          "line": 118,
-          "end": 202
+          "line": 126,
+          "end": 210
         }
       ],
       "inputs": "评测 CLI",
@@ -9160,7 +9473,7 @@
           "file": "tests/eval/selfcheck.py",
           "symbol": "main",
           "line": 47,
-          "end": 260
+          "end": 266
         }
       ],
       "inputs": "内建自检样本",
@@ -9199,20 +9512,20 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_command",
-          "line": 106,
-          "end": 123
+          "line": 108,
+          "end": 125
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_pytest_suite",
-          "line": 158,
-          "end": 207
+          "line": 160,
+          "end": 209
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "run_script_suite",
-          "line": 210,
-          "end": 237
+          "line": 212,
+          "end": 239
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9231,50 +9544,50 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult",
-          "line": 79,
-          "end": 103
+          "line": 81,
+          "end": 105
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.total",
-          "line": 92,
-          "end": 93
+          "line": 94,
+          "end": 95
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.success",
-          "line": 96,
-          "end": 98
+          "line": 98,
+          "end": 100
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "TestSuiteResult.counts_str",
-          "line": 100,
-          "end": 103
+          "line": 102,
+          "end": 105
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "parse_pytest_output",
-          "line": 126,
-          "end": 138
+          "line": 128,
+          "end": 140
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "parse_legacy_output",
-          "line": 141,
-          "end": 146
+          "line": 143,
+          "end": 148
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "_fill_counts",
-          "line": 149,
-          "end": 155
+          "line": 151,
+          "end": 157
         },
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "_print_suite_result",
-          "line": 590,
-          "end": 599
+          "line": 603,
+          "end": 612
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9293,8 +9606,8 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "find_unregistered_suites",
-          "line": 572,
-          "end": 587
+          "line": 585,
+          "end": 600
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -9313,8 +9626,8 @@
         {
           "file": "tests/scripts/run_all.py",
           "symbol": "main",
-          "line": 240,
-          "end": 566
+          "line": 242,
+          "end": 579
         }
       ],
       "inputs": "测试参数 / 合成输入 / 既有产物",
@@ -12281,6 +12594,30 @@
           "end": 175
         },
         {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_expected_captions_from_page_text_finds_missed_caption",
+          "line": 278,
+          "end": 296
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_merge_expected_captions_keeps_index_and_text_union",
+          "line": 299,
+          "end": 341
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_text_layer_caption_survives_inventory_gap_render",
+          "line": 348,
+          "end": 370
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_text_layer_caption_scan_skips_superscript_footnotes",
+          "line": 373,
+          "end": 390
+        },
+        {
           "file": "tests/scripts/test_structure_review_20260922.py",
           "symbol": "test_inventory_empty_placeholder_does_not_satisfy_expected",
           "line": 87,
@@ -12691,6 +13028,84 @@
           "symbol": "test_process_pdf_reuses_markdown_extraction",
           "line": 111,
           "end": 146
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_infer_heading_level_from_numbering",
+          "line": 124,
+          "end": 126
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_numbered_heading_levels_in_markdown_document",
+          "line": 129,
+          "end": 141
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_full_width_heading_before_left_column",
+          "line": 148,
+          "end": 157
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_cross_column_conversion_report_not_blind_ready",
+          "line": 160,
+          "end": 187
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_inline_bold_italic_preserved_in_gathered_text",
+          "line": 238,
+          "end": 255
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_tables_structure_help_mentions_placeholder",
+          "line": 262,
+          "end": 271
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_layout_model_bold_follows_flag_not_font_name",
+          "line": 427,
+          "end": 438
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_heading_detection_ignores_font_name_heuristics",
+          "line": 445,
+          "end": 456
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_inline_style_renders_exactly_the_source_text",
+          "line": 549,
+          "end": 558
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_strip_inline_markdown_restores_plain_text",
+          "line": 561,
+          "end": 573
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_bold_caption_keeps_plain_text_and_stays_matchable",
+          "line": 587,
+          "end": 600
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_bold_caption_figure_is_inserted_inline_not_appendix",
+          "line": 603,
+          "end": 625
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "test_rich_text_is_ignored_when_it_diverges_from_plain_text",
+          "line": 628,
+          "end": 653
         },
         {
           "file": "tests/scripts/test_pdf_to_markdown_cli.py",
@@ -13557,6 +13972,54 @@
           "end": 626
         },
         {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "_make_cross_column_pdf",
+          "line": 47,
+          "end": 73
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "_make_numbered_heading_pdf",
+          "line": 76,
+          "end": 92
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "_make_inline_style_pdf",
+          "line": 95,
+          "end": 105
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "_inline_runs",
+          "line": 194,
+          "end": 230
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "_squash",
+          "line": 233,
+          "end": 235
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "_single_line_block",
+          "line": 397,
+          "end": 404
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "blank_pdf",
+          "line": 408,
+          "end": 414
+        },
+        {
+          "file": "tests/scripts/test_markdown_structure_20261123.py",
+          "symbol": "_make_bold_caption_pdf",
+          "line": 576,
+          "end": 584
+        },
+        {
           "file": "tests/scripts/test_p0_env_priority.py",
           "symbol": "main",
           "line": 257,
@@ -14192,6 +14655,106 @@
       "key": "26/GitHub issue 回归保障",
       "scope": "testing",
       "id": "F26.037"
+    },
+    {
+      "group": "26",
+      "name": "BUG-154~160 安全与评测回归保障",
+      "description": "覆盖源 PDF 与输出同路径及符号/硬链接别名拒绝、日志路径源文件保护、输出别名互撞、共用资源目录归属清理、旋转页可见墨迹、无正文报告非 ready、显式 --below 不被裸题注纠正覆盖、摘要复用拒收目录、评测单文件 index.json 文档键回归。",
+      "refs": [
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "<module>",
+          "line": 1,
+          "end": 291
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "_make_two_figure_pdf",
+          "line": 31,
+          "end": 41
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "_index_items",
+          "line": 44,
+          "end": 45
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "_make_file_alias",
+          "line": 48,
+          "end": 52
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug154_rejects_out_path_equal_to_source_pdf",
+          "line": 55,
+          "end": 69
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug154_rejects_file_aliases_to_source_pdf",
+          "line": 74,
+          "end": 99
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug154_extract_rejects_log_path_equal_to_source_pdf",
+          "line": 103,
+          "end": 119
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug154_rejects_outputs_aliased_to_same_file",
+          "line": 123,
+          "end": 139
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug155_shared_asset_dir_does_not_prune_other_doc_images",
+          "line": 142,
+          "end": 168
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug156_rotated_page_crops_have_visible_ink",
+          "line": 171,
+          "end": 192
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug157_scan_only_pdf_report_is_not_ready",
+          "line": 195,
+          "end": 221
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug158_explicit_below_not_overridden_by_bare_correction",
+          "line": 224,
+          "end": 249
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug159_reuse_existing_rejects_directory_text_path",
+          "line": 252,
+          "end": 271
+        },
+        {
+          "file": "tests/scripts/test_bugfix_20261123.py",
+          "symbol": "test_bug160_find_pred_files_single_index_uses_document_id",
+          "line": 274,
+          "end": 291
+        }
+      ],
+      "inputs": "合成 PDF、临时目录、正式 index.json 路径",
+      "outputs": "pytest 断言",
+      "mode": "默认",
+      "depends": [
+        "F26.004"
+      ],
+      "key": "26/BUG-154~160 安全与评测回归保障",
+      "scope": "testing",
+      "id": "F26.038"
     }
   ],
   "source_coverage": [
@@ -14223,7 +14786,7 @@
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 705,
+      "end": 724,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -14245,31 +14808,7 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "configure_logging",
-      "line": 55,
-      "end": 60,
-      "kind": "function",
-      "ancestors": [],
-      "ids": [
-        "F23.013"
-      ],
-      "mapping": "直接引用"
-    },
-    {
-      "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
-      "symbol": "get_logger",
-      "line": 62,
-      "end": 63,
-      "kind": "function",
-      "ancestors": [],
-      "ids": [
-        "F23.013"
-      ],
-      "mapping": "直接引用"
-    },
-    {
-      "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
-      "symbol": "log_event",
-      "line": 65,
+      "line": 61,
       "end": 66,
       "kind": "function",
       "ancestors": [],
@@ -14280,9 +14819,33 @@
     },
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
+      "symbol": "get_logger",
+      "line": 68,
+      "end": 69,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F23.013"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
+      "symbol": "log_event",
+      "line": 71,
+      "end": 72,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F23.013"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "build_parser_modular",
-      "line": 92,
-      "end": 247,
+      "line": 98,
+      "end": 253,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14293,8 +14856,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "parse_args_modular",
-      "line": 250,
-      "end": 260,
+      "line": 256,
+      "end": 266,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14305,8 +14868,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "main_modular",
-      "line": 263,
-      "end": 669,
+      "line": 269,
+      "end": 688,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14326,8 +14889,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "main_modular._caption_candidates_for_pairing",
-      "line": 486,
-      "end": 499,
+      "line": 496,
+      "end": 509,
       "kind": "function",
       "ancestors": [
         "main_modular"
@@ -14349,8 +14912,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "parse_args",
-      "line": 690,
-      "end": 694,
+      "line": 709,
+      "end": 713,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14361,8 +14924,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "main",
-      "line": 697,
-      "end": 701,
+      "line": 716,
+      "end": 720,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14374,7 +14937,7 @@
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 830,
+      "end": 905,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -14399,7 +14962,7 @@
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "parse_args",
       "line": 25,
-      "end": 40,
+      "end": 54,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14411,8 +14974,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_resolve_outputs",
-      "line": 43,
-      "end": 65,
+      "line": 57,
+      "end": 79,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14423,8 +14986,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_paragraphs_to_document",
-      "line": 68,
-      "end": 104,
+      "line": 82,
+      "end": 133,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14435,8 +14998,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_filter_assets_by_mode",
-      "line": 107,
-      "end": 113,
+      "line": 150,
+      "end": 156,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14447,8 +15010,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_split_assets_for_markdown",
-      "line": 116,
-      "end": 150,
+      "line": 159,
+      "end": 193,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14459,8 +15022,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_run_asset_extraction",
-      "line": 153,
-      "end": 188,
+      "line": 196,
+      "end": 231,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14472,8 +15035,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_caption_ident_for_kind",
-      "line": 191,
-      "end": 212,
+      "line": 234,
+      "end": 255,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14484,8 +15047,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_make_image_block",
-      "line": 215,
-      "end": 236,
+      "line": 258,
+      "end": 279,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14496,8 +15059,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_asset_kind_matches_text",
-      "line": 239,
-      "end": 248,
+      "line": 282,
+      "end": 291,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14508,8 +15071,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_block_is_caption_for_asset",
-      "line": 251,
-      "end": 276,
+      "line": 294,
+      "end": 319,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14520,8 +15083,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_content_is_above_caption",
-      "line": 279,
-      "end": 284,
+      "line": 322,
+      "end": 327,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14532,8 +15095,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_append_asset_section",
-      "line": 287,
-      "end": 297,
+      "line": 330,
+      "end": 340,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14544,8 +15107,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_place_assets_in_document",
-      "line": 485,
-      "end": 573,
+      "line": 528,
+      "end": 616,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14556,8 +15119,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "main",
-      "line": 684,
-      "end": 826,
+      "line": 727,
+      "end": 901,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14620,7 +15183,7 @@
       "file": "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 126,
+      "end": 137,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -14647,7 +15210,7 @@
       "file": "skills/pdf-markdown-summary/scripts/core/summarize_pdf.py",
       "symbol": "main",
       "line": 37,
-      "end": 122,
+      "end": 133,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14674,7 +15237,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/__init__.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 304,
+      "end": 312,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -14787,7 +15350,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 669,
+      "end": 769,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -14814,7 +15377,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "AssessmentInput",
       "line": 33,
-      "end": 46,
+      "end": 47,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -14825,8 +15388,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "AssessmentResult",
-      "line": 50,
-      "end": 55,
+      "line": 51,
+      "end": 56,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -14837,8 +15400,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "ExpectedCaption",
-      "line": 59,
-      "end": 65,
+      "line": 60,
+      "end": 66,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -14849,8 +15412,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "InventoryReport",
-      "line": 69,
-      "end": 88,
+      "line": 70,
+      "end": 89,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -14861,8 +15424,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "InventoryReport.to_dict",
-      "line": 75,
-      "end": 88,
+      "line": 76,
+      "end": 89,
       "kind": "function",
       "ancestors": [
         "InventoryReport"
@@ -14875,8 +15438,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "markdown_insertable",
-      "line": 91,
-      "end": 105,
+      "line": 92,
+      "end": 106,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14887,8 +15450,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "assess_extraction",
-      "line": 108,
-      "end": 158,
+      "line": 109,
+      "end": 162,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14899,8 +15462,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "apply_assessment",
-      "line": 161,
-      "end": 167,
+      "line": 165,
+      "end": 171,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14911,8 +15474,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "expected_captions_from_index",
-      "line": 170,
-      "end": 195,
+      "line": 174,
+      "end": 199,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14923,8 +15486,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "_record_key",
-      "line": 198,
-      "end": 199,
+      "line": 295,
+      "end": 296,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14935,8 +15498,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "reconcile_inventory",
-      "line": 202,
-      "end": 226,
+      "line": 299,
+      "end": 323,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14947,8 +15510,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "_sequence_gaps",
-      "line": 229,
-      "end": 246,
+      "line": 326,
+      "end": 343,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14959,8 +15522,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "_file_digest",
-      "line": 249,
-      "end": 256,
+      "line": 346,
+      "end": 353,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14971,8 +15534,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "_bbox_overlap_ratio",
-      "line": 259,
-      "end": 271,
+      "line": 356,
+      "end": 368,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14983,8 +15546,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "mark_cross_kind_overlaps",
-      "line": 274,
-      "end": 313,
+      "line": 371,
+      "end": 410,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -14995,8 +15558,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "mark_duplicate_png_records",
-      "line": 316,
-      "end": 336,
+      "line": 413,
+      "end": 433,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15007,8 +15570,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "apply_unexpected_rejects",
-      "line": 339,
-      "end": 353,
+      "line": 436,
+      "end": 450,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15019,8 +15582,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "_outside_bands",
-      "line": 356,
-      "end": 384,
+      "line": 453,
+      "end": 481,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15031,8 +15594,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "objects_truncated_on_far_side",
-      "line": 387,
-      "end": 456,
+      "line": 484,
+      "end": 553,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15043,8 +15606,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "objects_truncated_on_far_side.lost_outside",
-      "line": 417,
-      "end": 420,
+      "line": 514,
+      "end": 517,
       "kind": "function",
       "ancestors": [
         "objects_truncated_on_far_side"
@@ -15057,8 +15620,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "text_crosses_clip_boundary",
-      "line": 459,
-      "end": 479,
+      "line": 556,
+      "end": 576,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15069,8 +15632,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "select_index_candidate",
-      "line": 485,
-      "end": 502,
+      "line": 582,
+      "end": 599,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15081,8 +15644,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "finalize_caption_inventory",
-      "line": 505,
-      "end": 606,
+      "line": 602,
+      "end": 706,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15095,8 +15658,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "finalize_caption_inventory._figure_in_range",
-      "line": 544,
-      "end": 554,
+      "line": 644,
+      "end": 654,
       "kind": "function",
       "ancestors": [
         "finalize_caption_inventory"
@@ -15111,8 +15674,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "gap_clip_from_caption",
-      "line": 609,
-      "end": 617,
+      "line": 709,
+      "end": 717,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -15123,8 +15686,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
       "symbol": "render_inventory_gap",
-      "line": 620,
-      "end": 669,
+      "line": 720,
+      "end": 769,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -16598,7 +17161,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 949,
+      "end": 957,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -16623,7 +17186,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/extract_figures.py",
       "symbol": "extract_figures",
       "line": 103,
-      "end": 941,
+      "end": 949,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -17916,7 +18479,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 102,
+      "end": 108,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -17931,7 +18494,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "MarkdownBlock",
       "line": 13,
-      "end": 33,
+      "end": 37,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -17942,8 +18505,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "MarkdownBlock.to_dict",
-      "line": 24,
-      "end": 33,
+      "line": 27,
+      "end": 37,
       "kind": "function",
       "ancestors": [
         "MarkdownBlock"
@@ -17956,8 +18519,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "MarkdownDocument",
-      "line": 37,
-      "end": 51,
+      "line": 41,
+      "end": 55,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -17968,8 +18531,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "MarkdownDocument.to_dict",
-      "line": 45,
-      "end": 51,
+      "line": 49,
+      "end": 55,
       "kind": "function",
       "ancestors": [
         "MarkdownDocument"
@@ -17982,8 +18545,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "render_block",
-      "line": 54,
-      "end": 78,
+      "line": 58,
+      "end": 84,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -17996,8 +18559,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "render_markdown",
-      "line": 81,
-      "end": 88,
+      "line": 87,
+      "end": 94,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18008,8 +18571,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/markdown.py",
       "symbol": "render_blocks",
-      "line": 91,
-      "end": 93,
+      "line": 97,
+      "end": 99,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18045,7 +18608,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 544,
+      "end": 576,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -18263,7 +18826,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "DocumentLayoutModel",
       "line": 344,
-      "end": 428,
+      "end": 444,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -18275,7 +18838,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "DocumentLayoutModel.to_dict",
       "line": 380,
-      "end": 428,
+      "end": 444,
       "kind": "function",
       "ancestors": [
         "DocumentLayoutModel"
@@ -18288,8 +18851,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "GatheredParagraph",
-      "line": 436,
-      "end": 449,
+      "line": 452,
+      "end": 477,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -18300,8 +18863,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "GatheredText",
-      "line": 453,
-      "end": 468,
+      "line": 481,
+      "end": 500,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -18312,8 +18875,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "FigureMention",
-      "line": 476,
-      "end": 487,
+      "line": 508,
+      "end": 519,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -18324,8 +18887,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "FigureContext",
-      "line": 491,
-      "end": 506,
+      "line": 523,
+      "end": 538,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -18336,8 +18899,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "DebugStageInfo",
-      "line": 514,
-      "end": 527,
+      "line": 546,
+      "end": 559,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -18348,8 +18911,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/models.py",
       "symbol": "AcceptanceThresholds",
-      "line": 531,
-      "end": 544,
+      "line": 563,
+      "end": 576,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -18481,7 +19044,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 478,
+      "end": 570,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -18510,8 +19073,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "write_manifest",
-      "line": 113,
-      "end": 143,
+      "line": 148,
+      "end": 178,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18522,8 +19085,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "load_index_json_items",
-      "line": 150,
-      "end": 179,
+      "line": 185,
+      "end": 214,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18534,8 +19097,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "snapshot_prunable_images",
-      "line": 182,
-      "end": 196,
+      "line": 217,
+      "end": 231,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18546,8 +19109,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "prune_unindexed_images",
-      "line": 199,
-      "end": 252,
+      "line": 284,
+      "end": 344,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18558,8 +19121,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "get_unique_path",
-      "line": 259,
-      "end": 284,
+      "line": 351,
+      "end": 376,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18571,8 +19134,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "get_run_id",
-      "line": 295,
-      "end": 300,
+      "line": 387,
+      "end": 392,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18583,8 +19146,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "set_run_id",
-      "line": 303,
-      "end": 306,
+      "line": 395,
+      "end": 398,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18595,8 +19158,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "write_index_json",
-      "line": 309,
-      "end": 470,
+      "line": 401,
+      "end": 562,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -18910,7 +19473,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 497,
+      "end": 505,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -19266,7 +19829,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "open_pdf",
       "line": 283,
-      "end": 312,
+      "end": 320,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19277,8 +19840,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "managed_pdf_document",
-      "line": 315,
-      "end": 322,
+      "line": 323,
+      "end": 330,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19289,8 +19852,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "managed_pdf_document.wrapper",
-      "line": 318,
-      "end": 320,
+      "line": 326,
+      "end": 328,
       "kind": "function",
       "ancestors": [
         "managed_pdf_document"
@@ -19303,8 +19866,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "try_extract_tables_with_pdfplumber",
-      "line": 329,
-      "end": 379,
+      "line": 337,
+      "end": 387,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19315,8 +19878,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "try_debug_tablefinder_with_pdfplumber",
-      "line": 382,
-      "end": 424,
+      "line": 390,
+      "end": 432,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19327,8 +19890,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "rect_to_list",
-      "line": 431,
-      "end": 442,
+      "line": 439,
+      "end": 450,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19339,8 +19902,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "create_rect",
-      "line": 445,
-      "end": 458,
+      "line": 453,
+      "end": 466,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19351,8 +19914,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "intersect_rects",
-      "line": 461,
-      "end": 471,
+      "line": 469,
+      "end": 479,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19363,8 +19926,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "union_rects",
-      "line": 474,
-      "end": 484,
+      "line": 482,
+      "end": 492,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -19375,8 +19938,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/pdf_backend.py",
       "symbol": "is_rect_empty",
-      "line": 487,
-      "end": 497,
+      "line": 495,
+      "end": 505,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -21610,7 +22173,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 697,
+      "end": 1121,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -21635,8 +22198,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
       "symbol": "looks_like_structural_heading",
-      "line": 77,
-      "end": 117,
+      "line": 79,
+      "end": 119,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -21647,8 +22210,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
       "symbol": "try_extract_text",
-      "line": 124,
-      "end": 153,
+      "line": 524,
+      "end": 553,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -21659,8 +22222,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
       "symbol": "pre_validate_pdf",
-      "line": 160,
-      "end": 293,
+      "line": 560,
+      "end": 693,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -21674,8 +22237,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
       "symbol": "gather_structured_text",
-      "line": 301,
-      "end": 470,
+      "line": 701,
+      "end": 892,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -21691,8 +22254,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
       "symbol": "extract_text_with_format",
-      "line": 487,
-      "end": 649,
+      "line": 909,
+      "end": 1073,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -21706,8 +22269,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
       "symbol": "_estimate_typical_metrics",
-      "line": 652,
-      "end": 697,
+      "line": 1076,
+      "end": 1121,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22142,7 +22705,7 @@
       "file": "tests/scripts/run_all.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 603,
+      "end": 616,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -22156,8 +22719,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult",
-      "line": 79,
-      "end": 103,
+      "line": 81,
+      "end": 105,
       "kind": "class",
       "ancestors": [],
       "ids": [
@@ -22168,8 +22731,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.total",
-      "line": 92,
-      "end": 93,
+      "line": 94,
+      "end": 95,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -22182,8 +22745,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.success",
-      "line": 96,
-      "end": 98,
+      "line": 98,
+      "end": 100,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -22196,8 +22759,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "TestSuiteResult.counts_str",
-      "line": 100,
-      "end": 103,
+      "line": 102,
+      "end": 105,
       "kind": "function",
       "ancestors": [
         "TestSuiteResult"
@@ -22210,8 +22773,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_command",
-      "line": 106,
-      "end": 123,
+      "line": 108,
+      "end": 125,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22222,8 +22785,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "parse_pytest_output",
-      "line": 126,
-      "end": 138,
+      "line": 128,
+      "end": 140,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22234,8 +22797,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "parse_legacy_output",
-      "line": 141,
-      "end": 146,
+      "line": 143,
+      "end": 148,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22246,8 +22809,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "_fill_counts",
-      "line": 149,
-      "end": 155,
+      "line": 151,
+      "end": 157,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22258,8 +22821,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_pytest_suite",
-      "line": 158,
-      "end": 207,
+      "line": 160,
+      "end": 209,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22270,8 +22833,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "run_script_suite",
-      "line": 210,
-      "end": 237,
+      "line": 212,
+      "end": 239,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22282,8 +22845,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "main",
-      "line": 240,
-      "end": 566,
+      "line": 242,
+      "end": 579,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22294,8 +22857,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "find_unregistered_suites",
-      "line": 572,
-      "end": 587,
+      "line": 585,
+      "end": 600,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -22306,8 +22869,8 @@
     {
       "file": "tests/scripts/run_all.py",
       "symbol": "_print_suite_result",
-      "line": 590,
-      "end": 599,
+      "line": 603,
+      "end": 612,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -29490,7 +30053,7 @@
       "file": "tests/eval/run_eval.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 206,
+      "end": 214,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -29529,8 +30092,8 @@
     {
       "file": "tests/eval/run_eval.py",
       "symbol": "find_pred_files",
-      "line": 54,
-      "end": 70,
+      "line": 61,
+      "end": 78,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -29541,8 +30104,8 @@
     {
       "file": "tests/eval/run_eval.py",
       "symbol": "load_gt",
-      "line": 73,
-      "end": 76,
+      "line": 81,
+      "end": 84,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -29553,8 +30116,8 @@
     {
       "file": "tests/eval/run_eval.py",
       "symbol": "load_preds",
-      "line": 79,
-      "end": 87,
+      "line": 87,
+      "end": 95,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -29565,8 +30128,8 @@
     {
       "file": "tests/eval/run_eval.py",
       "symbol": "make_lines_provider",
-      "line": 90,
-      "end": 115,
+      "line": 98,
+      "end": 123,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -29577,8 +30140,8 @@
     {
       "file": "tests/eval/run_eval.py",
       "symbol": "make_lines_provider.provider",
-      "line": 97,
-      "end": 113,
+      "line": 105,
+      "end": 121,
       "kind": "function",
       "ancestors": [
         "make_lines_provider"
@@ -29591,8 +30154,8 @@
     {
       "file": "tests/eval/run_eval.py",
       "symbol": "main",
-      "line": 118,
-      "end": 202,
+      "line": 126,
+      "end": 210,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -29604,7 +30167,7 @@
       "file": "tests/eval/selfcheck.py",
       "symbol": "<module>",
       "line": 1,
-      "end": 264,
+      "end": 270,
       "kind": "module",
       "ancestors": [],
       "ids": [
@@ -29628,7 +30191,7 @@
       "file": "tests/eval/selfcheck.py",
       "symbol": "main",
       "line": 47,
-      "end": 260,
+      "end": 266,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -31441,8 +32004,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_blocks_covered_by_assets",
-      "line": 300,
-      "end": 340,
+      "line": 343,
+      "end": 383,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -31454,8 +32017,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_annotate_and_persist_embed_status",
-      "line": 576,
-      "end": 602,
+      "line": 619,
+      "end": 645,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -31466,8 +32029,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_persist_embed_status_to_index",
-      "line": 605,
-      "end": 659,
+      "line": 648,
+      "end": 702,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -31478,8 +32041,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_persist_embed_status_to_index.key_of",
-      "line": 616,
-      "end": 622,
+      "line": 659,
+      "end": 665,
       "kind": "function",
       "ancestors": [
         "_persist_embed_status_to_index"
@@ -31492,8 +32055,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_summarize_embed_status",
-      "line": 662,
-      "end": 681,
+      "line": 705,
+      "end": 724,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -32533,8 +33096,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "_positive_int",
-      "line": 72,
-      "end": 77,
+      "line": 78,
+      "end": 83,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -32545,8 +33108,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/extract_pdf_assets.py",
       "symbol": "_positive_float",
-      "line": 80,
-      "end": 89,
+      "line": 86,
+      "end": 95,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -32557,8 +33120,8 @@
     {
       "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
       "symbol": "_preserve_equation_regions",
-      "line": 343,
-      "end": 482,
+      "line": 386,
+      "end": 525,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -32598,7 +33161,7 @@
       "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
       "symbol": "validate_output_targets",
       "line": 82,
-      "end": 111,
+      "end": 146,
       "kind": "function",
       "ancestors": [],
       "ids": [
@@ -33668,6 +34231,756 @@
       "ancestors": [],
       "ids": [
         "F26.037"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
+      "symbol": "_pdf_content_hash16",
+      "line": 234,
+      "end": 243,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F22.008"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/output.py",
+      "symbol": "load_owned_prunable_images",
+      "line": 246,
+      "end": 281,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F22.008"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/eval/run_eval.py",
+      "symbol": "_pred_doc_key_from_file",
+      "line": 54,
+      "end": 58,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F25.019"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "<module>",
+      "line": 1,
+      "end": 291,
+      "kind": "module",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "所在文件的功能归属（不是独立功能）"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "_make_two_figure_pdf",
+      "line": 31,
+      "end": 41,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "_index_items",
+      "line": 44,
+      "end": 45,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug154_rejects_out_path_equal_to_source_pdf",
+      "line": 55,
+      "end": 69,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug155_shared_asset_dir_does_not_prune_other_doc_images",
+      "line": 142,
+      "end": 168,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug156_rotated_page_crops_have_visible_ink",
+      "line": 171,
+      "end": 192,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug157_scan_only_pdf_report_is_not_ready",
+      "line": 195,
+      "end": 221,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug158_explicit_below_not_overridden_by_bare_correction",
+      "line": 224,
+      "end": 249,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug159_reuse_existing_rejects_directory_text_path",
+      "line": 252,
+      "end": 271,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug160_find_pred_files_single_index_uses_document_id",
+      "line": 274,
+      "end": 291,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "_make_file_alias",
+      "line": 48,
+      "end": 52,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug154_rejects_file_aliases_to_source_pdf",
+      "line": 74,
+      "end": 99,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug154_extract_rejects_log_path_equal_to_source_pdf",
+      "line": 103,
+      "end": 119,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_bugfix_20261123.py",
+      "symbol": "test_bug154_rejects_outputs_aliased_to_same_file",
+      "line": 123,
+      "end": 139,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.038"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
+      "symbol": "expected_captions_from_page_text",
+      "line": 202,
+      "end": 276,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F17.011"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/assess.py",
+      "symbol": "merge_expected_captions",
+      "line": 279,
+      "end": 292,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F17.002",
+        "F17.012"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "infer_heading_level",
+      "line": 128,
+      "end": 161,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.017"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "_span_is_bold",
+      "line": 174,
+      "end": 180,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.009",
+        "F05.015",
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "_span_is_italic",
+      "line": 183,
+      "end": 189,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "format_spans_as_markdown",
+      "line": 274,
+      "end": 348,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "plain_text_from_lines",
+      "line": 351,
+      "end": 358,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.016"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "rich_text_from_lines",
+      "line": 361,
+      "end": 368,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "iter_native_text_blocks",
+      "line": 371,
+      "end": 402,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.016"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "classify_block_column",
+      "line": 405,
+      "end": 422,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.008"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "sort_paragraphs_reading_order",
+      "line": 425,
+      "end": 472,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.008"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "collect_structure_warnings",
+      "line": 475,
+      "end": 517,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.019"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "<module>",
+      "line": 1,
+      "end": 653,
+      "kind": "module",
+      "ancestors": [],
+      "ids": [
+        "F26.028",
+        "F26.030",
+        "F26.036"
+      ],
+      "mapping": "所在文件的功能归属（不是独立功能）"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "_make_cross_column_pdf",
+      "line": 47,
+      "end": 73,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "_make_numbered_heading_pdf",
+      "line": 76,
+      "end": 92,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "_make_inline_style_pdf",
+      "line": 95,
+      "end": 105,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_infer_heading_level_from_numbering",
+      "line": 124,
+      "end": 126,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_numbered_heading_levels_in_markdown_document",
+      "line": 129,
+      "end": 141,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_full_width_heading_before_left_column",
+      "line": 148,
+      "end": 157,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_cross_column_conversion_report_not_blind_ready",
+      "line": 160,
+      "end": 187,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_inline_bold_italic_preserved_in_gathered_text",
+      "line": 238,
+      "end": 255,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_tables_structure_help_mentions_placeholder",
+      "line": 262,
+      "end": 271,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_expected_captions_from_page_text_finds_missed_caption",
+      "line": 278,
+      "end": 296,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.028"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_merge_expected_captions_keeps_index_and_text_union",
+      "line": 299,
+      "end": 341,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.028"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/core/pdf_to_markdown.py",
+      "symbol": "_inline_rich_text",
+      "line": 136,
+      "end": 147,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F21.003"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "_span_has_bold_flag",
+      "line": 164,
+      "end": 171,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.009",
+        "F05.015"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "_ends_with_odd_backslashes",
+      "line": 195,
+      "end": 201,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "_char_class",
+      "line": 204,
+      "end": 218,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "_star_marker_is_unambiguous",
+      "line": 221,
+      "end": 239,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "_trailing_marker_char_needs_escape",
+      "line": 242,
+      "end": 246,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "skills/pdf-markdown-summary/scripts/lib/text_extract.py",
+      "symbol": "strip_inline_markdown",
+      "line": 249,
+      "end": 271,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F05.018"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "_inline_runs",
+      "line": 194,
+      "end": 230,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "_squash",
+      "line": 233,
+      "end": 235,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_text_layer_caption_survives_inventory_gap_render",
+      "line": 348,
+      "end": 370,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.028"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_text_layer_caption_scan_skips_superscript_footnotes",
+      "line": 373,
+      "end": 390,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.028"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "_single_line_block",
+      "line": 397,
+      "end": 404,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "blank_pdf",
+      "line": 408,
+      "end": 414,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_layout_model_bold_follows_flag_not_font_name",
+      "line": 427,
+      "end": 438,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_heading_detection_ignores_font_name_heuristics",
+      "line": 445,
+      "end": 456,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_inline_style_renders_exactly_the_source_text",
+      "line": 549,
+      "end": 558,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_strip_inline_markdown_restores_plain_text",
+      "line": 561,
+      "end": 573,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "_make_bold_caption_pdf",
+      "line": 576,
+      "end": 584,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.036"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_bold_caption_keeps_plain_text_and_stays_matchable",
+      "line": 587,
+      "end": 600,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_bold_caption_figure_is_inserted_inline_not_appendix",
+      "line": 603,
+      "end": 625,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
+      ],
+      "mapping": "直接引用"
+    },
+    {
+      "file": "tests/scripts/test_markdown_structure_20261123.py",
+      "symbol": "test_rich_text_is_ignored_when_it_diverges_from_plain_text",
+      "line": 628,
+      "end": 653,
+      "kind": "function",
+      "ancestors": [],
+      "ids": [
+        "F26.030"
       ],
       "mapping": "直接引用"
     }

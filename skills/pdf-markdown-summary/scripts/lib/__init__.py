@@ -146,6 +146,8 @@ from .direction import (
 from .text_extract import (
     extract_text_with_format,
     gather_structured_text,
+    infer_heading_level,
+    iter_native_text_blocks,
     pre_validate_pdf,
     try_extract_text,
 )
@@ -188,7 +190,9 @@ from .assess import (
     markdown_insertable,
     assess_extraction,
     expected_captions_from_index,
+    expected_captions_from_page_text,
     finalize_caption_inventory,
+    merge_expected_captions,
 )
 
 __all__ = [
@@ -287,6 +291,8 @@ __all__ = [
     # text_extract
     "extract_text_with_format",
     "gather_structured_text",
+    "infer_heading_level",
+    "iter_native_text_blocks",
     "pre_validate_pdf",
     "try_extract_text",
     # figure_contexts
@@ -300,5 +306,7 @@ __all__ = [
     "markdown_insertable",
     "assess_extraction",
     "expected_captions_from_index",
+    "expected_captions_from_page_text",
     "finalize_caption_inventory",
+    "merge_expected_captions",
 ]

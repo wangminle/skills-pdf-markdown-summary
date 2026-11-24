@@ -309,6 +309,14 @@ def open_pdf(pdf_path: Union[str, Path]) -> PDFDocument:
     except Exception as e:
         raise RuntimeError(f"Failed to open PDF: {path_str}") from e
 
+    # 旋转页上 get_text/get_drawings 返回 MediaBox（未旋转）坐标，而
+    # get_pixmap(clip=...) 使用 page.rect（旋转后）坐标，直接裁剪会得到纯白图。
+    # 打开时去掉 /Rotate，统一到内容坐标系，文本、对象、渲染与评估一致。
+    for page_index in range(raw_doc.page_count):
+        page = raw_doc[page_index]
+        if page.rotation:
+            page.set_rotation(0)
+
     return PDFDocument(raw=raw_doc, path=path_str)
 
 

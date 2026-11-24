@@ -70,6 +70,10 @@ design/_build/
 __pypackages__/
 cython_debug/
 
+# 任务台账的运行时产物（不入库）：锁文件、ZSpace/Syncthing 同步冲突副本
+task-list.md.lock
+task-list.sync-conflict-*.md
+
 # 测试运行产物（不上传 GitHub）
 # 注意：不要忽略整个 tests/ —— 下列内容应保留可提交：
 #   tests/scripts/          pytest

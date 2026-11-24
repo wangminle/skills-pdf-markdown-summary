@@ -44,6 +44,7 @@ class AssessmentInput:
     duplicate_png: bool = False
     weak_anchor: bool = False
     extra_whitespace: bool = False
+    blank_render: bool = False
 
 
 @dataclass
@@ -114,6 +115,9 @@ def assess_extraction(inp: AssessmentInput) -> AssessmentResult:
         status = STATUS_REJECTED
     elif inp.text_pollution:
         warnings.append("text_pollution")
+        status = STATUS_REJECTED
+    elif inp.blank_render:
+        warnings.append("blank_render")
         status = STATUS_REJECTED
     else:
         if inp.duplicate_png:
@@ -193,6 +197,99 @@ def expected_captions_from_index(index: CaptionIndex) -> List[ExpectedCaption]:
             )
     expected.sort(key=lambda item: (item.kind, item.page, item.ident))
     return expected
+
+
+def expected_captions_from_page_text(doc: Any) -> List[ExpectedCaption]:
+    """从页面文本层独立扫描题注期望，不依赖识别器评分索引。
+
+    识别器从未入选的题注仍可进入对账；正文引用仍由
+    ``is_caption_anchor_candidate`` / ``is_caption_reference`` 过滤。
+    """
+    from .idents import (
+        extract_figure_ident,
+        extract_table_ident,
+        line_text_skip_superscript,
+    )
+    from .pdf_backend import create_rect
+
+    expected: List[ExpectedCaption] = []
+    seen: Set[Tuple[str, str, int]] = set()
+    page_count = len(doc)
+    for pno in range(page_count):
+        page = doc[pno]
+        page_dict = page.get_text("dict") if hasattr(page, "get_text") else page.raw.get_text("dict")
+        for block_idx, block in enumerate(page_dict.get("blocks", [])):
+            if block.get("type") != 0:
+                continue
+            for line_idx, line in enumerate(block.get("lines", []) or []):
+                spans = line.get("spans", []) or []
+                # 与识别器同口径：剔除上角标 span，否则表体行的脚注编号会与
+                # 标签词融合成 "Table2" 被当成题注
+                text = line_text_skip_superscript(spans).strip()
+                if not text:
+                    continue
+                for kind, pattern, extract in (
+                    ("figure", FIGURE_LINE_RE, extract_figure_ident),
+                    ("table", TABLE_LINE_RE, extract_table_ident),
+                ):
+                    match = pattern.match(text)
+                    if not match:
+                        continue
+                    if not is_caption_anchor_candidate(text):
+                        continue
+                    if is_caption_reference(text, block, pattern):
+                        continue
+                    try:
+                        ident = str(extract(match))
+                    except Exception:
+                        continue
+                    page_1based = pno + 1
+                    key = (kind, ident, page_1based)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    bbox = line.get("bbox") or block.get("bbox") or (0, 0, 0, 0)
+                    # 下游 render_inventory_gap / gap_clip_from_caption 按 Rect 取 y0/y1
+                    candidate = CaptionCandidate(
+                        rect=create_rect(*bbox),
+                        text=text,
+                        number=ident,
+                        kind=kind,
+                        page=pno,
+                        block_idx=block_idx,
+                        line_idx=line_idx,
+                        spans=list(spans),
+                        block=block,
+                        score=50.0,
+                    )
+                    expected.append(
+                        ExpectedCaption(
+                            kind=kind,
+                            ident=ident,
+                            page=page_1based,
+                            text=text,
+                            score=50.0,
+                            candidate=candidate,
+                        )
+                    )
+    expected.sort(key=lambda item: (item.kind, item.page, item.ident))
+    return expected
+
+
+def merge_expected_captions(
+    *groups: Sequence[ExpectedCaption],
+) -> List[ExpectedCaption]:
+    """合并多路题注期望；同 (kind, ident, page) 保留较高分。"""
+    best: Dict[Tuple[str, str, int], ExpectedCaption] = {}
+    for group in groups:
+        for item in group or []:
+            key = (item.kind, str(item.ident), int(item.page))
+            prev = best.get(key)
+            if prev is None or float(item.score) > float(prev.score):
+                best[key] = item
+    merged = list(best.values())
+    merged.sort(key=lambda item: (item.kind, item.page, item.ident))
+    return merged
 
 
 def _record_key(kind: str, ident: str, page: int) -> Tuple[str, str, int]:
@@ -534,7 +631,10 @@ def finalize_caption_inventory(
     doc = fitz.open(pdf_path)
     try:
         index = build_caption_index(doc)
-        expected = expected_captions_from_index(index)
+        index_expected = expected_captions_from_index(index)
+        # 文本层独立扫描：识别器索引从未收录的题注仍进入对账
+        text_expected = expected_captions_from_page_text(doc)
+        expected = merge_expected_captions(index_expected, text_expected)
         if kinds is not None:
             expected = [item for item in expected if item.kind in kinds]
         if min_figure is not None or max_figure is not None:

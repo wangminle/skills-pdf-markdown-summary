@@ -32,9 +32,23 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
                         help="Image asset directory; relative paths resolve next to the Markdown output file (--out out/paper.md --asset-dir assets -> out/assets/), absolute paths are used as-is")
     parser.add_argument("--report-json", default=None, help="Output conversion report JSON")
     parser.add_argument("--blocks-json", default=None, help="Output Markdown blocks JSON")
-    parser.add_argument("--tables", choices=["off", "auto", "screenshot", "structure"], default="off")
+    parser.add_argument(
+        "--tables",
+        choices=["off", "auto", "screenshot", "structure"],
+        default="off",
+        help=(
+            "Table handling: off / auto / screenshot / structure. "
+            "auto, screenshot, and structure currently all export table screenshots; "
+            "structure is a roadmap placeholder (not yet implemented)"
+        ),
+    )
     parser.add_argument("--images", choices=["off", "figures"], default="figures")
-    parser.add_argument("--ocr", choices=["off", "auto", "force"], default="off")
+    parser.add_argument(
+        "--ocr",
+        choices=["off", "auto", "force"],
+        default="off",
+        help="OCR mode (currently a no-op placeholder; recorded as not_implemented when not off)",
+    )
     parser.add_argument("--preset", default="robust", choices=["robust"], help="Asset extraction preset")
     parser.add_argument("--allow-continued", action="store_true", default=False, help="Allow repeated-caption continuation items; structurally matched captionless table pages are recovered automatically")
     return parser.parse_args(argv)
@@ -84,13 +98,25 @@ def _paragraphs_to_document(pdf_path: str, title: str, validation=None):
         if not text:
             continue
 
+        meta = {
+            "bbox": list(paragraph.bbox),
+            "column": getattr(paragraph, "column", -1),
+            "is_full_width": getattr(paragraph, "is_full_width", False),
+            "font_size": getattr(paragraph, "font_size", 0.0),
+        }
         if getattr(paragraph, "is_heading", False):
-            blocks.append(MarkdownBlock(type="heading", text=text, level=2, page=paragraph.page,
-                                        meta={"bbox": list(paragraph.bbox)}))
+            level = int(getattr(paragraph, "heading_level", 0) or 0) or 2
+            level = min(max(level, 1), 6)
+            blocks.append(MarkdownBlock(
+                type="heading", text=text, level=level, page=paragraph.page, meta=meta,
+            ))
         else:
-            blocks.append(MarkdownBlock(type="paragraph", text=text, page=paragraph.page,
-                                        meta={"bbox": list(paragraph.bbox)}))
+            blocks.append(MarkdownBlock(
+                type="paragraph", text=text, page=paragraph.page, meta=meta,
+                rich_text=_inline_rich_text(paragraph, text),
+            ))
 
+    structure_warnings = list(getattr(gathered, "structure_warnings", None) or [])
     return MarkdownDocument(
         title=title,
         source_pdf=os.path.basename(pdf_path),
@@ -100,8 +126,25 @@ def _paragraphs_to_document(pdf_path: str, title: str, validation=None):
             "text_layer_ratio": validation.text_layer_ratio,
             "has_text_layer": validation.has_text_layer,
             "warnings": validation.warnings,
+            "structure_warnings": structure_warnings,
+            "is_dual_column": getattr(gathered, "is_dual_column", False),
+            "typical_font_size": getattr(gathered, "typical_font_size", 10.0),
         },
     )
+
+
+def _inline_rich_text(paragraph, text: str) -> str:
+    """正文段落的行内样式文本。
+
+    块的 text 必须保持纯文本（题注匹配靠它）；样式只在渲染时取 rich_text。
+    富文本与纯文本对不上时宁可不加样式，正文一字不差（CHK-068 P1-3）。
+    """
+    from lib.text_extract import strip_inline_markdown
+
+    rich = (getattr(paragraph, "rich_text", "") or "").strip()
+    if rich and rich != text and strip_inline_markdown(rich) == text:
+        return rich
+    return ""
 
 
 def _filter_assets_by_mode(
@@ -691,13 +734,16 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from lib.output import validate_output_targets
 
-    problems = validate_output_targets([
-        (paths["out_md"], False, "输出 Markdown"),
-        (paths["asset_dir"], True, "资源目录"),
-        (paths["text_dir"], True, "文本目录"),
-        (paths["blocks_json"], False, "blocks JSON"),
-        (paths["report_json"], False, "report JSON"),
-    ])
+    problems = validate_output_targets(
+        [
+            (paths["out_md"], False, "输出 Markdown"),
+            (paths["asset_dir"], True, "资源目录"),
+            (paths["text_dir"], True, "文本目录"),
+            (paths["blocks_json"], False, "blocks JSON"),
+            (paths["report_json"], False, "report JSON"),
+        ],
+        protected_paths=[paths["pdf_path"]],
+    )
     if problems:
         for problem in problems:
             print(f"[ERROR] {problem}", file=sys.stderr)
@@ -748,9 +794,37 @@ def main(argv: Optional[List[str]] = None) -> int:
     asset_exit = asset_result.get("exit_code")
     asset_failed = bool(asset_result.get("enabled") and asset_exit)
     omitted = asset_result.get("omitted") or []
+    has_text_content = any(
+        getattr(block, "type", None) in ("paragraph", "heading")
+        for block in getattr(document, "blocks", []) or []
+    )
+    structure_warnings = list((getattr(document, "meta", None) or {}).get("structure_warnings") or [])
+    # 编号标题深度不同却同级 → 层级塌缩，必须进 review（不能继续 blind ready）
+    heading_levels = [
+        int(getattr(block, "level", 0) or 0)
+        for block in getattr(document, "blocks", []) or []
+        if getattr(block, "type", None) == "heading"
+    ]
+    numbered_depths = []
+    for block in getattr(document, "blocks", []) or []:
+        if getattr(block, "type", None) != "heading":
+            continue
+        match = re.match(r"^(\d+(?:\.\d+)*)\s+\S", (block.text or "").strip())
+        if match:
+            numbered_depths.append(len(match.group(1).split(".")))
+    if len(set(numbered_depths)) >= 2 and heading_levels and len(set(heading_levels)) == 1:
+        if "heading_level_collapsed" not in structure_warnings:
+            structure_warnings.append("heading_level_collapsed")
     if asset_failed:
         report_status = "failed"
-    elif omitted or equation_stats.get("needs_review"):
+    elif (
+        omitted
+        or equation_stats.get("needs_review")
+        or not has_text_content
+        or structure_warnings
+    ):
+        # 纯扫描/无文字层时 Markdown 往往只剩文档标题；OCR 未启用不算实现缺陷，
+        # 但内容缺失或结构告警必须反映到 status，不能继续标 ready。
         report_status = "review"
     else:
         report_status = "ready"
@@ -782,6 +856,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "status": "not_implemented" if args.ocr != "off" else "off",
         },
         "equations": equation_stats,
+        "structure_warnings": structure_warnings,
         "generated_at": datetime.now().isoformat(),
     }
     try:

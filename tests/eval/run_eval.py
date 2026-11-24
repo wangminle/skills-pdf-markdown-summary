@@ -51,17 +51,25 @@ def find_gt_files(gt_dir: Path) -> Dict[str, Path]:
     return out
 
 
+def _pred_doc_key_from_file(path: Path) -> str:
+    """从单个预测文件路径推导 document_id，与目录递归发现保持一致。"""
+    if path.name == "index.json" and path.parent.name == "images":
+        return _doc_key(path.parent.parent.name)
+    return _doc_key(path.parent.name)
+
+
 def find_pred_files(pred_root: Path) -> Dict[str, Path]:
     """{document_id: 预测文件路径}。
 
     支持两种产物布局（predictions.json 优先）：
       - 实验 legacy：`<document_id>/predictions.json`
       - 正式提取产物：`<document_id>/images/index.json`（递归匹配）
-    根目录本身是一个 JSON 文件时也直接接受。
+    根目录本身是一个 JSON 文件时也直接接受；正式 `images/index.json`
+    单文件传入时文档键取 `<document_id>`，不得误用父目录名 `images`。
     """
     out: Dict[str, Path] = {}
     if pred_root.is_file():
-        out[_doc_key(pred_root.parent.name)] = pred_root
+        out[_pred_doc_key_from_file(pred_root)] = pred_root
         return out
     for p in sorted(pred_root.glob("*/predictions.json")):
         out[_doc_key(p.parent.name)] = p

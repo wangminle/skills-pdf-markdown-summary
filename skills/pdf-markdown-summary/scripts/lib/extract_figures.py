@@ -401,17 +401,20 @@ def extract_figures(
                             neighbor_caption_rects.append(cand.rect)
                             if key.startswith("figure_"):
                                 figure_neighbor_caption_rects.append(cand.rect)
-                direction = correct_bare_figure_caption_direction(
-                    direction,
-                    caption_bbox,
-                    full_caption_text,
-                    page_rect,
-                    image_rects,
-                    vector_rects,
-                    figure_neighbor_caption_rects,
-                    clip_height=clip_height,
-                    caption_gap=caption_gap,
-                )
+                # 用户显式 --below/--above 优先级最高，禁止裸题注自动纠正覆盖。
+                user_forced_direction = ident in (below_set or set()) or ident in (above_set or set())
+                if not user_forced_direction:
+                    direction = correct_bare_figure_caption_direction(
+                        direction,
+                        caption_bbox,
+                        full_caption_text,
+                        page_rect,
+                        image_rects,
+                        vector_rects,
+                        figure_neighbor_caption_rects,
+                        clip_height=clip_height,
+                        caption_gap=caption_gap,
+                    )
 
                 # ================================================================
                 # 计算基础裁剪窗口 (Baseline)
@@ -878,6 +881,10 @@ def extract_figures(
                             })
                         raise
 
+                    from .pixel_detect import estimate_ink_ratio
+
+                    blank_render = estimate_ink_ratio(pix) < 1e-4
+
                     # A0-1: 落盘最终渲染框（只记录，不改变任何截图行为）
                     final_bbox = [final_clip.x0, final_clip.y0, final_clip.x1, final_clip.y1]
                     caption_bbox_list = [
@@ -925,6 +932,7 @@ def extract_figures(
                                     min_inside_height_ratio=0.5,
                                 ),
                                 weak_anchor=weak_anchor,
+                                blank_render=blank_render,
                             )
                         ),
                     ))

@@ -3,7 +3,7 @@
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
 >
-> 当前版本 / Current version: **0.6.9**
+> 当前版本 / Current version: **0.6.10**
 
 ---
 
