@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from .pdf_backend import PDFDocument, create_rect, managed_pdf_document
 
@@ -93,12 +93,8 @@ from .direction import compute_global_anchor, determine_direction, score_local_d
 from .layout_model import adjust_clip_with_layout
 from .debug_visual import create_debug_stage, save_debug_visualization
 from .extraction_logger import log_event
-from .models import DebugStageInfo, CaptionBlock
+from .models import DebugStageInfo
 from .output import get_unique_path
-
-# 避免循环导入
-if TYPE_CHECKING:
-    import fitz
 
 # 模块日志器
 logger = logging.getLogger(__name__)

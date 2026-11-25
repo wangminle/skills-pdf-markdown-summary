@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import quote
@@ -55,6 +56,40 @@ class MarkdownDocument:
         }
 
 
+def _escape_paragraph_line_starts(text: str) -> str:
+    if text.lstrip().startswith("```"):
+        return text
+    text = re.sub(
+        r"^([ \t]{0,3})(\d{1,9})([.)])(?=[ \t]|$)",
+        lambda match: f"{match.group(1)}{match.group(2)}\\{match.group(3)}",
+        text,
+        flags=re.MULTILINE,
+    )
+    text = re.sub(
+        r"^([ \t]{0,3})([+*-])(?=[ \t]|$)",
+        lambda match: f"{match.group(1)}\\{match.group(2)}",
+        text,
+        flags=re.MULTILINE,
+    )
+    return re.sub(
+        r"^([ \t]{0,3})(>)",
+        lambda match: f"{match.group(1)}\\{match.group(2)}",
+        text,
+        flags=re.MULTILINE,
+    )
+
+
+_UNICODE_LIST_BULLET_LINE_RE = re.compile(r"^([ \t]*)[•▪▫◦‣⁃➢➣➤]\s*")
+
+
+def _render_list_block(text: str) -> str:
+    lines = [
+        _UNICODE_LIST_BULLET_LINE_RE.sub(r"\1- ", line)
+        for line in text.splitlines()
+    ]
+    return "\n".join(lines).strip()
+
+
 def render_block(block: MarkdownBlock) -> str:
     if block.type == "heading":
         level = min(max(block.level or 2, 1), 6)
@@ -79,8 +114,13 @@ def render_block(block: MarkdownBlock) -> str:
         page = block.page if block.page is not None else ""
         return f"<!-- page {page} -->".strip()
 
-    if block.type == "paragraph" and block.rich_text.strip():
-        return block.rich_text.strip()
+    if block.type == "list":
+        text = block.rich_text.strip() if block.rich_text.strip() else block.text.strip()
+        return _render_list_block(text)
+
+    if block.type == "paragraph":
+        text = block.rich_text.strip() if block.rich_text.strip() else block.text.strip()
+        return _escape_paragraph_line_starts(text)
     return block.text.strip()
 
 

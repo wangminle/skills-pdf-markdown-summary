@@ -13,6 +13,7 @@ except ImportError:
     fitz = None  # type: ignore
 
 from .direction import captions_share_column
+from .models import DrawItem
 
 
 def limit_clip_by_text_blocks(

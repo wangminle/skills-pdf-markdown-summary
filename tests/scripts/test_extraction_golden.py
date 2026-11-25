@@ -131,9 +131,10 @@ def _current_code_fingerprint() -> str:
 
 
 def _write_code_fingerprint(stem_dir: Path) -> None:
-    """提取完成后在该 PDF 的产物目录（<batch>/<stem>/）写入代码指纹文件"""
+    """提取完成后在该 PDF 的产物目录记录源码指纹与完整渲染环境。"""
     payload = {
         "skills_scripts_sha256": _current_code_fingerprint(),
+        "render_environment": render_environment(),
         "generated_at": datetime.now().isoformat(),
     }
     stem_dir.mkdir(parents=True, exist_ok=True)
@@ -142,16 +143,20 @@ def _write_code_fingerprint(stem_dir: Path) -> None:
 
 
 def _read_code_fingerprint(stem_dir: Path) -> Optional[str]:
-    """读取该 PDF 产物目录的代码指纹；文件缺失或损坏返回 None"""
+    """仅返回同渲染环境的源码指纹；旧格式或损坏的缓存不可复用。"""
     fp_path = stem_dir / FINGERPRINT_FILENAME
     if not fp_path.exists():
         return None
     try:
         with open(fp_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
-        return payload.get("skills_scripts_sha256")
-    except (json.JSONDecodeError, OSError):
+        if isinstance(payload, dict) and payload.get("render_environment") == render_environment():
+            fingerprint = payload.get("skills_scripts_sha256")
+            if isinstance(fingerprint, str):
+                return fingerprint
+    except (ValueError, OSError):
         return None
+    return None
 
 
 def _compute_batch_dir() -> Path:
@@ -187,8 +192,8 @@ def _find_existing_index(stem: str) -> Optional[Tuple[Path, Path]]:
 
     复用条件（防止「改了 skills/ 却比对旧产物」的假绿）：
     - 环境变量 PDF_GOLDEN_REEXTRACT=1 时不复用任何批次（强制重新提取）；
-    - 该 PDF 的产物目录必须带 _code_fingerprint.json，且指纹与当前 skills 代码
-      一致；指纹缺失或不符的产物直接跳过。
+    - 产物目录的 _code_fingerprint.json 必须同时匹配当前源码与完整渲染环境；
+      信息缺失或不符的产物直接跳过。
 
     按批次从新到旧检查，找到则返回 (images_dir, index_path)，否则返回 None。
     """
@@ -292,11 +297,23 @@ def _find_golden_index(stem: str) -> Optional[Path]:
     旧批次的 golden 作为对比基准。同类文件取最新批次。
     """
     variants = _find_golden_variants(stem)
-    return (
-        variants.get(render_environment_key())
-        or variants.get(legacy_render_environment_key())
-        or variants.get("")
-    )
+    current = variants.get(render_environment_key())
+    if current is not None:
+        return current
+    legacy_key = variants.get(legacy_render_environment_key())
+    if legacy_key is not None:
+        legacy_data = load_index_json(legacy_key)
+        environment = (
+            (legacy_data.get("meta") or {}).get("render_environment")
+            if isinstance(legacy_data, dict) else None
+        )
+        has_known_conflict = isinstance(environment, dict) and any(
+            environment.get(field) and str(environment[field]) != local
+            for field, local in render_environment().items()
+        )
+        if not has_known_conflict or variants.get("") is None:
+            return legacy_key
+    return variants.get("")
 
 
 def recorded_environment_key(golden_data: Dict[str, Any]) -> Optional[str]:
@@ -752,7 +769,7 @@ def _batch_name_of(golden_path: Path) -> str:
 
 
 def baseline_problems(golden_path: Path, golden_data: Dict[str, Any]) -> List[str]:
-    """基准文件自检：文件名里的环境标识必须与文件内记录的一致。
+    """验证文件名与元数据，并拒绝与本机渲染环境明确冲突的旧键基准。
 
     把别的平台的基准改个名冒充本环境基准，会在本环境留下永远对不上的 PNG 哈希，
     还抹掉了基准的真实来源；这种文件必须显式拒绝。
@@ -766,6 +783,15 @@ def baseline_problems(golden_path: Path, golden_data: Dict[str, Any]) -> List[st
             f"基准文件可能被改名或混入，请保留旧版无环境记录文件，或在目标环境重新 "
             f"--update-golden: {golden_path}"
         ]
+    environment = (golden_data.get("meta") or {}).get("render_environment")
+    if isinstance(environment, dict):
+        for field, local in render_environment().items():
+            value = environment.get(field)
+            if value and str(value) != local:
+                return [
+                    f"基准渲染环境标识不一致（{field}：文件内={value}，本机={local}）："
+                    f"请在目标环境重新 --update-golden: {golden_path}"
+                ]
     return []
 
 

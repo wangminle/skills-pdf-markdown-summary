@@ -146,6 +146,59 @@ def test_pre_mupdf_environment_baseline_remains_compatible(tmp_path, monkeypatch
     assert not (rig.images_dir / golden.golden_filename_for(ENV_KEY)).exists()
 
 
+def test_legacy_key_rejects_known_mupdf_conflict(tmp_path, monkeypatch) -> None:
+    rig = _Rig(tmp_path, monkeypatch)
+    data = _golden([_item()], OLD_ENV_KEY)
+    data["meta"]["render_environment"]["mupdf"] = "foreign-version"
+    rig.baseline("20260101-001", data, key=OLD_ENV_KEY)
+    rig.current([_item()])
+
+    passed, failed, results = rig.run()
+
+    assert (passed, failed) == (0, 1)
+    assert "mupdf" in results[0].messages[0]
+
+
+def test_conflicting_legacy_key_falls_through_to_unsuffixed_baseline(tmp_path, monkeypatch) -> None:
+    rig = _Rig(tmp_path, monkeypatch)
+    conflict = _golden([_item()], OLD_ENV_KEY)
+    conflict["meta"]["render_environment"]["mupdf"] = "foreign-version"
+    conflicting_path = rig.baseline("20260102-001", conflict, key=OLD_ENV_KEY)
+    legacy = rig.baseline("20260101-001", _golden([_item()]))
+    rig.current([_item()])
+
+    assert golden._find_golden_index("paper") == legacy
+    passed, failed, results = rig.run()
+
+    assert (passed, failed) == (1, 0), results[0].messages
+    assert conflicting_path.exists()
+
+
+def test_cached_extraction_requires_matching_render_environment(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(golden, "RESULTS_DIR", tmp_path)
+    monkeypatch.delenv(golden.REEXTRACT_ENV, raising=False)
+
+    def create_index(batch):
+        directory = tmp_path / batch / "paper" / "images"
+        _write_json(directory / "index.json", {"items": []})
+        return directory
+
+    local = create_index("20260101-001")
+    golden._write_code_fingerprint(local.parent)
+    foreign = create_index("20260102-001")
+    with monkeypatch.context() as changed:
+        changed.setattr(golden, "render_environment", lambda: {**_ENV, "mupdf": "foreign-version"})
+        golden._write_code_fingerprint(foreign.parent)
+    unknown = create_index("20260103-001")
+    _write_json(unknown.parent / golden.FINGERPRINT_FILENAME, {
+        "skills_scripts_sha256": golden._current_code_fingerprint(),
+    })
+
+    assert golden._find_existing_index("paper") == (local, local / "index.json")
+    monkeypatch.setenv(golden.REEXTRACT_ENV, "1")
+    assert golden._find_existing_index("paper") is None
+
+
 def test_other_environment_baseline_is_never_borrowed(tmp_path, monkeypatch) -> None:
     rig = _Rig(tmp_path, monkeypatch)
     rig.baseline("20260101-001", _golden([_item()], OTHER_KEY), key=OTHER_KEY)

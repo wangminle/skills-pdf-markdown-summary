@@ -483,6 +483,56 @@ def test_equation_preserved_as_screenshot_when_images_on(tmp_path: Path) -> None
     assert report["equations"]["screenshot"] == 1
 
 
+def _make_multiline_equation_pdf(path: Path) -> None:
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        page.insert_text(
+            (65, 85),
+            "The following expression defines the result of the simulation for this experiment.",
+            fontsize=11,
+        )
+        page.insert_text((170, 140), "f(x) = (a^2)/(b + c)", fontsize=11)
+        for y, operator in ((157, "+ (x^2)/(1 + y)"), (174, "- (z^2)/(1 + t)")):
+            with fitz.open() as overlay:
+                overlay.new_page(width=600, height=800).insert_text((190, y), operator, fontsize=11)
+                page.show_pdf_page(page.rect, overlay, 0)
+        page.insert_text(
+            (65, 230),
+            "We apply the resulting expression to each of the inputs in the study before averaging.",
+            fontsize=11,
+        )
+        doc.save(path)
+
+
+@pytest.mark.parametrize("images_mode", ["off", "figures"])
+def test_equation_group_includes_operator_prefixed_list_candidates(tmp_path: Path, images_mode: str) -> None:
+    pdf = tmp_path / "multiline-equation.pdf"
+    output = tmp_path / f"{images_mode}.md"
+    report_json = tmp_path / f"{images_mode}-report.json"
+    _make_multiline_equation_pdf(pdf)
+
+    assert pdf_to_markdown_main([
+        "--pdf", str(pdf), "--out", str(output),
+        "--images", images_mode, "--tables", "off",
+        "--report-json", str(report_json),
+    ]) == 0
+
+    report = json.loads(report_json.read_text(encoding="utf-8"))
+    assert report["equations"]["detected"] == 1
+    assert report["equations"]["groups"][0]["members"] == 3
+    markdown = output.read_text(encoding="utf-8")
+    for fragment in ("f(x) = (a^2)/(b + c)", "+ (x^2)/(1 + y)", "- (z^2)/(1 + t)"):
+        if images_mode == "off":
+            assert fragment in markdown.split("```text", 1)[1].split("```", 1)[0]
+        else:
+            assert fragment in next(
+                line for line in markdown.splitlines() if "images/Equation_p1_" in line
+            )
+    if images_mode == "figures":
+        assert report["equations"]["screenshot"] == 1
+        assert len(list((tmp_path / "images").glob("Equation_p1_*.png"))) == 1
+
+
 def test_short_assignment_sentence_is_not_an_equation(tmp_path: Path) -> None:
     # BUG-147：宽栏里的短正文「We set a=1.」含等号，但不能当成独立公式。
     # 仍保留「E = mc^2.」这类以句点结尾的真正公式。

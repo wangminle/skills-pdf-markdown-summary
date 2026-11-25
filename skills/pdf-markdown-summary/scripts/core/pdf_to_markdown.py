@@ -79,13 +79,14 @@ def _resolve_outputs(args: argparse.Namespace) -> Dict[str, str]:
     }
 
 
-def _paragraphs_to_document(pdf_path: str, title: str, validation=None):
+def _paragraphs_to_document(pdf_path: str, title: str, validation=None, *, gathered=None):
+    import lib.text_extract as _text_extract
     from lib.markdown import MarkdownBlock, MarkdownDocument
-    from lib.text_extract import gather_structured_text, pre_validate_pdf
 
     if validation is None:
-        validation = pre_validate_pdf(pdf_path)
-    gathered = gather_structured_text(pdf_path)
+        validation = _text_extract.pre_validate_pdf(pdf_path)
+    if gathered is None:
+        gathered = _text_extract.gather_structured_text(pdf_path)
 
     blocks: List[MarkdownBlock] = []
     last_page: Optional[int] = None
@@ -103,12 +104,22 @@ def _paragraphs_to_document(pdf_path: str, title: str, validation=None):
             "column": getattr(paragraph, "column", -1),
             "is_full_width": getattr(paragraph, "is_full_width", False),
             "font_size": getattr(paragraph, "font_size", 0.0),
+            "font_name": getattr(paragraph, "font_name", ""),
+            "is_bold": bool(getattr(paragraph, "is_bold", False)),
+            "para_type": paragraph.para_type,
+            "line_count": int(getattr(paragraph, "line_count", 0)),
         }
         if getattr(paragraph, "is_heading", False):
             level = int(getattr(paragraph, "heading_level", 0) or 0) or 2
             level = min(max(level, 1), 6)
+            meta["heading_level"] = level
             blocks.append(MarkdownBlock(
                 type="heading", text=text, level=level, page=paragraph.page, meta=meta,
+            ))
+        elif paragraph.para_type == "list":
+            blocks.append(MarkdownBlock(
+                type="list", text=text, page=paragraph.page, meta=meta,
+                rich_text=_inline_rich_text(paragraph, text),
             ))
         else:
             blocks.append(MarkdownBlock(
@@ -117,6 +128,7 @@ def _paragraphs_to_document(pdf_path: str, title: str, validation=None):
             ))
 
     structure_warnings = list(getattr(gathered, "structure_warnings", None) or [])
+    is_dual = bool(getattr(gathered, "is_dual_column", False))
     return MarkdownDocument(
         title=title,
         source_pdf=os.path.basename(pdf_path),
@@ -127,8 +139,11 @@ def _paragraphs_to_document(pdf_path: str, title: str, validation=None):
             "has_text_layer": validation.has_text_layer,
             "warnings": validation.warnings,
             "structure_warnings": structure_warnings,
-            "is_dual_column": getattr(gathered, "is_dual_column", False),
+            "is_dual_column": is_dual,
+            "num_columns": int(getattr(gathered, "num_columns", 2 if is_dual else 1)),
             "typical_font_size": getattr(gathered, "typical_font_size", 10.0),
+            "body_font_size": getattr(gathered, "body_font_size", 0.0),
+            "toc": list(getattr(gathered, "toc", None) or []),
         },
     )
 
@@ -294,7 +309,7 @@ def _asset_kind_matches_text(kind: str, text: str) -> bool:
 def _block_is_caption_for_asset(block, item: Dict[str, Any]) -> bool:
     from lib.caption_detection import is_bare_caption_label, is_explicit_caption_format
 
-    if getattr(block, "type", "") not in ("paragraph", "heading"):
+    if getattr(block, "type", "") not in ("paragraph", "heading", "list"):
         return False
     text = (getattr(block, "text", "") or "").strip()
     if not text:
@@ -365,7 +380,7 @@ def _blocks_covered_by_assets(document, items, protected_idx: set):
         for idx, block in enumerate(document.blocks):
             if idx in protected_idx or idx in covered:
                 continue
-            if getattr(block, "type", "") not in ("paragraph", "heading"):
+            if getattr(block, "type", "") not in ("paragraph", "heading", "list"):
                 continue
             block_page = getattr(block, "page", None)
             if page is not None and block_page is not None and int(block_page) != int(page):
@@ -407,7 +422,7 @@ def _preserve_equation_regions(
 
     paragraph_items = []
     for idx, block in enumerate(document.blocks):
-        if getattr(block, "type", "") != "paragraph":
+        if getattr(block, "type", "") not in ("paragraph", "list"):
             continue
         page = getattr(block, "page", None)
         bbox = (getattr(block, "meta", None) or {}).get("bbox")
@@ -749,9 +764,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"[ERROR] {problem}", file=sys.stderr)
         return 2
 
-    from lib.text_extract import pre_validate_pdf
+    import lib.text_extract as _text_extract
+    from lib.pdf_backend import open_pdf
 
-    validation = pre_validate_pdf(paths["pdf_path"])
+    validation = _text_extract.pre_validate_pdf(paths["pdf_path"])
     if not validation.is_valid:
         print(f"[ERROR] PDF validation failed: {validation.errors}", file=sys.stderr)
         return 1
@@ -766,11 +782,24 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"[ERROR] 创建输出目录失败: {exc}", file=sys.stderr)
         return 2
 
-    document = _paragraphs_to_document(paths["pdf_path"], paths["stem"], validation)
+    with open_pdf(paths["pdf_path"]) as _shared_doc:
+        shared_blocks = _text_extract.iter_native_text_blocks(_shared_doc)
+    gathered = _text_extract.gather_structured_text(
+        paths["pdf_path"], native_blocks=shared_blocks
+    )
+    document = _paragraphs_to_document(
+        paths["pdf_path"], paths["stem"], validation, gathered=gathered
+    )
     if not (args.images == "off" and args.tables == "off"):
         print(f"Asset dir: {paths['asset_dir']} "
               f"(relative --asset-dir resolves next to the Markdown file)")
-    asset_result = _run_asset_extraction(args, paths)
+    with _text_extract.reuse_scan_context(
+        paths["pdf_path"],
+        validation=validation,
+        gathered=gathered,
+        native_blocks=shared_blocks,
+    ):
+        asset_result = _run_asset_extraction(args, paths)
     equation_stats = _preserve_equation_regions(
         document, asset_result, paths, images_enabled=args.images != "off"
     )
@@ -795,7 +824,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     asset_failed = bool(asset_result.get("enabled") and asset_exit)
     omitted = asset_result.get("omitted") or []
     has_text_content = any(
-        getattr(block, "type", None) in ("paragraph", "heading")
+        getattr(block, "type", None) in ("paragraph", "heading", "list")
         for block in getattr(document, "blocks", []) or []
     )
     structure_warnings = list((getattr(document, "meta", None) or {}).get("structure_warnings") or [])
@@ -809,7 +838,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     for block in getattr(document, "blocks", []) or []:
         if getattr(block, "type", None) != "heading":
             continue
-        match = re.match(r"^(\d+(?:\.\d+)*)\s+\S", (block.text or "").strip())
+        match = re.match(r"^(\d+(?:\.\d+)*)\.?\s+\S", (block.text or "").strip())
         if match:
             numbered_depths.append(len(match.group(1).split(".")))
     if len(set(numbered_depths)) >= 2 and heading_levels and len(set(heading_levels)) == 1:

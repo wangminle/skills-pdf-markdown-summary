@@ -235,6 +235,12 @@ Examples:
     )
     p.add_argument("--no-adaptive-line-height", action="store_false", dest="adaptive_line_height")
     p.add_argument("--layout-driven", default="on", choices=["auto", "on", "off"], help="Layout driven mode")
+    p.add_argument(
+        "--layout-model-detail",
+        default="blocks",
+        choices=["summary", "blocks", "full"],
+        help="Detail level for layout_model.json (summary/blocks/full; default: blocks)",
+    )
 
     # === A1: Layout 语义区域后端（feature flag，默认关闭） ===
     p.add_argument(
@@ -331,13 +337,19 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
         logger.error(f"创建输出目录失败: {e}")
         return 2
 
-    validation = pre_validate_pdf(pdf_path)
+    import lib.text_extract as _text_extract
+    from lib.pdf_backend import open_pdf
+
+    scan_ctx = _text_extract.get_reusable_scan_context(pdf_path)
+    if scan_ctx is not None and scan_ctx.get("validation") is not None:
+        validation = scan_ctx["validation"]
+    else:
+        validation = pre_validate_pdf(pdf_path)
     if not validation.is_valid:
         logger.error(f"PDF validation failed: {validation.errors}")
         return 1
 
     try_extract_text(pdf_path, out_text)
-    gathered_text: GatheredText = gather_structured_text(pdf_path, out_json=gathered_json)
 
     layout_model: Optional[DocumentLayoutModel] = None
     enable_layout = False
@@ -348,10 +360,34 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
     elif args.layout_driven == "off":
         enable_layout = False
 
-    if enable_layout:
-        from lib.text_extract import extract_text_with_format
+    shared_blocks = scan_ctx.get("native_blocks") if scan_ctx is not None else None
+    precomputed_gathered = scan_ctx.get("gathered") if scan_ctx is not None else None
 
-        layout_model = extract_text_with_format(pdf_path, out_json=layout_model_json)
+    if shared_blocks is None and precomputed_gathered is None and enable_layout:
+        with open_pdf(pdf_path) as _shared_doc:
+            shared_blocks = _text_extract.iter_native_text_blocks(_shared_doc)
+
+    gather_debug = args.log_level == "DEBUG"
+    if precomputed_gathered is not None:
+        gathered_text = precomputed_gathered
+        _text_extract.write_gathered_text_json(gathered_text, gathered_json, debug=gather_debug)
+    elif shared_blocks is not None:
+        gathered_text = gather_structured_text(
+            pdf_path, out_json=gathered_json, debug=gather_debug, native_blocks=shared_blocks,
+        )
+    else:
+        gathered_text = gather_structured_text(pdf_path, out_json=gathered_json, debug=gather_debug)
+
+    if enable_layout:
+        detail_mode = getattr(args, "layout_model_detail", "blocks")
+        layout_model = _text_extract.extract_text_with_format(
+            pdf_path,
+            out_json=layout_model_json,
+            native_blocks=shared_blocks,
+            include_details=(detail_mode != "summary"),
+            include_units=(detail_mode != "summary"),
+            full_text_export=(detail_mode == "full"),
+        )
 
     # === A1: Layout 语义区域后端（feature flag） ===
     layout_backend_name = args.layout_backend

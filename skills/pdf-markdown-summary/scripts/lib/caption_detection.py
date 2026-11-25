@@ -17,13 +17,10 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from .pdf_backend import PDFDocument, PDFPage, create_rect
-
-# 避免循环导入
-if TYPE_CHECKING:
-    from .models import CaptionCandidate, CaptionIndex
+from .models import CaptionBlock, CaptionCandidate, CaptionIndex
+from .pdf_backend import PDFDocument, PDFPage, create_rect, fitz
 
 # 导入标识符提取函数
 from .idents import (
@@ -424,7 +421,6 @@ def find_all_caption_candidates(
     Returns:
         CaptionCandidate 列表
     """
-    from .models import CaptionCandidate
 
     candidates: List[CaptionCandidate] = []
 
@@ -747,7 +743,6 @@ def build_caption_index(
     Returns:
         CaptionIndex 对象
     """
-    from .models import CaptionIndex
 
     skip_figure = figure_pattern is False
     skip_table = table_pattern is False
@@ -843,7 +838,6 @@ def merge_caption_lines(
     Returns:
         CaptionBlock 或 None（如果首行索引无效）
     """
-    from .models import CaptionBlock
 
     lines = block.get("lines", [])
     if not lines or start_line_idx >= len(lines):

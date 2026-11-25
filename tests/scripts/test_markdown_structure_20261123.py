@@ -35,9 +35,10 @@ from lib.assess import (
     merge_expected_captions,
     render_inventory_gap,
 )
-from lib.markdown import render_markdown
+from lib.markdown import MarkdownBlock, render_block, render_markdown
 from lib.models import CaptionCandidate
 from lib.text_extract import (
+    classify_block_column,
     gather_structured_text,
     infer_heading_level,
     looks_like_structural_heading,
@@ -115,7 +116,13 @@ def _make_inline_style_pdf(path: Path) -> None:
         ("3 Model Architecture", 2),
         ("3.2 Attention", 3),
         ("3.2.1 Scaled Dot-Product Attention", 4),
+        ("1. Introduction", 2),
+        ("2.3. Experimental Setup", 3),
+        ("2.3.4. 实验模型", 4),
         ("1 Introduction", 2),
+        ("1. Introduction", 2),
+        ("2.3. Foo", 3),
+        ("2.3.1. Foo", 4),
         ("I. Introduction", 2),
         ("A. Appendix Detail", 3),
         ("Introduction", 2),
@@ -124,6 +131,13 @@ def _make_inline_style_pdf(path: Path) -> None:
 def test_infer_heading_level_from_numbering(text: str, expected: int) -> None:
     assert looks_like_structural_heading(text, is_bold=True, font_size=12.0)
     assert infer_heading_level(text, font_size=12.0, typical_font_size=10.0) == expected
+
+
+def test_long_numbered_heading_is_not_rejected() -> None:
+    text = "3 Reinforcement Learning for Optimized Trade Execution in Global Electronic Markets"
+    assert len(text) >= 50
+    assert looks_like_structural_heading(text, is_bold=True, font_size=14.35)
+    assert infer_heading_level(text, font_size=14.35, typical_font_size=10.9) == 2
 
 
 def test_numbered_heading_levels_in_markdown_document(tmp_path: Path) -> None:
@@ -141,9 +155,183 @@ def test_numbered_heading_levels_in_markdown_document(tmp_path: Path) -> None:
     assert "#### 3.2.1 Scaled Dot-Product Attention" in md
 
 
+def test_long_chapter_headings_and_figure_labels_in_benchmark() -> None:
+    benchmark = PROJECT_ROOT / "tests" / "basic-benchmark"
+    kearns = gather_structured_text(str(next(benchmark.glob("Kearns*.pdf"))))
+    levels = {" ".join(p.text.split()): p.heading_level for p in kearns.paragraphs if p.is_heading}
+
+    assert levels["3 Reinforcement Learning for Optimized Trade Execution"] == 2
+    assert levels["5 Machine Learning for Smart Order Routing in Dark Pools"] == 2
+    assert looks_like_structural_heading(
+        "3 Long Section on the Reliability of Experimental Results Across Several Trading Venues",
+        is_bold=True, font_size=14.35,
+    )
+    assert not looks_like_structural_heading(
+        "3 Participants were included after screening. The remaining data were processed separately.",
+        is_bold=True, font_size=14.35,
+    )
+
+    attention = gather_structured_text(str(next(benchmark.glob("1706.03762*.pdf"))))
+    headings = {" ".join(p.text.split()) for p in attention.paragraphs if p.is_heading}
+    assert "Scaled Dot-Product Attention" not in headings
+    assert "Multi-Head Attention" not in headings
+    assert "3.2.1 Scaled Dot-Product Attention" in headings
+    assert "3.2.2 Multi-Head Attention" in headings
+
+
+def test_deepseek_contents_rows_remain_text_and_body_headings_survive() -> None:
+    benchmark = PROJECT_ROOT / "tests" / "basic-benchmark"
+    gathered = gather_structured_text(str(next(benchmark.glob("DeepSeek*.pdf"))))
+    paragraphs = {" ".join(p.text.split()): p for p in gathered.paragraphs}
+
+    for text in ("1 Introduction 4", "2 Architecture 7", "3 General Infrastructures 16",
+                 "4 Pre-Training 20", "5 Post-Training 25",
+                 "6 Conclusion, Limitations, and Future Directions 37"):
+        assert not paragraphs[text].is_heading
+    assert paragraphs["1. Introduction"].heading_level == 2
+    assert paragraphs["2. Architecture"].heading_level == 2
+
+
+def test_toc_promoted_heading_uses_explicit_numbering_depth(tmp_path: Path) -> None:
+    path = tmp_path / "toc-numbered-heading.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        page.insert_text((65, 130), "3.2 Verification", fontname="Helvetica", fontsize=14)
+        for index in range(5):
+            page.insert_text(
+                (65, 170 + 20 * index),
+                "The samples in this study were gathered independently from each of the original sources.",
+                fontname="Times-Roman", fontsize=11,
+            )
+        doc.set_toc([[1, "3.2 Verification", 1]])
+        doc.save(path)
+
+    gathered = gather_structured_text(str(path))
+    heading = next(p for p in gathered.paragraphs if p.text == "3.2 Verification")
+
+    assert heading.is_heading is True
+    assert heading.heading_level == 3
+
+
+def test_body_heading_ending_in_year_is_not_a_contents_entry(tmp_path: Path) -> None:
+    path = tmp_path / "year-heading.pdf"
+    with fitz.open() as pdf:
+        page = pdf.new_page()
+        for index in range(1, 4):
+            page.insert_text(
+                (65, 85 + index * 40), f"{index} Results from {2020 + index}",
+                fontsize=14, fontname="Times-Bold",
+            )
+        pdf.save(path)
+
+    paragraphs = gather_structured_text(str(path)).paragraphs
+
+    assert [p.heading_level for p in paragraphs] == [2, 2, 2]
+
+
+def test_markdown_renders_literal_paragraph_prefixes_and_preserves_emphasis() -> None:
+    from markdown_it import MarkdownIt
+
+    from lib.markdown import MarkdownBlock, render_block
+
+    plain = "1.\n2) Numbered words\n> α(t)\n+ plus\n- minus\n* literal\n-"
+    block = MarkdownBlock(
+        type="paragraph", text=plain, rich_text=plain.replace("Numbered", "**Numbered**"),
+        meta={"para_type": "list"},  # gather 的旧元数据可能把普通的 1. 标作列表
+    )
+
+    rendered = render_block(block)
+
+    assert [token.type for token in MarkdownIt("commonmark").parse(rendered)] == [
+        "paragraph_open", "inline", "paragraph_close",
+    ]
+    assert "".join(text for _style, text in _inline_runs(rendered)) == plain
+    assert ("b", "Numbered") in _inline_runs(rendered)
+    assert block.to_dict()["text"] == plain
+    assert render_block(MarkdownBlock(type="list", text="1. Item")) == "1. Item"
+
+
+def test_pdf_conversion_keeps_ambiguous_number_and_quote_as_text(tmp_path: Path) -> None:
+    from markdown_it import MarkdownIt
+
+    path = tmp_path / "literal-prefixes.pdf"
+    output = tmp_path / "markdown" / "paper.md"
+    lines = ["1. Reported in the source note.", "2. Another printed number.", "> x in the upper range."]
+    with fitz.open() as pdf:
+        page = pdf.new_page()
+        for index, line in enumerate(lines):
+            page.insert_text((65, 85 + index * 40), line, fontsize=11)
+        pdf.save(path)
+
+    assert main(["--pdf", str(path), "--out", str(output), "--images", "off", "--tables", "off"]) == 0
+    tokens = MarkdownIt("commonmark").parse(output.read_text(encoding="utf-8"))
+
+    assert not any(token.type in {"ordered_list_open", "blockquote_open"} for token in tokens)
+    assert len([token for token in tokens if token.type == "paragraph_open"]) == len(lines)
+    rendered = output.read_text(encoding="utf-8")
+    assert all(line in [text for _style, text in _inline_runs(rendered)] for line in lines)
+
+
+@pytest.mark.parametrize("separate_blocks", [False, True])
+def test_pdf_conversion_preserves_tightly_aligned_numbered_list(tmp_path: Path, separate_blocks: bool) -> None:
+    from markdown_it import MarkdownIt
+
+    path = tmp_path / "ordered-list.pdf"
+    output = tmp_path / "markdown" / "paper.md"
+    with fitz.open() as pdf, fitz.open() as overlay:
+        page = pdf.new_page()
+        page.insert_text((85, 85), "1. Prepare the samples.", fontsize=11)
+        if separate_blocks:
+            overlay.new_page().insert_text((85, 101), "2. Record the response.", fontsize=11)
+            page.show_pdf_page(page.rect, overlay, 0)
+        else:
+            page.insert_text((85, 101), "2. Record the response.", fontsize=11)
+        pdf.save(path)
+
+    assert main(["--pdf", str(path), "--out", str(output), "--images", "off", "--tables", "off"]) == 0
+    tokens = MarkdownIt("commonmark").parse(output.read_text(encoding="utf-8"))
+    assert [token.type for token in tokens].count("list_item_open") == 2
+
+
+def test_toc_entries_with_trailing_page_numbers_are_not_headings(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "toc.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((72, 48), "Contents", fontsize=14, fontname="Times-Bold")
+        for index, title in enumerate(("Introduction", "Architecture", "Training", "Evaluation", "Conclusion")):
+            page.insert_text(
+                (72, 72 + index * 24), f"{index + 1} {title} . . . . {index + 4}",
+                fontsize=10.9, fontname="Times-Bold",
+            )
+        page.insert_text((72, 300), "1 Introduction", fontsize=14, fontname="Times-Bold")
+        doc.save(pdf_path)
+
+    gathered = gather_structured_text(str(pdf_path))
+    toc = [p for p in gathered.paragraphs if p.text.rsplit(" ", 1)[-1].isdigit()]
+    assert toc
+    assert all(not p.is_heading for p in toc)
+    assert any(p.is_heading and p.text == "1 Introduction" for p in gathered.paragraphs)
+
+
+def test_plain_paragraph_escapes_block_syntax_but_preserves_lists() -> None:
+    rendered = render_block(MarkdownBlock(
+        type="paragraph",
+        text="1. Introduction\n> alpha\n+ plain\n- plain\n* plain\n-0.5 negative",
+    ))
+    assert rendered == "1\\. Introduction\n\\> alpha\n\\+ plain\n\\- plain\n\\* plain\n-0.5 negative"
+    assert render_block(MarkdownBlock(
+        type="list", text="- actual list item", meta={"para_type": "list"},
+    )) == "- actual list item"
+
+
 # ---------------------------------------------------------------------------
 # 双栏通栏阅读顺序
 # ---------------------------------------------------------------------------
+
+def test_narrow_cross_midline_block_is_not_full_width() -> None:
+    column, full_width = classify_block_column((290, 10, 322, 20), 600, is_dual_column=True)
+    assert (column, full_width) == (1, False)
+
 
 def test_full_width_heading_before_left_column(tmp_path: Path) -> None:
     pdf_path = tmp_path / "cross-column.pdf"
@@ -155,6 +343,71 @@ def test_full_width_heading_before_left_column(tmp_path: Path) -> None:
     assert texts.index(wide) < texts.index("Left column paragraph number 1.")
     assert texts.index("Left column paragraph number 1.") < texts.index("Right column paragraph number 1.")
     assert texts.index("Left column paragraph number 4.") < texts.index("Right column paragraph number 1.")
+
+
+def test_centered_short_heading_above_columns_is_full_width(tmp_path: Path) -> None:
+    path = tmp_path / "centered-short-heading.pdf"
+    with fitz.open() as pdf:
+        page = pdf.new_page(width=600, height=800)
+        title = "Study of Energy Use"
+        title_width = fitz.get_text_length(title, fontname="Times-Bold", fontsize=18)
+        page.insert_text(
+            (300 - title_width / 2, 85), title,
+            fontname="Times-Bold", fontsize=18,
+        )
+        for index in range(5):
+            page.insert_text(
+                (50, 160 + 34 * index),
+                f"Left paragraph {index + 1}, describing the procedure.", fontsize=10,
+            )
+            page.insert_text(
+                (326, 170 + 34 * index),
+                f"Right paragraph {index + 1}, describing the results.", fontsize=10,
+            )
+        pdf.save(path)
+
+    gathered = gather_structured_text(str(path))
+    paragraphs = {p.text: p for p in gathered.paragraphs}
+    order = list(paragraphs)
+
+    assert gathered.num_columns == 2
+    assert paragraphs[title].is_heading is True
+    assert paragraphs[title].is_full_width is True
+    assert paragraphs[title].column == -1
+    assert order.index(title) < order.index("Left paragraph 1, describing the procedure.")
+    assert order.index("Left paragraph 5, describing the procedure.") < order.index(
+        "Right paragraph 1, describing the results."
+    )
+
+
+def test_two_column_page_splits_at_wide_centered_blocks_only(tmp_path: Path) -> None:
+    path = tmp_path / "multi-band.pdf"
+    with fitz.open() as pdf, fitz.open() as left, fitz.open() as right:
+        page = pdf.new_page(width=600, height=800)
+        wide = "A full width separator drawn across the middle of both text columns"
+        page.insert_text((55, 80), wide + " (top)", fontsize=14)
+        page.insert_text((55, 390), wide + " (middle)", fontsize=14)
+        page.insert_text((280, 210), "x + y = z", fontsize=12)
+        for source, name, x in ((left, "Left", 45), (right, "Right", 340)):
+            column = source.new_page(width=600, height=800)
+            for i, y in enumerate((130, 175, 240, 285, 450, 495, 550, 595)):
+                column.insert_text((x, y), f"{name} column paragraph number {i}.", fontsize=11)
+            page.show_pdf_page(page.rect, source, 0)
+        pdf.save(path)
+
+    gathered = gather_structured_text(str(path))
+    paragraphs = {p.text: p for p in gathered.paragraphs}
+    order = list(paragraphs)
+
+    assert gathered.num_columns == 2
+    assert paragraphs[wide + " (top)"].is_full_width
+    assert paragraphs[wide + " (middle)"].is_full_width
+    assert not paragraphs["x + y = z"].is_full_width
+    assert order.index(wide + " (top)") < order.index("Left column paragraph number 0.")
+    assert order.index("Left column paragraph number 3.") < order.index("Right column paragraph number 0.")
+    assert order.index("Right column paragraph number 3.") < order.index(wide + " (middle)")
+    assert order.index(wide + " (middle)") < order.index("Left column paragraph number 4.")
+    assert order.index("Left column paragraph number 7.") < order.index("Right column paragraph number 4.")
 
 
 def test_cross_column_conversion_report_not_blind_ready(tmp_path: Path) -> None:
@@ -651,3 +904,148 @@ def test_rich_text_is_ignored_when_it_diverges_from_plain_text(
     assert "alpha beta gamma" in md
     assert "GAMMA" not in md and "**alpha**" not in md
     assert "**delta** epsilon" in md
+
+
+def test_toc_extraction_and_conservative_heading_fallback(tmp_path: Path) -> None:
+    """WP-1.2 / BUG-171：提取书签目录并保守提升同页唯一粗体/大字号标题，忽略小字号图内标签。"""
+    import json
+
+    pdf_path = tmp_path / "toc-fallback.pdf"
+    out_json = tmp_path / "gathered.json"
+    with fitz.open() as doc:
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((72, 90), "Acknowledgements", fontsize=12.5, fontname="Times-Bold")
+        page.insert_text((72, 130), "Normal prose about model evaluation metrics.", fontsize=10.0)
+        page.insert_text((180, 300), "Figure label inside chart", fontsize=8.0)
+        doc.set_toc([
+            [1, "Acknowledgements", 1],
+            [2, "Figure label inside chart", 1],
+        ])
+        doc.save(pdf_path)
+
+    gathered = gather_structured_text(str(pdf_path), out_json=str(out_json))
+    assert len(gathered.toc) == 2
+    assert gathered.toc[0] == {"level": 1, "title": "Acknowledgements", "page": 1}
+
+    by_text = {" ".join(p.text.split()): p for p in gathered.paragraphs}
+    assert by_text["Acknowledgements"].is_heading is True
+    assert by_text["Acknowledgements"].heading_level == 2
+    assert by_text["Figure label inside chart"].is_heading is False
+
+    payload = json.loads(out_json.read_text(encoding="utf-8"))
+    assert payload["toc"] == gathered.toc
+
+
+def test_caption_and_list_tight_classification(tmp_path: Path) -> None:
+    """WP-3.3 / WP-4.3：正文陈述句与数值常量不被误标成 caption/list，真实项目符号渲染为规范列表。"""
+    pdf_path = tmp_path / "caption-list.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((72, 80), "Figures show steady improvements across benchmarks.", fontsize=10.5)
+        page.insert_text((72, 120), "Figure 1: Overview of the architecture.", fontsize=10.5)
+        page.insert_text((72, 160), "-0.69", fontsize=10.5)
+        page.insert_text((72, 200), "1.000", fontsize=10.5)
+        page.insert_text((72, 240), "2.0 Flash", fontsize=10.5)
+        page.insert_text((72, 280), "- First real bullet item", fontsize=10.5)
+        page.insert_text((72, 296), "- Second real bullet item", fontsize=10.5)
+        doc.save(pdf_path)
+
+    gathered = gather_structured_text(str(pdf_path))
+    by_text = {" ".join(p.text.split()): p for p in gathered.paragraphs}
+    assert by_text["Figures show steady improvements across benchmarks."].para_type == "paragraph"
+    assert by_text["Figure 1: Overview of the architecture."].para_type == "caption"
+    assert by_text["-0.69"].para_type == "paragraph"
+    assert by_text["1.000"].para_type == "paragraph"
+    assert by_text["2.0 Flash"].para_type == "paragraph"
+    bullet_paras = [p for p in gathered.paragraphs if "real bullet item" in p.text]
+    assert bullet_paras and all(p.para_type == "list" for p in bullet_paras)
+
+    md = render_markdown(_paragraphs_to_document(str(pdf_path), title="Caption List"))
+    assert "- First real bullet item" in md
+    assert "- Second real bullet item" in md
+    assert "\\- First real bullet item" not in md
+
+    # 同时验证 Unicode 圆点经由 native_blocks 直入时也能识别为 list 并规范化为 "- "
+    from lib.text_extract import _looks_like_list_item
+    assert _looks_like_list_item("• Unicode bullet item") is True
+
+
+def test_markdown_list_and_fenced_equation_rendering() -> None:
+    """WP-4.3 / BUG-165：Unicode 列表规范化渲染，语义勾号/实心圆不误改，代码块围栏内的行首符号不被误转义。"""
+    from lib.text_extract import _looks_like_list_item
+
+    assert render_block(MarkdownBlock(type="list", text="• Alpha\n▪ Beta")) == "- Alpha\n- Beta"
+    assert render_block(MarkdownBlock(type="list", text="✓ Passed\n● Active")) == "✓ Passed\n● Active"
+    assert _looks_like_list_item("✓ Passed") is False
+    assert _looks_like_list_item("● Active") is False
+    fenced = "```text\n1. Keep equation line\n- x\n```"
+    assert render_block(MarkdownBlock(type="paragraph", text=fenced)) == fenced
+
+
+def test_layout_model_detail_export_modes(tmp_path: Path) -> None:
+    """WP-4.2：layout_model.to_dict 与 extract_pdf_assets --layout-model-detail 支持 summary/blocks/full。"""
+    import json
+    from core.extract_pdf_assets import main as assets_main
+    from lib.text_extract import extract_text_with_format
+
+    long_line = "token_" * 42  # 252 chars > 200 单元截断线
+    pdf_path = tmp_path / "detail.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=2000, height=1200)
+        for i in range(12):
+            page.insert_text((40, 80 + i * 12), long_line, fontsize=10.0)
+        doc.save(pdf_path)
+
+    model = extract_text_with_format(str(pdf_path))
+    summary_d = model.to_dict(include_details=False)
+    default_d = model.to_dict()
+    no_units_d = model.to_dict(include_units=False)
+    full_d = model.to_dict(full_text_export=True)
+
+    page_blocks = next(iter(default_d["text_blocks"].values()))
+    full_page_blocks = next(iter(full_d["text_blocks"].values()))
+    no_units_page_blocks = next(iter(no_units_d["text_blocks"].values()))
+
+    assert "text_blocks" not in summary_d
+    assert page_blocks, "应生成非空 text_blocks"
+    assert len(page_blocks[0]["text"]) <= 2000
+    assert len(page_blocks[0]["units"][0]["text"]) <= 200
+    assert "units" not in no_units_page_blocks[0]
+    assert len(full_page_blocks[0]["text"]) > 2000
+    assert len(full_page_blocks[0]["units"][0]["text"]) > 200
+
+    out_dir = tmp_path / "images"
+    out_text = tmp_path / "text" / "detail.txt"
+    rc = assets_main([
+        "--pdf", str(pdf_path),
+        "--out-dir", str(out_dir),
+        "--out-text", str(out_text),
+        "--no-figures",
+        "--no-tables",
+        "--layout-model-detail", "summary",
+    ])
+    assert rc == 0
+    saved_layout = json.loads((out_dir / "layout_model.json").read_text(encoding="utf-8"))
+    assert "text_blocks" not in saved_layout
+
+
+def test_pdf_to_markdown_meta_carries_body_font_size_and_toc(tmp_path: Path) -> None:
+    """WP-4.1：markdown_blocks.json 元数据透传 body_font_size 与 toc。"""
+    import json
+
+    pdf_path = tmp_path / "meta.pdf"
+    out_md = tmp_path / "md" / "paper.md"
+    with fitz.open() as doc:
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((72, 80), "1. Introduction", fontsize=13.0, fontname="Times-Bold")
+        page.insert_text((72, 110), "1.1. Details", fontsize=11.5, fontname="Times-Bold")
+        page.insert_text((72, 150), "Body prose in 10.5pt font size across multiple words.", fontsize=10.5)
+        doc.set_toc([[1, "Introduction", 1]])
+        doc.save(pdf_path)
+
+    assert main(["--pdf", str(pdf_path), "--out", str(out_md), "--images", "off", "--tables", "off"]) == 0
+    blocks_payload = json.loads((tmp_path / "md" / "text" / "markdown_blocks.json").read_text(encoding="utf-8"))
+    report_payload = json.loads((tmp_path / "md" / "text" / "conversion_report.json").read_text(encoding="utf-8"))
+    assert blocks_payload["meta"]["body_font_size"] > 0
+    assert blocks_payload["meta"]["toc"] == [{"level": 1, "title": "Introduction", "page": 1}]
+    assert report_payload["status"] == "ready"

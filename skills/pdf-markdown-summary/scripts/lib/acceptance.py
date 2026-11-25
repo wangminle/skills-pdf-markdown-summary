@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import Any, List, Tuple
 
+from .models import AcceptanceThresholds
+
 try:
     import fitz
 except ImportError:
@@ -35,8 +37,6 @@ def adaptive_acceptance_thresholds(
     Returns:
         AcceptanceThresholds 对象
     """
-    from .models import AcceptanceThresholds as AT
-
     # 基础阈值（根据尺寸分层）
     # 旧版还有一个 relax_text 文本行阈值，AcceptanceThresholds 已不含该字段，
     # 对应的 base_text 计算一并移除，避免留下无人消费的死值。
@@ -67,7 +67,7 @@ def adaptive_acceptance_thresholds(
         base_ink = min(base_ink, 0.80)
         base_cov = min(base_cov, 0.80)
 
-    return AT(
+    return AcceptanceThresholds(
         height_ratio=base_h,
         area_ratio=base_a,
         object_coverage=base_cov,

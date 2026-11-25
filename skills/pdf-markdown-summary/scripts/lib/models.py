@@ -377,12 +377,20 @@ class DocumentLayoutModel:
     # 留白区域
     vacant_regions: Dict[int, List[Any]]            # key=page_num, value=List[fitz.Rect]
 
-    def to_dict(self, include_details: bool = True) -> Dict[str, Any]:
+    def to_dict(
+        self,
+        include_details: bool = True,
+        *,
+        include_units: bool = True,
+        full_text_export: bool = False,
+    ) -> Dict[str, Any]:
         """
         转换为可序列化的字典。
 
         Args:
             include_details: 是否包含 text_blocks 的 bbox/type 细节
+            include_units: include_details=True 时是否导出逐行 units 明细
+            full_text_export: 是否取消 block.text/unit.text 的截断以导出全文
         """
         result = {
             'page_size': self.page_size,
@@ -417,26 +425,27 @@ class DocumentLayoutModel:
                         'column': block.column,
                         'units_count': len(block.units),
                     }
-                    # 完整文本（截断防爆）+ 逐行字号/字重，避免只剩 100 字符样本
+                    # 默认截断防爆；显式开启 full_text_export 时保留完整文本
                     full_text = ' '.join(u.text for u in block.units).strip()
                     if full_text:
-                        block_info['text'] = full_text[:2000]
+                        block_info['text'] = full_text if full_text_export else full_text[:2000]
                         block_info['sample'] = full_text[:100]
-                    block_info['units'] = [
-                        {
-                            'text': u.text[:200],
-                            'bbox': [round(u.bbox.x0, 2), round(u.bbox.y0, 2),
-                                     round(u.bbox.x1, 2), round(u.bbox.y1, 2)],
-                            'font_name': u.font_name,
-                            'font_size': round(float(u.font_size), 2),
-                            'font_weight': u.font_weight,
-                            'font_flags': int(u.font_flags),
-                            'color': list(u.color) if u.color is not None else None,
-                            'text_type': u.text_type,
-                            'column': u.column,
-                        }
-                        for u in block.units
-                    ]
+                    if include_units:
+                        block_info['units'] = [
+                            {
+                                'text': u.text if full_text_export else u.text[:200],
+                                'bbox': [round(u.bbox.x0, 2), round(u.bbox.y0, 2),
+                                         round(u.bbox.x1, 2), round(u.bbox.y1, 2)],
+                                'font_name': u.font_name,
+                                'font_size': round(float(u.font_size), 2),
+                                'font_weight': u.font_weight,
+                                'font_flags': int(u.font_flags),
+                                'color': list(u.color) if u.color is not None else None,
+                                'text_type': u.text_type,
+                                'column': u.column,
+                            }
+                            for u in block.units
+                        ]
                     page_blocks.append(block_info)
                 text_blocks_detail[str(page_num)] = page_blocks
             result['text_blocks'] = text_blocks_detail
@@ -462,8 +471,11 @@ class GatheredParagraph:
         column: 栏位（0=左, 1=右, -1=单栏或通栏）
         font_size: 首行主 span 字号
         is_bold: 首行是否粗体（只认 PDF 粗体标志位）
-        is_full_width: 双栏页上是否通栏（跨中线或宽度占比大）
+        is_full_width: 双栏页上是否通栏（跨中线且达到宽度阈值）
         rich_text: 正文行内 Markdown 粗斜体文本，仅供渲染；标题或无样式时为空串
+        para_type: 段落类型（heading / caption / list / paragraph）
+        font_name: 首行主 span 字体名
+        line_count: 块内非空文本行数
     """
     page: int
     text: str
@@ -475,6 +487,9 @@ class GatheredParagraph:
     is_bold: bool = False
     is_full_width: bool = False
     rich_text: str = ""
+    para_type: str = "paragraph"
+    font_name: str = ""
+    line_count: int = 0
 
 
 @dataclass
@@ -489,7 +504,9 @@ class GatheredText:
         footers_removed: 移除的页脚列表
         paragraphs: 段落列表
         structure_warnings: 结构质量告警（阅读顺序、标题层级等）
-        typical_font_size: 估计的正文字号
+        typical_font_size: 8-14pt 全部 span 字号的算术平均（按 span 计数）
+        body_font_size: 正文字号的字符加权并簇众数，标题层级判定用；未估计时为 0.0
+        num_columns: 检测到的栏数（1=单栏, 2=双栏）
     """
     version: str
     is_dual_column: bool
@@ -498,6 +515,9 @@ class GatheredText:
     paragraphs: List[GatheredParagraph]
     structure_warnings: List[str] = field(default_factory=list)
     typical_font_size: float = 10.0
+    body_font_size: float = 0.0
+    num_columns: int = 1
+    toc: List[Dict[str, Any]] = field(default_factory=list)
 
 
 # ============================================================================

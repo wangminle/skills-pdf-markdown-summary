@@ -227,9 +227,11 @@ def detect_columns(
     bin_width = (last_edge - first_edge) / bin_count
     bins = [first_edge + i * bin_width for i in range(bin_count)] + [last_edge]
     hist = [0] * bin_count
+    bin_values: List[List[float]] = [[] for _ in range(bin_count)]
     for value in x0_values:
         bin_idx = max(0, min(bin_count - 1, bisect_right(bins, value) - 1))
         hist[bin_idx] += 1
+        bin_values[bin_idx].append(value)
 
     threshold = (sum(hist) / bin_count) * 1.5
     peaks_idx = [i for i, count in enumerate(hist) if count > threshold]
@@ -238,8 +240,8 @@ def detect_columns(
         top_peaks = sorted(peaks_idx, key=lambda i: hist[i], reverse=True)[:2]
         top_peaks.sort()
 
-        peak1_x = bins[top_peaks[0]]
-        peak2_x = bins[top_peaks[1]]
+        peak1_x = sum(bin_values[top_peaks[0]]) / len(bin_values[top_peaks[0]])
+        peak2_x = sum(bin_values[top_peaks[1]]) / len(bin_values[top_peaks[1]])
 
         # 栏间距估计：两峰间距 ≈ 栏宽 + 栏间距，用段落行宽中位数估计栏宽后相减。
         # 旧公式误减 (page_width - peak2_x)（= 栏宽 + 右页边距），对称布局下
@@ -450,6 +452,15 @@ def detect_vacant_regions(
         print("=" * 70)
 
     grid_size = 50
+    try:
+        import numpy as np
+        from scipy.ndimage import label as scipy_label
+    except ImportError:
+        logger.warning("NumPy/SciPy not available; skipping vacant region detection for this document")
+        if debug:
+            print("[Page 1] NumPy/SciPy not available, skipping vacant region detection")
+        return {pno: [] for pno in range(len(doc))}
+
     all_vacant: Dict[int, List[Any]] = {}
 
     for pno in range(len(doc)):
@@ -459,61 +470,49 @@ def detect_vacant_regions(
         nx = int(page_rect.width / grid_size) + 1
         ny = int(page_rect.height / grid_size) + 1
 
-        try:
-            import numpy as np
-            grid = np.zeros((ny, nx), dtype=bool)
+        grid = np.zeros((ny, nx), dtype=bool)
 
-            blocks = all_blocks.get(pno, [])
-            for block in blocks:
-                if block.block_type in ['paragraph_group', 'list_group']:
-                    x0_idx = max(0, int(block.bbox.x0 / grid_size))
-                    y0_idx = max(0, int(block.bbox.y0 / grid_size))
-                    x1_idx = min(nx, int(block.bbox.x1 / grid_size) + 1)
-                    y1_idx = min(ny, int(block.bbox.y1 / grid_size) + 1)
-                    grid[y0_idx:y1_idx, x0_idx:x1_idx] = True
+        blocks = all_blocks.get(pno, [])
+        for block in blocks:
+            if block.block_type in ['paragraph_group', 'list_group']:
+                x0_idx = max(0, int(block.bbox.x0 / grid_size))
+                y0_idx = max(0, int(block.bbox.y0 / grid_size))
+                x1_idx = min(nx, int(block.bbox.x1 / grid_size) + 1)
+                y1_idx = min(ny, int(block.bbox.y1 / grid_size) + 1)
+                grid[y0_idx:y1_idx, x0_idx:x1_idx] = True
 
-            from scipy.ndimage import label as scipy_label
-            labeled_grid, num_features = scipy_label(~grid)
+        labeled_grid, num_features = scipy_label(~grid)
 
-            vacant_rects = []
-            for region_id in range(1, num_features + 1):
-                coords = np.argwhere(labeled_grid == region_id)
-                if len(coords) == 0:
-                    continue
+        vacant_rects = []
+        for region_id in range(1, num_features + 1):
+            coords = np.argwhere(labeled_grid == region_id)
+            if len(coords) == 0:
+                continue
 
-                y_indices, x_indices = coords[:, 0], coords[:, 1]
-                y0_idx = y_indices.min()
-                y1_idx = y_indices.max()
-                x0_idx = x_indices.min()
-                x1_idx = x_indices.max()
+            y_indices, x_indices = coords[:, 0], coords[:, 1]
+            y0_idx = y_indices.min()
+            y1_idx = y_indices.max()
+            x0_idx = x_indices.min()
+            x1_idx = x_indices.max()
 
-                rect = fitz.Rect(
-                    x0_idx * grid_size,
-                    y0_idx * grid_size,
-                    min((x1_idx + 1) * grid_size, page_rect.width),
-                    min((y1_idx + 1) * grid_size, page_rect.height)
-                )
+            rect = fitz.Rect(
+                x0_idx * grid_size,
+                y0_idx * grid_size,
+                min((x1_idx + 1) * grid_size, page_rect.width),
+                min((y1_idx + 1) * grid_size, page_rect.height)
+            )
 
+            area_ratio = (rect.width * rect.height) / (page_rect.width * page_rect.height)
+            if area_ratio > 0.05:
+                vacant_rects.append(rect)
+
+        all_vacant[pno] = vacant_rects
+
+        if debug and pno == 0:
+            print(f"[Page {pno+1}] Found {len(vacant_rects)} vacant regions")
+            for i, rect in enumerate(vacant_rects[:3]):
                 area_ratio = (rect.width * rect.height) / (page_rect.width * page_rect.height)
-                if area_ratio > 0.05:
-                    vacant_rects.append(rect)
-
-            all_vacant[pno] = vacant_rects
-
-            if debug and pno == 0:
-                print(f"[Page {pno+1}] Found {len(vacant_rects)} vacant regions")
-                for i, rect in enumerate(vacant_rects[:3]):
-                    area_ratio = (rect.width * rect.height) / (page_rect.width * page_rect.height)
-                    print(f"  Region {i+1}: {rect}, area={area_ratio:.1%}")
-
-        except ImportError:
-            if pno == 0:
-                logger.warning(
-                    "NumPy/SciPy not available; skipping vacant region detection for this document"
-                )
-            if debug and pno == 0:
-                print(f"[Page {pno+1}] NumPy/SciPy not available, skipping vacant region detection")
-            all_vacant[pno] = []
+                print(f"  Region {i+1}: {rect}, area={area_ratio:.1%}")
 
     return all_vacant
 
