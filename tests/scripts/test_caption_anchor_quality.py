@@ -130,7 +130,6 @@ def _make_text_block(
     return TextBlock(rect, [unit], block_type, 0, column)
 
 
-
 def _make_caption_test_pdf(path: Path) -> None:
     doc = fitz.open()
     page = doc.new_page(width=600, height=800)
@@ -2439,89 +2438,3 @@ def test_bare_figure_caption_keeps_below_without_above_object() -> None:
         clip_height=400.0,
     )
     assert direction == "below"
-
-
-def main() -> int:
-    tests = [
-        test_caption_index_scores_candidates,
-        test_caption_index_respects_min_score_for_cross_page_lookup,
-        test_detect_text_pollution_flags_dense_body_text,
-        test_looks_like_table_text_distinguishes_cells_from_body,
-        test_iterative_far_side_trim_removes_long_body_before_table,
-        test_table_band_removes_body_and_keeps_full_table,
-        test_table_band_excludes_narrow_two_part_section_heading,
-        test_table_band_excludes_numbered_section_heading_after_table,
-        test_table_band_keeps_category_row_and_following_data_rows,
-        test_table_band_keeps_strong_rows_across_group_spacing,
-        test_table_band_stops_before_sentence_like_strong_row_after_gap,
-        test_baseline_clip_stops_before_far_section_title_below_caption,
-        test_baseline_clip_stops_after_far_body_above_caption,
-        test_baseline_clip_preserves_near_table_cluster_before_far_body,
-        test_baseline_clip_preserves_table_header_above_caption,
-        test_baseline_clip_preserves_wide_numeric_table_blocks,
-        test_baseline_clip_preserves_clustered_diagram_labels,
-        test_baseline_clip_stops_at_wide_numeric_body_block,
-        test_baseline_clip_stops_before_far_short_title_followed_by_body,
-        test_baseline_clip_stops_after_isolated_far_title_above_caption,
-        test_baseline_clip_ignores_other_column_title_above_caption,
-        test_baseline_clip_keeps_original_when_limit_would_be_too_short,
-        test_table_band_recognizes_compact_single_block_rows,
-        test_looks_like_table_text_accepts_short_compact_table,
-        test_restore_table_clip_width_recovers_over_narrow_structured_table,
-        test_table_final_text_bounds_recovers_connected_header_band,
-        test_table_final_text_bounds_stops_before_body_paragraph,
-        test_table_final_text_bounds_recovers_header_but_not_leading_body_line,
-        test_table_direction_tie_break_prefers_nearest_structured_table,
-        test_table_direction_ignores_adjacent_table_reference_line,
-        test_table_direction_keeps_short_numeric_cells_as_evidence,
-        test_table_direction_prefers_nearest_structured_rows_over_chart_labels,
-        test_two_column_neighbor_caption_does_not_steal_rows,
-        test_period_caption_with_common_opener_is_real_caption,
-        test_period_caption_with_our_opener_is_real_caption,
-        test_period_tail_cross_reference_unifies_body_opener_criteria,
-        test_body_sentence_after_table_verb_is_reference,
-        test_table_appendix_reference_is_not_caption_context,
-        test_colon_caption_is_not_reference_even_inside_long_text_block,
-        test_limit_clip_by_neighbor_captions_bounds_same_page_items,
-        test_table_direction_uses_text_structure_above_caption,
-        test_table_direction_uses_text_structure_below_caption,
-        test_layout_trims_section_title_from_short_figure,
-        test_table_far_side_trims_trailing_section_heading,
-        test_table_far_side_keeps_misclassified_last_data_row,
-        test_table_far_side_keeps_header_followed_by_table_rows,
-        test_table_far_side_trims_numbered_section_heading_above_table,
-        test_table_far_side_keeps_same_row_data_cell_at_far_edge,
-        test_table_far_side_keeps_layout_only_same_row_data_cell,
-        test_table_final_text_bounds_recovers_qwen_table2_tail_row,
-        test_table_final_text_bounds_recovers_tail_row_from_layout_blocks,
-        test_table_final_text_bounds_trims_far_side_blank_before_table,
-        test_table_final_text_bounds_trims_body_tail_before_header,
-        test_table_final_text_bounds_trims_numeric_body_tail_before_header,
-        test_table_final_text_bounds_keeps_wrapped_tail_cell_line,
-        test_figure_noise_trim_ignores_sentence_tail_as_content_evidence,
-        test_figure_post_autocrop_trims_narrow_lowercase_sentence_tail,
-        test_figure_title_recovery_ignores_lowercase_sentence_tail,
-        test_table_far_side_trims_single_number_section_heading,
-        test_bare_figure_caption_prefers_above_when_next_caption_below,
-        test_bare_figure_caption_keeps_below_without_above_object,
-    ]
-    passed = 0
-    failed = 0
-
-    for test in tests:
-        try:
-            test()
-            passed += 1
-        except AssertionError as e:
-            print(f"FAIL {test.__name__}: {e}")
-            failed += 1
-        except Exception as e:
-            print(f"ERROR {test.__name__}: {e}")
-            failed += 1
-
-    print(f"\n测试结果: {passed} 通过, {failed} 失败")
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

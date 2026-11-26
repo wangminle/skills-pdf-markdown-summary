@@ -33,7 +33,11 @@ Commit 01B: PDF 后端适配层（薄适配 + 可选 pdfplumber）
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+import sys
+import threading
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from pathlib import Path
@@ -45,6 +49,170 @@ except ImportError as e:
     raise ImportError(
         "PyMuPDF (pymupdf) is required: pip install pymupdf"
     ) from e
+
+
+# ============================================================================
+# 按页解析缓存
+# ============================================================================
+
+# 一次转换里同一份 PDF 会被打开十几次（预验证、原生块扫描、版式模型、资产提取、
+# 题注对账各开各的），同一页的 get_text("dict") 用相同参数被解析十来次。
+# 这里把解析结果按「文件 + 页 + 调用」缓存在进程内，跨多次打开共享。
+#
+# 返回的是缓存对象本身，不做拷贝：调用方必须把它当只读。静态审计没有发现原地
+# 修改的调用方；需要确认时打开 PDF_SKILL_CACHE_MUTATION_CHECK=1，命中前会
+# 校验缓存内容未被改动，改动即报错。
+#
+# get_text("dict") 有一条例外：它只在同一文档实例内复用，每个实例的每一页首次
+# 调用仍然真实执行。原因是 MuPDF 的副作用——对某页做过一次 get_text("dict")
+# 之后，该文档实例里这一页随后的渲染像素会有细微变化（提取要读每个 span 的字体
+# 信息，触发字体加载）。提取链路里每张图都在结构化文本提取之后渲染，Golden
+# 基准也是这个状态的产物；若后续实例直接命中缓存，页面保持「干净」状态，渲染
+# 就会与基准不同（Gemini 第 3 页 Figure 1 实测如此）。get_text("text") 与
+# get_drawings() 没有这个副作用，照常跨实例共享。
+_PARSE_CACHE_MB_ENV = "PDF_SKILL_PARSE_CACHE_MB"
+_PARSE_CACHE_MUTATION_CHECK_ENV = "PDF_SKILL_CACHE_MUTATION_CHECK"
+_DEFAULT_PARSE_CACHE_BYTES = 1024 * 1024 * 1024
+# 只有这两种模式被反复调用；其余模式直接透传
+_CACHED_TEXT_MODES = ("dict", "text")
+
+
+def _env_int(name: str, default: int) -> int:
+    """读整数环境变量：缺省或不是整数取默认值，负值按 0 处理。"""
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
+
+
+def _estimate_bytes(value: Any) -> int:
+    """递归估算解析结果占用的 Python 内存；fitz 对象只计代理本身。"""
+    seen: set = set()
+    total = 0
+    stack = [value]
+    while stack:
+        obj = stack.pop()
+        if id(obj) in seen:
+            continue
+        seen.add(id(obj))
+        total += sys.getsizeof(obj)
+        if isinstance(obj, dict):
+            stack.extend(obj.keys())
+            stack.extend(obj.values())
+        elif isinstance(obj, (list, tuple, set, frozenset)):
+            stack.extend(obj)
+    return total
+
+
+class _ParseCache:
+    """按页解析结果的进程内缓存：最近最少使用淘汰 + 内存预算。
+
+    一个「文件 + 页 + 调用」只保留最新页面状态的一条；页面内容变了（内容流、
+    旋转或页面框变化）就视为未命中并覆盖，所以调用方改过页面再读不会拿到旧结果。
+    """
+
+    def __init__(self, byte_budget: int, mutation_check: bool = False) -> None:
+        self._byte_budget = byte_budget
+        self._mutation_check = mutation_check
+        self._entries: "OrderedDict[tuple, tuple]" = OrderedDict()  # slot -> (state, value, size, fingerprint)
+        self._total_bytes = 0
+        self._lock = threading.RLock()
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, slot: tuple, state: tuple, *, count_hit: bool = True) -> Tuple[bool, Any]:
+        """按槽位与页面状态取缓存。
+
+        count_hit=False 用于「调用方这次其实做了真实解析、只是想复用已有对象」的读取：
+        命中也不计 hit，而计一次 miss。hits 只统计没有解析就直接返回的次数，
+        misses 等于底层真实解析的次数。
+        """
+        with self._lock:
+            entry = self._entries.get(slot)
+            if entry is None or entry[0] != state:
+                self.misses += 1
+                return False, None
+            self._entries.move_to_end(slot)
+            if count_hit:
+                self.hits += 1
+            else:
+                self.misses += 1
+            if self._mutation_check:
+                _state, value, _size, fingerprint = entry
+                if hash(repr(value)) != fingerprint:
+                    raise RuntimeError(
+                        "按页解析缓存被调用方原地修改："
+                        f"{os.path.basename(str(slot[0][0]))} 第 {slot[1] + 1} 页 {slot[2]}{slot[3]}"
+                    )
+            return True, entry[1]
+
+    def put(self, slot: tuple, state: tuple, value: Any) -> None:
+        with self._lock:
+            previous = self._entries.pop(slot, None)
+            if previous is not None:
+                self._total_bytes -= previous[2]
+            size = _estimate_bytes(value)
+            if size > self._byte_budget:
+                return  # 单条就超过预算：不缓存
+            fingerprint = hash(repr(value)) if self._mutation_check else 0
+            self._entries[slot] = (state, value, size, fingerprint)
+            self._total_bytes += size
+            while self._total_bytes > self._byte_budget and len(self._entries) > 1:
+                _slot, (_state, _value, dropped, _fp) = self._entries.popitem(last=False)
+                self._total_bytes -= dropped
+
+    def drop_file(self, file_id: Optional[tuple]) -> None:
+        if file_id is None:
+            return
+        with self._lock:
+            for slot in [s for s in self._entries if s[0] == file_id]:
+                self._total_bytes -= self._entries.pop(slot)[2]
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries.clear()
+            self._total_bytes = 0
+            self.hits = 0
+            self.misses = 0
+
+    def snapshot(self) -> Dict[str, int]:
+        with self._lock:
+            return {
+                "entries": len(self._entries),
+                "bytes": self._total_bytes,
+                "budget_bytes": self._byte_budget,
+                "hits": self.hits,
+                "misses": self.misses,
+            }
+
+
+_parse_cache = _ParseCache(
+    _env_int(_PARSE_CACHE_MB_ENV, _DEFAULT_PARSE_CACHE_BYTES // (1024 * 1024)) * 1024 * 1024,
+    mutation_check=bool(os.environ.get(_PARSE_CACHE_MUTATION_CHECK_ENV)),
+)
+
+
+def clear_parse_cache() -> None:
+    """清空按页解析缓存（页面被程序改写、或测试需要时调用）。"""
+    _parse_cache.clear()
+
+
+def parse_cache_stats() -> Dict[str, int]:
+    """缓存当前条目数、估算内存与命中计数，供诊断与测试。"""
+    return _parse_cache.snapshot()
+
+
+def _page_state(raw_page: Any) -> tuple:
+    """页面内容状态：内容流对象号、旋转与页面框，任何一项变化都使缓存失效。"""
+    return (
+        tuple(raw_page.get_contents()),
+        raw_page.rotation,
+        tuple(raw_page.cropbox),
+        tuple(raw_page.mediabox),
+    )
 
 
 # ============================================================================
@@ -62,6 +230,12 @@ class PDFDocument:
     """
     raw: Any  # fitz.Document
     path: str
+    # 文件身份（规范路径、大小、修改时间），按页解析缓存按它跨多次打开共享；
+    # 内存文档或无法取文件状态时为 None，不缓存
+    cache_id: Optional[tuple] = None
+    # 本实例内已真实执行过 get_text("dict") 的页号：该提取会改变这一页随后的
+    # 渲染，每个实例每页的首次调用必须真实执行，之后才允许命中缓存
+    dict_extracted_pages: set = field(default_factory=set)
 
     @property
     def page_count(self) -> int:
@@ -152,6 +326,25 @@ class PDFPage:
         """页面高度（pt）"""
         return self.raw.rect.height
 
+    def _cache_slot(self, kind: str, args: tuple) -> Optional[tuple]:
+        """解析缓存的槽位：文件 + 页 + 调用；不缓存时返回 None。"""
+        file_id = getattr(self.doc, "cache_id", None)
+        if file_id is None:
+            return None
+        return (file_id, int(self.raw.number), kind, args)
+
+    def _cached(self, kind: str, args: tuple, parse) -> Any:
+        slot = self._cache_slot(kind, args)
+        if slot is None:
+            return parse()
+        state = _page_state(self.raw)
+        hit, value = _parse_cache.get(slot, state)
+        if hit:
+            return value
+        value = parse()
+        _parse_cache.put(slot, state, value)
+        return value
+
     def get_text(self, mode: str = "text") -> Union[str, Dict, List]:
         """
         提取文本。
@@ -166,17 +359,47 @@ class PDFPage:
 
         Returns:
             根据 mode 返回不同格式的文本内容
+
+        Note:
+            "text" 的结果按页缓存并跨多次打开共享，调用方须当作只读；
+            "dict" 只在同一文档实例内复用，每个实例每页的首次调用真实执行
+            （它会改变这一页随后的渲染，见文件头的说明）。
         """
+        if mode == "dict":
+            return self._dict_text()
+        if mode in _CACHED_TEXT_MODES:
+            return self._cached("text", (mode,), lambda: self.raw.get_text(mode))
         return self.raw.get_text(mode)
+
+    def _dict_text(self) -> Dict[str, Any]:
+        parse = lambda: self.raw.get_text("dict")  # noqa: E731 - 绑定模式，供 _cached 无参调用
+        extracted = getattr(self.doc, "dict_extracted_pages", None)
+        page_index = int(self.raw.number)
+        slot = self._cache_slot("text", ("dict",))
+        if extracted is None or slot is None:
+            return parse()  # 内存文档或伪造的文档对象：不缓存，行为与没有缓存时一致
+        if page_index not in extracted:
+            # 首次调用真实执行：保持与没有缓存时相同的页面渲染状态。
+            # 解析成功后才记入已提取集合，中途抛错不会被误标成已做过
+            value = parse()
+            extracted.add(page_index)
+            state = _page_state(self.raw)
+            # 这一次是真实解析，命中已有条目也不算 hit
+            hit, cached = _parse_cache.get(slot, state, count_hit=False)
+            if hit:
+                return cached  # 别的实例已放入同一页的结果，不再重复估算内存
+            _parse_cache.put(slot, state, value)
+            return value
+        return self._cached("text", ("dict",), parse)
 
     def get_text_dict(self) -> Dict[str, Any]:
         """
         获取结构化文本（透传 PyMuPDF 的 get_text("dict")）。
 
         Returns:
-            包含 'blocks', 'width', 'height' 等字段的字典
+            包含 'blocks', 'width', 'height' 等字段的字典（按页缓存，调用方须当作只读）
         """
-        return self.raw.get_text("dict")
+        return self.get_text("dict")
 
     def get_images(self, full: bool = True) -> List[Tuple]:
         """
@@ -208,8 +431,9 @@ class PDFPage:
 
         Returns:
             矢量图形信息列表，每个元素包含 'rect', 'items', 'fill', 'color' 等字段
+            （按页缓存并跨多次打开共享，调用方须当作只读）
         """
-        return self.raw.get_drawings()
+        return self._cached("drawings", (), self.raw.get_drawings)
 
     def get_pixmap(
         self,
@@ -270,6 +494,8 @@ class PDFPage:
         if isinstance(rect, (tuple, list)):
             rect = fitz.Rect(rect)
 
+        # 页面内容被改写：这份文件的解析缓存全部作废
+        _parse_cache.drop_file(getattr(self.doc, "cache_id", None))
         shape = self.raw.new_shape()
         shape.draw_rect(rect)
         shape.finish(color=color, width=width, fill=fill)
@@ -317,7 +543,12 @@ def open_pdf(pdf_path: Union[str, Path]) -> PDFDocument:
         if page.rotation:
             page.set_rotation(0)
 
-    return PDFDocument(raw=raw_doc, path=path_str)
+    try:
+        stat = os.stat(path_str)
+        cache_id = (os.path.realpath(path_str), stat.st_size, stat.st_mtime_ns)
+    except OSError:
+        cache_id = None
+    return PDFDocument(raw=raw_doc, path=path_str, cache_id=cache_id)
 
 
 def managed_pdf_document(func):

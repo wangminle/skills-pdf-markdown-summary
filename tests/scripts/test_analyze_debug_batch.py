@@ -166,30 +166,3 @@ def test_main_prints_all_flagged_items() -> None:
         assert len(flag_lines) == n_flagged, (
             f"flagged 输出被截断：只打印 {len(flag_lines)}/{n_flagged} 项"
         )
-
-
-def main() -> int:
-    tests = [
-        test_true_fallback_y_edges_match_baseline,
-        test_title_reexpand_not_flagged_as_fallback,
-        test_final_small_h_still_flagged,
-        test_x_shrink_not_flagged_as_fallback,
-        test_main_prints_all_flagged_items,
-    ]
-    passed = failed = 0
-    for t in tests:
-        try:
-            t()
-            passed += 1
-        except AssertionError as e:
-            print(f"FAIL {t.__name__}: {e}")
-            failed += 1
-        except Exception as e:
-            print(f"ERROR {t.__name__}: {e}")
-            failed += 1
-    print(f"\n测试结果: {passed} 通过, {failed} 失败")
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

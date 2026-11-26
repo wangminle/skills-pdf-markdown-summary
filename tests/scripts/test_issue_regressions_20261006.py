@@ -15,11 +15,9 @@ Issue #4 / #5 / #6 / #7 回归测试（2026-10-06，2026-10-07 增补）。
 """
 
 import hashlib
-import inspect
 import json
 import os
 import sys
-import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -135,8 +133,7 @@ def test_parser_rejects_non_positive_geometry(argv_fragment) -> None:
 
 
 def test_parser_accepts_positive_geometry(tmp_path: Path) -> None:
-    # tmp_path 未被使用，但保持与独立运行器 main_test 统一的 (tmp_path) 签名，
-    # 否则 `python tests/scripts/test_issue_regressions_20261006.py` 固定失败。
+    # tmp_path 未被使用，签名保持与其余用例一致。
     args = extract_pdf_assets_module.parse_args_modular(
         ["--pdf", "x.pdf", "--dpi", "72", "--clip-height", "100", "--table-clip-height", "50"]
     )
@@ -1272,70 +1269,3 @@ def test_math_prose_paragraph_is_preserved_by_cli(tmp_path: Path) -> None:
     assert report["equations"]["screenshot"] == 1
     assert report["equations"]["needs_review"] == 0
     assert report["status"] == "ready"
-
-
-def main_test() -> int:
-    tests = [
-        test_pre_validate_marks_unreadable_encrypted_pdf_invalid,
-        test_pre_validate_marks_zero_page_pdf_invalid,
-        test_pdf_to_markdown_encrypted_pdf_exits_cleanly,
-        test_extract_pdf_assets_encrypted_pdf_exits_cleanly,
-        test_pdf_to_markdown_zero_page_pdf_exits_cleanly,
-        test_parser_accepts_positive_geometry,
-        test_pdf_to_markdown_out_is_existing_dir_returns_2,
-        test_pdf_to_markdown_asset_dir_is_existing_file_returns_2,
-        test_extract_pdf_assets_index_json_is_existing_dir_returns_2,
-        test_extract_pdf_assets_out_dir_is_existing_file_returns_2,
-        test_render_block_normalizes_multiline_heading,
-        test_render_block_heading_parses_as_single_atx_heading,
-        test_render_block_paragraph_keeps_internal_newlines,
-        test_render_failure_leaves_no_zero_byte_png_and_returns_nonzero,
-        test_pdf_to_markdown_render_failure_propagates_failed_status,
-        test_pdf_to_markdown_out_parent_is_file_returns_2,
-        test_extract_index_json_parent_is_file_returns_2,
-        test_pdf_to_markdown_text_dir_is_existing_file_returns_2,
-        test_detect_equation_groups_merges_ocr_fragments,
-        test_detect_equation_groups_skips_asset_overlaps_and_non_equations,
-        test_affiliation_en_dash_is_not_equation_fragment,
-        test_detect_equation_groups_columns_do_not_break_grouping,
-        test_detect_equation_groups_absorbs_line_neighbors,
-        test_equation_preserved_as_text_code_block_when_images_off,
-        test_equation_preserved_as_screenshot_when_images_on,
-        test_short_assignment_sentence_is_not_an_equation,
-        test_neighbor_absorption_stays_in_column_and_respects_barriers,
-        test_display_equation_bbox_covers_vertical_pieces,
-        test_dangling_equation_fragment_is_reported_not_packaged,
-        test_a3_rerender_failure_keeps_existing_png_and_reports_hard_failure,
-        test_numeric_denominator_is_not_mistaken_for_page_number,
-        test_numeric_denominator_reaches_cli_output,
-        test_single_word_and_chinese_sentences_are_not_equations,
-        test_group_without_equation_body_is_not_complete,
-        test_accessory_fragments_alone_are_not_complete,
-        test_merged_accessory_fragment_is_not_equation_body,
-        test_double_space_leading_word_is_not_prose,
-        test_equation_screenshot_keeps_existing_png_on_shared_asset_dir,
-        test_multiletter_variable_continuation_merges_into_equation,
-        test_prose_with_math_operator_is_not_an_equation_continuation,
-        test_math_prose_neighbor_stays_outside_equation_group,
-        test_math_prose_paragraph_is_preserved_by_cli,
-    ]
-    failed = 0
-    for test in tests:
-        with tempfile.TemporaryDirectory() as td:
-            try:
-                # 按签名分发：pytest 风格测试收 tmp_path，无参测试直接调用，
-                # 独立入口与 pytest 两种运行方式必须都能全量执行。
-                kwargs = {}
-                if "tmp_path" in inspect.signature(test).parameters:
-                    kwargs["tmp_path"] = Path(td)
-                test(**kwargs)
-                print(f"PASS {test.__name__}")
-            except Exception as e:
-                print(f"FAIL {test.__name__}: {e}")
-                failed += 1
-    print(f"\n测试结果: {len(tests) - failed} 通过, {failed} 失败")
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main_test())

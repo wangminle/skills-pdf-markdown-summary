@@ -3,7 +3,7 @@
 > 一个用于 PDF 转 Markdown、图表导出和论文带图摘要生成的 Codex Skill。
 > A Codex Skill for PDF-to-Markdown conversion, figure/table asset extraction, and figure-aware PDF summaries.
 >
-> 当前版本 / Current version: **0.6.14**
+> 当前版本 / Current version: **0.6.15**
 
 ---
 
@@ -23,7 +23,7 @@ skills/pdf-markdown-summary/
 2. **PDF 带图摘要**：提取正文与 Figure/Table 图片，辅助生成中文或英文阅读摘要。
 3. **完整处理流程**：一条命令同时完成 Markdown 转换和摘要素材准备。
 
-历史根目录 `scripts/` 已迁移到正式 Skill 包，并保留快照于 `old-version/scripts-archive-20260605/`。当前对外能力以 `skills/pdf-markdown-summary/scripts/` 为准。
+历史根目录 `scripts/` 已迁移到正式 Skill 包（历史代码归档目录 `old-version/` 已于 2026-11-24 删除，历史代码见 Git 记录）。当前对外能力以 `skills/pdf-markdown-summary/scripts/` 为准。
 
 ### Skill 目录结构
 
@@ -186,18 +186,23 @@ python3 "skills/pdf-markdown-summary/scripts/process_pdf.py" \
 - 列表与跨页续接：换栏或换页重置列表缩进栈；跨页有序列表只在抽取阶段确认续接后省略分页标记，且只越过真实页码序列；被转义成字面星号的项目符号仍渲染为 CommonMark 列表。
 - 布局导出与写入保护：`--layout-model-detail` 支持 `summary` / `blocks` / `full`；图表与表格都关闭时，显式档位只写 `layout_model.json`，不改动既有索引与 PNG。布局与派生资产写入前校验路径身份，拒绝覆盖源 PDF 或其他输出。
 - 多行标题归一：编号与标题文本被排版拆行时序列化为单行 ATX 标题，后半段不再掉入正文（段落换行策略保持不变）。
+- 按页解析缓存：`get_text` 的 dict/text 结果与 `get_drawings` 按「文件、页、调用」在进程内复用，8 份基准提速 41%～47% 且输出逐字节不变；预算与变异检测由环境变量 `PDF_SKILL_PARSE_CACHE_MB`、`PDF_SKILL_CACHE_MUTATION_CHECK` 控制。
+- 版式模型与文本层的双栏判定同源：版式模型判出双栏须文本层的文档级判定确认，单栏页里并排的表格不再让通栏图被夹到半页；栏间留白不计横跨两栏的行。
+- 双栏论文的栏位收边：题注同时伸进左右两栏的通栏图表不按栏收窄，栏沟取本页实际正文行，单栏图不越过栏沟伸进邻栏文字。
+- 冻结 Holdout 集：7 份外部文档（等宽与不等宽双栏会议论文、带书签的单栏论文与 Word 报告），清单与重建脚本在 `tests/eval/`。
 - `--prune-images` 安全化：仅清理运行前已存在且未被修改、未被当前索引引用的 PNG。
 - 全部入口 CLI 参数参考文档（`references/cli-options.md`）。
-- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；基准按平台、架构、PyMuPDF 与 MuPDF 完整渲染环境分文件（同页同框的 PNG 在 macOS 与 Windows 上只差个别像素，字节数与 sha256 不同），完整环境键优先，同平台/架构/PyMuPDF 旧键及无后缀基准只读回退且不覆盖。当前回归基线为 895 passed、0 failed、0 skipped（2026-11-26 在 macOS arm64 + PyMuPDF 1.28.0 + MuPDF 1.29.0 复验，Golden 9/9 实际执行）。
+- Basic Benchmark 八份 PDF 已纳入 Golden 变更检测；输入集于 2026-09 更新（Kimi K3、DeepSeek V4.1 替换旧版 K3/V4 报告，仍为 8 份）。Golden 基准存放于独立批次，与被比产物分批，杜绝同批自比假绿；基准按平台、架构、PyMuPDF 与 MuPDF 完整渲染环境分文件（同页同框的 PNG 在 macOS 与 Windows 上只差个别像素，字节数与 sha256 不同），完整环境键优先，同平台/架构/PyMuPDF 旧键及无后缀基准只读回退且不覆盖。当前回归基线为 950 passed、0 failed、0 skipped（2026-11-26 在 macOS arm64 + PyMuPDF 1.28.0 + MuPDF 1.29.0 复验，Golden 9/9 实际执行）。
 - Basic Benchmark 已完成多轮逐图 debug 排查，图表选取策略记录见 `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`。
 - 当前图表提取代码流程说明见 `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`。
-- 旧版 scripts 快照归档。
 
 继续改进方向：
 
 - pdfplumber 表格结构化输出。
 - OCR fallback（当前 CLI 保留 `--ocr` 参数，但生产流程仍依赖 PDF 文本层）。
-- 完成独立 holdout PDF 与人工 GT 标注，执行 A4 正式 KPI 评估。
+- 完成 Holdout 集的人工 GT 标注（PDF 已就绪，规范见 `tests/annotations/SCHEMA-20261126.md`），执行正式六项 KPI 评估。
+- 不等宽双栏版式识别（ACM 模板左栏约 57%）：当前文本层与版式模型均判单栏。
+- 双栏论文里图与表相邻时的归属仲裁，以及正文交叉引用（如 "Table 5 shows …"）被当成题注。
 - 清理确认无引用的旧代码。
 
 ### 开发与归档
@@ -212,13 +217,6 @@ skills/pdf-markdown-summary/scripts/
 
 ```text
 skills/pdf-markdown-summary/
-```
-
-历史归档：
-
-```text
-old-version/scripts-archive-20260605/
-old-version/scripts-old/
 ```
 
 ---
@@ -374,18 +372,23 @@ Implemented:
 - Lists and cross-page continuation: crossing a column or page resets the list-indent stack; ordered lists omit the page marker only when continuation is confirmed during extraction and only across genuine page-number sequences; bullets escaped to literal asterisks still render as CommonMark lists.
 - Layout export and write protection: `--layout-model-detail` accepts `summary` / `blocks` / `full`; with both figures and tables off, an explicit level writes `layout_model.json` alone without touching the existing index or PNGs. Layout and derived asset paths are identity-checked before writing and may not overwrite the source PDF or another output.
 - Multi-line heading normalization: headings whose numbering and text were split across lines serialize as a single-line ATX heading (the tail no longer leaks into body text); paragraph line-breaking is unchanged.
+- Page parse cache: `get_text` dict/text results and `get_drawings` are reused in-process per file, page, and call; the eight benchmark PDFs run 41–47% faster with byte-identical outputs. Budget and mutation check are controlled by `PDF_SKILL_PARSE_CACHE_MB` and `PDF_SKILL_CACHE_MUTATION_CHECK`.
+- Column detection kept consistent between the layout model and the text layer: a two-column result from the layout model is kept only when the text layer's document-level detection agrees, so side-by-side tables on a single-column page no longer squeeze a full-width figure into half a page; the minimum column gap ignores lines that span both columns.
+- Column-aware clipping in two-column papers: a caption reaching into both columns (a full-width figure or table) is never clamped to one column, the gutter is taken from this page's body lines, and single-column figures stop before the neighbouring column's text.
+- Frozen Holdout set: seven external documents (equal- and unequal-width two-column papers, bookmarked single-column papers, and a Word report); the manifest and rebuild script live in `tests/eval/`.
 - Safe `--prune-images`: only PNGs that existed before the run, are unchanged, and are unreferenced by the current index are removed.
 - Complete CLI options reference (`references/cli-options.md`).
-- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; baselines are stored per full rendering environment (platform, architecture, PyMuPDF, and MuPDF; the same clip renders to PNGs that differ by a few pixels between macOS and Windows, so byte size and sha256 differ). The full environment key takes precedence, while same-platform/architecture/PyMuPDF legacy keys and unsuffixed baselines are read-only fallbacks and are never overwritten. The current regression baseline is 895 passed, 0 failed, 0 skipped (reverified on 2026-11-26 on macOS arm64 with PyMuPDF 1.28.0 and MuPDF 1.29.0, with all 9 golden cases actually executed).
+- Eight Basic Benchmark PDFs are covered by local Golden change detection; the set was refreshed in September 2026 (Kimi K3 and DeepSeek V4.1 replace the older K3/V4 reports, still 8 PDFs). Golden baselines live in a dedicated batch, separated from the artifacts they are compared against to rule out same-batch self-comparison; baselines are stored per full rendering environment (platform, architecture, PyMuPDF, and MuPDF; the same clip renders to PNGs that differ by a few pixels between macOS and Windows, so byte size and sha256 differ). The full environment key takes precedence, while same-platform/architecture/PyMuPDF legacy keys and unsuffixed baselines are read-only fallbacks and are never overwritten. The current regression baseline is 950 passed, 0 failed, 0 skipped (reverified on 2026-11-26 on macOS arm64 with PyMuPDF 1.28.0 and MuPDF 1.29.0, and all 9 golden cases actually executed).
 - Multi-round Basic Benchmark visual review is recorded in `design/1-archive/Basic-Benchmark图表细致排查记录-20260618-0621.md`.
 - Current extraction flow diagrams are documented in `design/1-archive/PDF图表提取流程逻辑说明-20260621.md`.
-- Archived previous root-level scripts snapshot.
 
 Planned:
 
 - Structured table extraction.
 - OCR fallback (`--ocr` is reserved; production extraction currently relies on the PDF text layer).
-- An independently annotated holdout set and the formal A4 KPI evaluation.
+- Manual GT annotation for the Holdout set (the PDFs are ready; see `tests/annotations/SCHEMA-20261126.md`) and the formal six-metric KPI evaluation.
+- Unequal-width two-column layouts (the ACM template's left column is about 57% wide): both the text layer and the layout model currently report a single column.
+- Ownership arbitration when a figure and a table sit next to each other in a two-column paper, and in-text cross-references (such as "Table 5 shows …") mistaken for captions.
 - Safe cleanup of unused legacy code.
 
 ### License

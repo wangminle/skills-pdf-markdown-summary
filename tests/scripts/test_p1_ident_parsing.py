@@ -81,31 +81,3 @@ def test_parse_figure_ident_numeric_key():
     assert parse_figure_ident("IV") == (False, 4)
     assert parse_figure_ident("S1") == (True, 1)
     assert parse_figure_ident("1") == (False, 1)
-
-
-def main() -> int:
-    tests = [
-        test_figure_idents,
-        test_table_idents,
-        test_parse_figure_ident_numeric_key,
-    ]
-
-    passed = 0
-    failed = 0
-    for t in tests:
-        try:
-            t()
-            passed += 1
-        except AssertionError as e:
-            print(f"FAIL {t.__name__}: {e}")
-            failed += 1
-        except Exception as e:
-            print(f"ERROR {t.__name__}: {e}")
-            failed += 1
-
-    print(f"\n测试结果: {passed} 通过, {failed} 失败")
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

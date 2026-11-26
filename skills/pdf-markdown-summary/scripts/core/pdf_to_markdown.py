@@ -242,6 +242,10 @@ def _export_layout_only(layout_detail: str, paths: Dict[str, str]) -> Dict[str, 
     asset_dir = paths["asset_dir"]
     layout_json = paths["layout_model_json"]
     scan_ctx = _text_extract.get_reusable_scan_context(paths["pdf_path"]) or {}
+    # 栏数须与资产提取入口一致：同一轮 gather 已给出文档级双栏判定（含框线表格
+    # 单元格剔除），版式模型直接复用
+    gathered = scan_ctx.get("gathered")
+    text_layer_dual = bool(getattr(gathered, "is_dual_column", False)) if gathered is not None else None
     try:
         os.makedirs(asset_dir, exist_ok=True)
         # 与 extract_pdf_assets.main_modular 对 --layout-model-detail 的映射保持一致。
@@ -252,6 +256,7 @@ def _export_layout_only(layout_detail: str, paths: Dict[str, str]) -> Dict[str, 
             include_details=layout_detail != "summary",
             include_units=layout_detail != "summary",
             full_text_export=layout_detail == "full",
+            text_layer_dual=text_layer_dual,
         )
     except Exception as exc:
         print(f"ERROR: layout model export failed: {exc}", file=sys.stderr)

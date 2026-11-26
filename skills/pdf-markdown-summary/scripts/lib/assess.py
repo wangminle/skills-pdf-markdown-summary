@@ -622,13 +622,14 @@ def finalize_caption_inventory(
     由主入口汇总为非零退出码（区别于质量存疑）。
     """
     try:
-        import fitz
+        from .pdf_backend import open_pdf
     except ImportError:
         return {}
 
     from .caption_detection import build_caption_index
 
-    doc = fitz.open(pdf_path)
+    # 与提取主链同一入口：去掉页面旋转统一到内容坐标系，解析结果命中按页缓存
+    doc = open_pdf(pdf_path)
     try:
         index = build_caption_index(doc)
         index_expected = expected_captions_from_index(index)
@@ -724,10 +725,6 @@ def render_inventory_gap(
     *,
     dpi: int = 300,
 ) -> Optional[AttachmentRecord]:
-    try:
-        import fitz
-    except ImportError:
-        return None
     caption_rect = expected.candidate.rect
     page_rect = page.rect
     clip = gap_clip_from_caption(caption_rect, page_rect)

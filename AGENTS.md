@@ -20,9 +20,8 @@
   - `tests/basic-benchmark/`：**只读**。固定测试集 PDF 存放目录。**禁止往 benchmark 中写入任何测试结果或临时文件**。
   - `tests/results/`：端到端测试输出目录，按日期分文件夹（如 `20260807-001/`），已加入 .gitignore。**所有测试结果都写这里**（含 golden 基准）。
   - `tests/annotations/`：人工标注 GT，已加入 .gitignore。
-  - `tests/holdout/`：冻结 holdout 集，已加入 .gitignore。
+  - `tests/holdout/`：冻结 holdout 集，已加入 .gitignore。清单在 `tests/eval/holdout_manifest.json`，克隆后用 `python3 tests/eval/fetch_holdout.py` 重建（`--check` 只校验）。
   - `tests/scripts/`、`tests/eval/`：pytest 脚本与版本化评测器，保留可提交。
-- `old-version/`：历史代码归档目录，仅供参考。
 - `task-list.md`：后续用于记录所有操作、修改和测试。
 
 ## 3. 正式 Skill 目录
@@ -41,12 +40,11 @@
 - 禁止把新的运行产物写入 `design/2-ref/`。
 - 与当前 Skill 重构无关的旧文档，应移动到 `design/1-archive/`。
 
-## 5. old-version 规则
+## 5. 历史代码归档
 
-- `old-version/` 只供参考。
-- 不再修改和维护 `old-version/` 下的旧代码。
-- 不要基于 `old-version/` 开发新功能。
+- `old-version/` 已于 2026-11-24 删除（`4922d0e`），仓库不再附带历史代码归档目录；历史代码看 Git 记录。
 - 需要保留历史快照时，可以新增归档目录，但不要改动已有归档内容。
+- 归档目录只供参考：不修改、不维护，不基于它开发新功能。
 
 ## 6. task-list.md 规则
 

@@ -175,7 +175,9 @@ def classify_text_types(
 def detect_columns(
     all_units: Dict[int, List["EnhancedTextUnit"]],
     page_width: float,
-    debug: bool = False
+    debug: bool = False,
+    *,
+    dual_confirmed: Optional[bool] = None,
 ) -> Tuple[int, float, Dict[int, List["EnhancedTextUnit"]]]:
     """
     检测文档是单栏还是双栏。
@@ -186,6 +188,10 @@ def detect_columns(
         all_units: 按页组织的文本单元字典
         page_width: 页面宽度
         debug: 调试模式
+        dual_confirmed: 文本层的文档级双栏判定（None 表示调用方没有这一结论）。
+            直方图判出双栏时还须它确认：单栏文档里并排的表格、左右分列的标签
+            同样会形成双峰，而文本层的判定带有满宽主导页、并排表格页、框线
+            表格单元格等守卫。不确认时回落单栏，图框不会被夹到半页。
 
     Returns:
         (num_columns, column_gap, updated_units):
@@ -306,6 +312,17 @@ def detect_columns(
         for units in all_units.values():
             for unit in units:
                 unit.column = -1
+
+    if num_columns >= 2 and dual_confirmed is False:
+        # 文本层不认这次双栏：双峰来自并排的表格或标签，不是双栏正文。
+        num_columns = 1
+        column_gap = 0.0
+        for units in all_units.values():
+            for unit in units:
+                unit.column = -1
+
+        if debug:
+            print("Rejected TWO-column result: not confirmed by the text layer")
 
     return num_columns, column_gap, all_units
 

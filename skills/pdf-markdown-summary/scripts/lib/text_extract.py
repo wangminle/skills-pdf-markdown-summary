@@ -1081,12 +1081,16 @@ def _min_column_gap(
 
     只统计起点落在左右栏位置附近的窄行，栏内的居中公式、右对齐编号等
     不参与；左列取最大右缘，所以右不齐的正文不会被当成宽留白。
+
+    起点在左栏位置、右缘却越过右栏起点的行横跨两栏（通栏图的题注、跨栏
+    的表头），两栏并排的正文里不会有这种行，不计入左列。计入的话，一条
+    中等宽度的题注就能把留白拉成负数，让下面的并排内容被当成双栏正文。
     """
     left_peak, right_peak = peaks
     tolerance = max(12.0, page_width * 0.04)
     left_edges = [
         x0 + width for x0, width in zip(x0_values, width_values)
-        if abs(x0 - left_peak) <= tolerance
+        if abs(x0 - left_peak) <= tolerance and x0 + width <= right_peak
     ]
     right_starts = [x0 for x0 in x0_values if abs(x0 - right_peak) <= tolerance]
     if not left_edges or not right_starts:
@@ -2116,6 +2120,7 @@ def extract_text_with_format(
     include_details: bool = True,
     include_units: bool = True,
     full_text_export: bool = False,
+    text_layer_dual: Optional[bool] = None,
 ) -> "DocumentLayoutModel":
     """
     提取文本并保留完整格式信息，构建版式模型。
@@ -2125,6 +2130,10 @@ def extract_text_with_format(
         out_json: 输出 JSON 路径（可选）
         sample_pages: 采样页数（None 表示全部）
         debug: 调试模式
+        text_layer_dual: 文本层的文档级双栏判定（gather_structured_text 的
+            is_dual_column）。版式模型判出双栏时须它确认；两个正式入口都会传入
+            同一轮 gather 的结论。None 时用同一批原生块现算一次（不含框线表格
+            单元格的剔除），仅供直接调用。
 
     Returns:
         DocumentLayoutModel 版式模型对象
@@ -2231,8 +2240,13 @@ def extract_text_with_format(
     # 文本类型分类
     all_units = classify_text_types(all_units, typical_font_size, typical_font_name, page_size[0], debug=debug)
 
-    # 双栏检测
-    num_columns, column_gap, all_units = detect_columns(all_units, page_size[0], debug=debug)
+    # 双栏检测：直方图判出双栏时，还须文本层的文档级判定确认
+    dual_confirmed = text_layer_dual
+    if dual_confirmed is None:
+        dual_confirmed = detect_dual_column_from_blocks(native_blocks_filtered, page_size[0])
+    num_columns, column_gap, all_units = detect_columns(
+        all_units, page_size[0], debug=debug, dual_confirmed=dual_confirmed
+    )
 
     # 构建文本区块
     all_blocks = build_text_blocks(all_units, typical_line_height, debug=debug)

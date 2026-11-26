@@ -75,11 +75,10 @@ _HYPHEN_BREAK_RE = re.compile(r"([A-Za-z]+(?:-[A-Za-z]+)*)-$")
 
 def collect_caption_word_forms(doc: Union[PDFDocument, Any]) -> Set[str]:
     """收集全文已有的完整词形，不拼接换行，供题注断词判定（BUG-140）。"""
-    raw_doc = _unwrap_doc(doc)
     forms: Set[str] = set()
-    for pno in range(len(raw_doc)):
+    for pno in range(len(_unwrap_doc(doc))):
         forms.update(word.casefold() for word in _CAPTION_WORD_RE.findall(
-            raw_doc[pno].get_text("text")
+            _page_view(doc, pno).get_text("text")
         ))
     return forms
 
@@ -126,6 +125,29 @@ def _unwrap_doc(doc: Union[PDFDocument, Any]) -> Any:
     return getattr(doc, "raw", doc)
 
 
+def _page_view(doc: Union[PDFDocument, Any], pno: int) -> Any:
+    """按页取对象：PDFDocument 的页用带解析缓存的 PDFPage，其余情况透传。"""
+    if isinstance(doc, PDFDocument):
+        return doc[pno]
+    return _unwrap_doc(doc)[pno]
+
+
+def _page_text_dict(page: Union[PDFPage, Any]) -> Dict[str, Any]:
+    """页面结构化文本：PDFPage 走按页缓存，裸 PyMuPDF 页直接解析。"""
+    getter = getattr(page, "get_text", None)
+    if getter is not None:
+        return getter("dict")
+    return _unwrap_page(page).get_text("dict")
+
+
+def _page_drawings(page: Union[PDFPage, Any]) -> List[Any]:
+    """页面矢量图：PDFPage 走按页缓存，裸 PyMuPDF 页直接解析。"""
+    getter = getattr(page, "get_drawings", None)
+    if getter is not None:
+        return getter()
+    return _unwrap_page(page).get_drawings()
+
+
 def get_page_images(page: Union[PDFPage, Any]) -> List[Any]:
     """
     提取页面中所有图像对象的边界框。
@@ -138,10 +160,12 @@ def get_page_images(page: Union[PDFPage, Any]) -> List[Any]:
     """
     images: List[Any] = []
     try:
-        raw_page = _unwrap_page(page)
-        dict_data = raw_page.get_text("dict")
+        dict_data = _page_text_dict(page)
+        page_rect = getattr(page, "rect", None)
+        if page_rect is None:
+            page_rect = _unwrap_page(page).rect
         from .extract_helpers import collect_image_rects
-        images = collect_image_rects(dict_data, raw_page.rect)
+        images = collect_image_rects(dict_data, page_rect)
     except Exception as e:
         page_no = getattr(_unwrap_page(page), "number", None)
         extra = {'stage': 'get_page_images'}
@@ -163,8 +187,7 @@ def get_page_drawings(page: Union[PDFPage, Any]) -> List[Any]:
     """
     drawings: List[Any] = []
     try:
-        raw_page = _unwrap_page(page)
-        for dr in raw_page.get_drawings():
+        for dr in _page_drawings(page):
             r = dr.get("rect")
             if r:
                 drawings.append(r)
@@ -428,7 +451,9 @@ def find_all_caption_candidates(
 
     try:
         if word_forms is None:
-            word_forms = collect_caption_word_forms(_unwrap_page(page).parent)
+            word_forms = collect_caption_word_forms(
+                getattr(page, "doc", None) or _unwrap_page(page).parent
+            )
         dict_data = page.get_text("dict")
         page_blocks = dict_data.get("blocks", [])
 
@@ -682,8 +707,7 @@ def select_best_caption(
         score_page = page
         if doc is not None:
             try:
-                raw_doc = _unwrap_doc(doc)
-                score_page = raw_doc[cand.page]
+                score_page = _page_view(doc, cand.page)
             except Exception as e:
                 logger.warning(
                     f"Failed to access page {cand.page + 1} for caption scoring: {e}",
@@ -761,7 +785,7 @@ def build_caption_index(
     if word_forms is None:
         word_forms = collect_caption_word_forms(doc)
     for pno in range(len(raw_doc)):
-        page = raw_doc[pno]
+        page = _page_view(doc, pno)
         images = get_page_images(page)
         drawings = get_page_drawings(page)
 

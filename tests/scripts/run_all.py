@@ -23,7 +23,7 @@ QA-01 统一测试入口
   一律失败，仅用户显式授权的排除模式可跳过），
   通过/失败数从 pytest 输出解析，解析不到标记"数量未知"。
 
-测试套件（共 33 个）：
+测试套件（共 37 个）：
 1. P0 环境变量优先级测试 (test_p0_env_priority.py)
 2. P1 标识符解析测试 (test_p1_ident_parsing.py)
 3. QA-03 debug_artifacts 测试 (test_qa03_debug_artifacts.py)
@@ -57,6 +57,10 @@ QA-01 统一测试入口
 31. 栏检测标准库迁移回归测试 (test_detect_columns_stdlib_20261124.py)
 32. 正文字号与 LaTeX 粗体回归测试 (test_body_font_size_20261124.py)
 33. 双栏统一、控制字符清洗与扫描共享回归测试 (test_wp2_3_text_unification_20261125.py)
+34. 按页解析缓存回归测试 (test_page_parse_cache_20261126.py)
+35. 版式模型双栏判定与文本层同源回归测试 (test_layout_model_column_sync_20261126.py)
+36. 双栏通栏图与栏沟裁剪回归测试 (test_two_column_figure_clamp_20261126.py)
+37. Holdout 清单下载器校验回归测试 (test_holdout_fetch_20261126.py)
 另有 Golden 对比测试 (test_extraction_golden.py)，默认纳入，--skip-golden 排除。
 """
 
@@ -479,6 +483,34 @@ def main(argv: Optional[List[str]] = None) -> int:
     test_suites.append({
         "name": "双栏统一、控制字符清洗与扫描共享回归 (20261125)",
         "path": TESTS_SCRIPTS_DIR / "test_wp2_3_text_unification_20261125.py",
+    })
+
+    # 2026-11-26 WP-2.3 可选项：按页解析缓存（get_text 的 dict/text 与 get_drawings
+    # 跨同一文件的多次打开共享），以及页面/文件变更后的失效与变异检测
+    test_suites.append({
+        "name": "按页解析缓存回归 (20261126)",
+        "path": TESTS_SCRIPTS_DIR / "test_page_parse_cache_20261126.py",
+    })
+
+    # 2026-11-26 V0.6.15 阶段 1.2：版式模型判出双栏须文本层确认（并排表格页
+    # 不再让通栏图被夹到半页），以及栏间留白不计横跨两栏的行
+    test_suites.append({
+        "name": "版式模型栏位同源回归 (20261126)",
+        "path": TESTS_SCRIPTS_DIR / "test_layout_model_column_sync_20261126.py",
+    })
+
+    # 2026-11-26 V0.6.15 阶段 2.2：Holdout 双栏论文发现的栏位裁剪缺陷（通栏题注不再
+    # 被夹成半幅，栏沟取本页实际正文行，单栏图不伸进邻栏文字）
+    test_suites.append({
+        "name": "双栏通栏图与栏沟裁剪回归 (20261126)",
+        "path": TESTS_SCRIPTS_DIR / "test_two_column_figure_clamp_20261126.py",
+    })
+
+    # 2026-11-26 CHK-098：Holdout 下载先校验 sha256 再落盘，坏包不残留；清单的
+    # 文档号与文件名不得带路径
+    test_suites.append({
+        "name": "Holdout 下载器校验回归 (20261126)",
+        "path": TESTS_SCRIPTS_DIR / "test_holdout_fetch_20261126.py",
     })
 
     # 清单完备性闸门：清单是硬编码的，新增 test_*.py 若忘了登记，

@@ -155,7 +155,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     "message": (
                         f"在 {args.gt_dir} 下未找到任何 <document_id>/gt.json。"
                         "人工标注尚未开始是正常状态；请先完成 A0-4 标注，"
-                        "或参考 tests/annotations/SCHEMA-20260731.md。"
+                        "或参考 tests/annotations/SCHEMA-20261126.md。"
                     ),
                 },
                 ensure_ascii=False,

@@ -244,6 +244,9 @@
 | BUG-231 | 修复 | --images off --tables off 时显式 --layout-model-detail full 被静默忽略 | 2026-11-25 18:48 | 2026-11-25 21:25 | 已修复 | P3，[[CHK-094]]。pdf_to_markdown 返回成功但不生成 layout_model.json，帮助与报告也未说明。修复：--layout-model-detail 默认改为 None；两个资产开关都关闭且未显式指定时跳过，显式 summary/blocks/full 仍执行资产提取并写布局模型。回归 test_explicit_layout_export_works_when_assets_disabled。；[[CHK-095]] 三种显式布局级别均生成模型，重新打开：用 Attention 正常转换产出的同一临时资产目录复跑，关闭图表且未指定布局时保留旧资产，显式 full 时覆盖旧索引（9 项变 0）并删除同一 PDF 已有的 9 张图表 PNG。；2026-11-25 [[DEV-033]] 修复：图表与表格都关闭且显式指定布局档位时只写 layout_model.json，不再经过资产提取入口。回归 test_layout_only_export_preserves_existing_assets，断言索引字节不变、已有 PNG 原样保留、布局模型与完整资产提取同档位写出的结果逐字节一致。说明：独立入口 extract_pdf_assets.py 自身带 --no-figures --no-tables 时仍会写出本轮索引，属该入口的既有语义，本次未改动。 |
 | BUG-232 | 修复 | F21.017 功能编号仍声明 table 仅返回原文本，与已更新的字面转义实现冲突 | 2026-11-25 18:48 | 2026-11-25 19:36 | 已修复 | P3，[[CHK-094]]。machine 编号表与功能全集仍写「table 仅返回已提供 text」「输出原 table 文本」，消费者会误以为可原样透传。修复：同步 F21.017 的职责、输入输出说明，并复核 F21.016 的 rich_text 生产/渲染边界描述；编号校验一致。 |
 | BUG-233 | 修复 | 富文本转义将已确认的 ASCII 星号项目符号变成普通段落 | 2026-11-25 20:01 | 2026-11-25 22:43 | 已修复 | P2，复核 BUG-227 时发现。两条 10pt、相邻的星号列表项已在抽取阶段标记为 list，但 format_spans_as_markdown 把行首星号也转义为字面字符，markdown.py 的 _render_list_block 只识别未转义的星号前缀。正式 CLI 产物由 CommonMark 解析为 0 个项目符号列表，HEAD 为 1 个列表、2 项。见 tests/results/20261125-185/boundary-probe.log 与 compare-probe.log。；2026-11-25 [[DEV-033]] 修复：列表块行首已被生产阶段转义为字面星号的项目符号，渲染时一并规范为列表标记。回归 test_asterisk_list_items_survive_rich_text_escaping，见 [[TST-069]]。；[[CHK-096]] 普通字重的星号列表样例通过。星号与项正文同为粗体时，块元数据仍为 list，生成的富文本先出现粗体开标记，现有星号前缀规则无法识别，CommonMark 仍解析为两个粗体段落。；[[DEV-034]] 规范化转义星号时识别其粗斜体包装并把项目样式留给正文。普通及粗体两个字体样例均解析为一组两项，粗体项均保留 strong。 |
+| BUG-234 | 修复 | 版式模型把单栏页里的并排表格判成双栏，通栏图被夹到题注所在的半页 | 2026-11-26 13:50 | 2026-11-26 14:05 | 已修复 | P1，V0.7.0 阶段 1.2 评估时发现。lib/layout_model.py 的 detect_columns 只看段落起点双峰，CHK-094、CHK-095 与 BUG-226 三个合成夹具上文本层判单栏而版式模型判双栏；端到端复现：单栏页配两列内容时通栏图只框住 43%。clip_limit.py 的策略 1 据此把图框夹到半页。修复：detect_columns 增 dual_confirmed，直方图判出双栏还须文本层文档级判定确认；extract_text_with_format 增 text_layer_dual，资产提取入口把同一轮 gather 的判定传入，没有 gather 时用同一批原生块现算。回归 test_layout_model_column_sync_20261126.py。15 份真实文档（8 基准 + 7 Holdout）修复前后栏位结论全部不变。 |
+| BUG-235 | 修复 | 并排表格页判据被横跨两栏的题注拉成负留白，通栏图下方的两列内容被当成双栏正文 | 2026-11-26 13:55 | 2026-11-26 14:05 | 已修复 | P2，同上评估中发现。text_extract._min_column_gap 取左列最大右缘；起点落在左栏位置、右缘却越过右栏起点的行（中等宽度的通栏题注）把留白算成 -32pt，_page_is_side_by_side_table 判否，文本层最终判双栏，阅读顺序被按列重排。修复：这类横跨行不计入左列。修复后同一页留白 131pt，判单栏并按行输出。 |
+| BUG-236 | 修复 | 双栏论文的通栏图因题注中心比页面中线偏右被夹成半幅，栏沟估算偏到邻栏文字 | 2026-11-26 14:50 | 2026-11-26 15:02 | 已修复 | P1，Holdout 首轮评估发现。refine_clip_x_range 的策略 1 只按题注中心偏向页面中线哪一侧定栏位：BERT 图 1 题注框 72～525，中心比中线偏右 1.1pt，图被夹到右半幅；按栏距估算的栏沟默认居中，ResNet 实际栏沟偏左 8.4pt，外扩余量把右栏正文带进裁剪图。三份等宽双栏论文 18 张图有 14 张因此被判 object_truncation。修复：题注同时伸进左右两栏时不按栏收窄；新增 _actual_column_gutter 从本页顶到栏外缘的正文行取实际栏沟；朝向栏沟一侧的余量不越过栏沟。Holdout 91 项资产需复核 25→15，改善 10 项、降级 0 项，三份单栏文档不变。回归 test_two_column_figure_clamp_20261126.py（5 条，修复前全红）。；评估与验证见 [[CHK-097]]、[[TST-072]]。 |
 
 ## 调整事项
 
@@ -260,11 +263,16 @@
 | ADJ-009 | 优化 | 拆分超载的 `lib/refine.py` 并清理 Markdown/DrawItem/像素检测模块边界 | 2026-06-22 00:00 | 2026-06-22 00:00 | 已完成 | 将精裁实现拆入 `pixel_detect.py`、`text_trim.py`、`object_refine.py`、`figure_post.py`、`table_refine.py`、`far_side.py`、`acceptance.py`、`clip_limit.py`；`refine.py` 保留兼容导出；新增 `markdown.py`，旧 Markdown 模块改为兼容导出；`DrawItem` 统一使用 `models.py` 定义，`estimate_ink_ratio` 迁入像素检测模块 |
 | ADJ-010 | 调整 | 删除 `--engine legacy` 与 `PDF_SUMMARY_AGENT_ENGINE` 环境变量，引擎固定为 modular；CLI 删除从未生效的死参数 `--protect-far-edge-px`（原默认 18）与 `--near-edge-pad-px`（原默认 6），新增 `--no-refine-near-edge-only` 反向开关 | 2026-07-31 08:48 | 2026-07-31 08:48 | 已完成 | `--refine-near-edge-only` 默认 True；四个入口脚本 `--help` 验证正常 |
 | ADJ-011 | 调整 | 核对 preset robust 实际取值并同步 `scripts/__init__.py` 版本号 | 2026-07-31 08:48 | 2026-07-31 08:48 | 已完成 | robust 实际生效：clip-height 520（argparse 裸默认 650）、margin-x 26（裸默认 20）、caption-gap 6（裸默认 5），并默认开启 text-trim、autocrop、autocrop-mask-text；版本号从 0.3.1 同步为 0.5.10，与 git tag V0.5.10 一致 |
-| ADJ-012 | 调整 | （补录）`lib/debug_visual.py` 存在未提交的 STAGE_COLORS 配色调整改动 | 2026-07-31 08:48 | - | 进行中 | 用户进行中的工作，本次仅登记状态，不代表已完成 |
+| ADJ-012 | 调整 | （补录）`lib/debug_visual.py` 存在未提交的 STAGE_COLORS 配色调整改动 | 2026-07-31 08:48 | 2026-11-26 14:40 | 已完成 | 用户进行中的工作，本次仅登记状态，不代表已完成；2026-11-26 核实：STAGE_COLORS 配色调整已随 0b6e498（V0.6.7，2026-10-01）入库，工作区无未提交改动，本条核销。 |
 | ADJ-013 | 调整 | ID 去重：功能开发区 BUG-025~033 与代码 Bug 区重复，移入代码 Bug 区并改号为 BUG-061~069（BUG-025->BUG-061; BUG-026->BUG-062; BUG-027->BUG-063; BUG-028->BUG-064; BUG-029->BUG-065; BUG-030->BUG-066; BUG-031->BUG-067; BUG-032->BUG-068; BUG-033->BUG-069）；DOC-051 重复条目改号为 DOC-054 | 2026-08-10 15:20 | 2026-08-10 15:20 | 已完成 | 保留原始记录内容，仅改号和迁移分区 |
-| ADJ-014 | 优化 | 单条数字脚注折行超过 1 条续行被拒：需要可靠判据区分脚注与编号章节标题 | 2026-09-30 22:06 | - | 待办 | BUG-127 的取舍：为拒绝 BUG-126 的 `1 Introduction`+正文，单标记块最多带 1 条续行，因此真实的单条数字脚注若折成 3 行或更多（`1 <长脚注> / 续行 / 续行`）会整块被拒，与表格底边被裁进脚注中间的旧症状同类。本轮审查复现：3 行单脚注得 0 行。没有改动，原因是需要可靠的判别特征，不能靠继续加限额：可考虑首行是否以句号结尾、是否明显比栏宽短（标题通常短且无句号）、字号是否小于后续正文、续行是否与首行同字号同左缘。建议先在真实语料中收集样本（目前 benchmark 与 Uni-Parser/PaddleOCR-VL 中没有此类脚注），再定判据；有样本前不建议改动。另一个极低概率边界：`Note:` 块后紧跟同字号、间距 ≤4pt 的编号行（如 `7 Experimental details`）会被当作 Note 续行吞入，实际章节标题字号通常更大，会被字号差守卫挡下。 |
+| ADJ-014 | 优化 | 单条数字脚注折行超过 1 条续行被拒：需要可靠判据区分脚注与编号章节标题 | 2026-09-30 22:06 | - | 待办 | BUG-127 的取舍：为拒绝 BUG-126 的 `1 Introduction`+正文，单标记块最多带 1 条续行，因此真实的单条数字脚注若折成 3 行或更多（`1 <长脚注> / 续行 / 续行`）会整块被拒，与表格底边被裁进脚注中间的旧症状同类。本轮审查复现：3 行单脚注得 0 行。没有改动，原因是需要可靠的判别特征，不能靠继续加限额：可考虑首行是否以句号结尾、是否明显比栏宽短（标题通常短且无句号）、字号是否小于后续正文、续行是否与首行同字号同左缘。建议先在真实语料中收集样本（目前 benchmark 与 Uni-Parser/PaddleOCR-VL 中没有此类脚注），再定判据；有样本前不建议改动。另一个极低概率边界：`Note:` 块后紧跟同字号、间距 ≤4pt 的编号行（如 `7 Experimental details`）会被当作 Note 续行吞入，实际章节标题字号通常更大，会被字号差守卫挡下。；2026-11-26 补充：Holdout 集已有多行数字脚注的真实样本（ResNet 4 页、BERT 7 页、ELECTRA 8 页、NIST 10 页），可据此收集判据样本；本轮未改动。 |
 | ADJ-015 | 开发 | 补齐 issue #3 的逐资产 Markdown 嵌入状态及控制台 embedded/extracted 汇总 | 2026-10-01 16:01 | 2026-10-01 21:17 | 已完成 | 当前inventory对账的是题注期望与提取导出，不能作为Markdown是否嵌入的证明。002批三篇24条图链均有效且实际内联，inventory均expected==exported、missing/sequence_gaps为0；但index资产仍无referenced_in_markdown或等价嵌入字段，console无embedded/extracted及过滤原因汇总。conversion_report已有count/extracted_count/omitted，属部分完成。https://github.com/wangminle/skills-pdf-markdown-summary/issues/3 问题2明确要求逐资产字段及控制台/报告汇总。可由Markdown放置完成后回写或独立关联报告实现，独立资产提取入口不应虚构嵌入状态。完成（2026-10-01）：新增 _annotate_and_persist_embed_status/_persist_embed_status_to_index/_summarize_embed_status——inserted 项写 referenced_in_markdown/embed_mode(inline/appendix)/suppressed_text_blocks，omitted 项写 False/None；按 (type,id,page,file) 键回写 index.json 的 items/figures/tables 三视图（兼容新旧格式）；main() 报告 assets 段新增 embedded_count/embed{inline,appendix}/omitted_reasons，控制台输出「Assets: extracted N, embedded M (inline i, appendix a), omitted K (reasons)」；extract_pdf_assets 独立入口不写这些字段，不虚构嵌入状态。回归 TestEmbedStatusAndSummary 4 例；批次 20261001-008 三篇 13/13、4/4、7/7 全 inline，index.json 逐项字段正确。验证见 CHK-033。 |
 | ADJ-016 | 优化 | 清理 CHK-085 遗留两处次要缺陷：删除 pdf_to_markdown.py 重复键 body_font_size 并收窄 Unicode 列表项目符号正则以保护 ✓/✔/● 等语义符号 | 2026-11-25 08:17 | 2026-11-25 08:17 | 已完成 | 回应 [[CHK-085]] 次要观察：(1) 删除 `core/pdf_to_markdown.py` 文档 `meta` 字典中重复的 `body_font_size` 键；(2) 将 `lib/markdown.py::_UNICODE_LIST_BULLET_LINE_RE` 与 `lib/text_extract.py::_UNICODE_LIST_BULLET_RE` 从 `[•▪▫◦‣⁃●○■□◆◇✓✔➢➣➤]` 收窄为纯项目符号 `[•▪▫◦‣⁃➢➣➤]`，避免表格或文本行首的 `✓`/`✔`/`●` 等语义符号被误判为列表或替换为 `- `；(3) 在 `tests/scripts/test_markdown_structure_20261123.py::test_markdown_list_and_fenced_equation_rendering` 补充语义符号保护断言；(4) 通过 `sync_numbering_bug188_190_20261125.py --apply` 刷新 4 个文件哈希与 16 处行号引用，维持 415 编号 / 26 域 / 98 文件 / 1610 声明一致。 |
+| ADJ-017 | 优化 | 不等宽双栏版式（ACM 模板，左栏约 57%）被文本层与版式模型判成单栏 | 2026-11-26 14:20 | - | 待办 | P2，Holdout 的 arxiv-1912.13318v1-layoutlm 实测。左栏行宽超过 0.55 倍页宽，被 _page_line_samples 记为通栏行，只剩右栏一个峰；版式模型与文本层都返回单栏，书签标题召回只有 0.26（等宽双栏的 SQuAD 为 1.0）。需要按栏沟而非固定页宽比例识别栏式，牵动阅读顺序与图框，按双栏改动惯例须另跑合成矩阵与栏距网格，未在 V0.7.0 封板前处理。；评估记录见 [[DEV-039]]。 |
+| ADJ-018 | 优化 | 双栏论文里相邻的图与表互相争区域，8 项资产被判需复核 | 2026-11-26 15:05 | - | 待办 | P2，Holdout 实测。ResNet 第 8 页图 6 与表 7、表 8，SQuAD 第 5 页图 3 与表 3、第 8 页图 5 与表 5：告警为 cross_kind_overlap_with_figure 或 cross_kind_overlap_with_table，多数同时带 inventory_gap。见 tests/results/20261126-005/holdout-figtab-fixed/ 下各文档的 images/index.json。未改动。；评估记录见 [[DEV-039]]。 |
+| ADJ-019 | 优化 | 正文里的交叉引用被当成题注（如 Fig. 6 (middle) shows…、Table 5 shows the performance of…） | 2026-11-26 15:05 | - | 待办 | P3，Holdout 实测。ResNet 第 7 页的 Fig. 6 (middle) shows the behaviors 被当作图 6 的题注，裁出 26～586 的全宽框；SQuAD 第 7 页与第 4 页的两句正文被当作表 5、表 3 的题注，产生 inventory_gap 与 table_band_open。对账里表现为 ResNet、SQuAD 各 1 项意外。未改动。；评估记录见 [[DEV-039]]。 |
+| ADJ-020 | 优化 | pymupdf4llm 后端在精修被边界守卫拒绝后，把本来合格的默认裁剪降级为需复核 | 2026-11-26 15:12 | - | 待办 | P3，阶段 2.2 评估。修复后的链路上 91 项资产：开启后端改善 2 项（T5 表 3、ELECTRA 表 2），变差 10 项，需复核 15→23；10 项的裁剪框与关闭时逐点相同，告警为 legacy_boundary_guard: expand(85～274pt)。后端提议的区域比原框大出百余点，守卫拒绝了精修却仍降级原框。耗时 1.28 倍（布局缓存已热；冷启动 2.21 倍）。结论：保持可选，不做默认；若要启用，先让精修被拒不降级已合格的默认裁剪。证据 tests/results/20261126-005/holdout-backend-compare-final.json。；评估记录见 [[DEV-039]]。 |
+| ADJ-021 | 优化 | Holdout 其余需复核资产与一处合成夹具观察 | 2026-11-26 15:05 | - | 待办 | P3。修复后仍需复核 15 项：除相邻图表归属与交叉引用两类外，另有表头被裁 2 项（ELECTRA 表 2、SQuAD 表 5，header_clipped）、页眉行混入 1 项（ResNet 图 1 紧贴作者邮箱行，裁剪框向上扩到页眉）。观察项：合成双栏页里左栏图上方有逐行写入的正文时，精修框被验收拒绝后回退到 Phase A 的全宽框，把上方正文圈入且状态为 accepted；修复前后结果相同，真实论文（BERT 图 5）未见此现象，复现脚本 experiments/hygiene-20261126/probe_left_fixture.py。；同类条目见 [[ADJ-018]]、[[ADJ-019]]；评估记录见 [[DEV-039]]。；2026-11-26 补充分类：修复后的 15 项需复核为 图表相邻争区域 7 项、对账缺口 2 项、表头被裁 2 项、object_truncation 4 项（ResNet 图 1 页眉行混入、ResNet 图 6 第 7 页正文交叉引用、ResNet 表 12 第 11 页、T5 表 3 第 21 页）；ResNet 表 8 同时带截断与重叠告警，计入第一类。明细见 tests/results/20261126-005/Holdout评估报告-20261126.md。 |
 
 ## 检查事项
 
@@ -366,6 +374,10 @@
 | CHK-094 | 检查 | 审查 V0.6.14 工作区：复核正文保真、双栏、跨页列表及布局导出 | 2026-11-25 18:48 | 2026-11-25 18:48 | 已完成 | 审查 HEAD ddf525f 以上全部 22 项未暂存修改，无已暂存或未跟踪项；未修改业务代码。独立合成 PDF 对照 HEAD 和当前输出，确认同文正文与数字表格值误删、稀疏双栏错序、同字号表格错分栏、不同页字号干扰 Layout 栏位、富文本星号及反斜杠变形、跨栏嵌套和跨页合并误判；核对关闭图表时显式 full 参数无输出，以及 F21.017 编号描述未同步。复现见 tests/results/20261125-182/probe.log。同批 pytest 日志：PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q（指定 tests/results/20261125-182/pytest 为临时目录）为 859 passed、0 skipped；四入口 --help、compileall、编号动态校验、git diff --check 均通过。修复闭环（2026-11-25 19:36）：11 项已修为 [[BUG-222]]～[[BUG-232]]，新增 10 项回归，最终 869 passed / 0 skipped，编号 415 / 1668 声明；见 [[DEV-032]]、[[TST-068]]。；独立复核见 [[CHK-095]]。以上首次修复验证结果为原场景的历史记录；扩展场景仍有四项待修复及一项新回归。 |
 | CHK-095 | 检查 | 独立复核 CHK-094 修复，确认原始场景通过及 5 类边界问题 | 2026-11-25 19:59 | 2026-11-25 20:04 | 已完成 | 对照 HEAD ddf525f 与当前 22 个工作区变更文件，复跑原始合成探针、10 条定向回归及 F21.016/F21.017 JSON 与全集描述核对。原场景均符合预期；正向跨页有序列表为同一张列表，关闭图表时 summary/blocks/full 均导出且多页字号场景栏数为 2。扩展探针确认 [[BUG-223]] 极页边表格值误删、[[BUG-226]] 多行单元格及稀疏两行表错序、[[BUG-230]] 未确认的页边数字仍触发列表误判、[[BUG-231]] 显式布局导出覆盖旧索引并清理既有 9 张图表 PNG，新增 [[BUG-233]] 星号项目符号回归。PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q（指定 tests/results/20261125-185/pytest 临时目录）为 869 passed、0 failed、0 skipped，301.55 秒；Golden 8 份 PDF 强制重提（20261125-186）及 1 项覆盖校验均通过。编号校验 415 编号 / 26 域 / 98 文件 / 1668 声明，四入口 --help、compileall、git diff --check 通过。证据在 tests/results/20261125-185/，台账以外仅生成本地复现产物，benchmark 仍为 8 份只读输入。；2026-11-25 [[DEV-033]] 已修复重开的四项与新增的一项回归，验证见 [[TST-069]]；修复后的独立复核尚未进行。；后续已进行独立复核，原反例通过及扩展残留见 [[CHK-096]]。 |
 | CHK-096 | 检查 | 独立复核 CHK-095 五项修复及输出路径保护 | 2026-11-25 21:44 | 2026-11-25 21:50 | 已完成 | 对当前工作区和 HEAD ddf525f 以上 22 个变更文件的相关调用链复核。直接重放 tests/results/20261125-185/ 的原始失败 PDF（正式 pdf_to_markdown CLI）：极页边不同标签 42/43 保留，宽间距多行表与稀疏两行表均逐行，孤立 42 不再触发跨页误判，普通星号列表 CommonMark 为一组两项；Attention 在关闭图表时通过 summary/blocks/full 仅导出版式，原索引和图表 PNG 等既有资产逐字节相同，确认 [[BUG-231]] 的原修复。扩展确认 [[BUG-154]] 派生布局文件未接入路径身份校验，隔离源 PDF 被覆盖且 rc=0/ready；[[BUG-223]] 重复表格标签、[[BUG-226]] 39.89pt 列间留白、[[BUG-230]] 相邻页中部连续数字与真镜像页脚、[[BUG-233]] 粗体星号列表均有残留。证据 tests/results/20261125-188/acceptance.log、edge.log。8 份 Basic Benchmark 用修复前源码副本和当前代码关闭图表对照，Markdown 字节与结构块类型、文本、阅读顺序一致。全量 PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q（指定独立 --basetemp 与 --junitxml）879 passed、0 failed、0 skipped，262.72 秒；JUnit 确认 9 项 Golden 均执行，8 份 PDF 重提批次 20261125-189。编号校验 415/26/98/1683，compileall、四入口 --help、git diff --check 与台账检查通过；本轮仅变更台账并写本地验证产物。；五项已由 [[DEV-034]] 修复并按原输入重跑，16 个新增场景转绿、全量 895 通过，见 [[TST-070]]。 |
+| CHK-097 | 检查 | Holdout 首轮无标注指标复核 | 2026-11-26 14:45 | 2026-11-26 15:30 | 已完成 | 栏式判定 6/7（LayoutLM 不等宽双栏漏判）；图片零断链、零字节 PNG 为 0、代码围栏全部配对；题注对账 7 份无缺失，ResNet、SQuAD 各 1 项意外、跨类重叠 3 与 4；标题检出对照书签，前三级召回 SQuAD 1.00、NIST 0.96、ELECTRA 0.72（漏 3.1～3.5 小节）、T5 0.54（漏段级小标题）、LayoutLM 0.26；资产 91 项，修复前需复核 25、修复后 15，单栏文档 2/34、等宽双栏论文修复前 23/50、修复后 13/50。目视复核 BERT 图 1、图 4 与 ResNet 图 3 修复前后的裁剪图。 |
+| CHK-098 | 检查 | 独立验收 V0.7.0 阶段 1 与阶段 2 全部未提交改动（35 修改 + 5 未跟踪） | 2026-11-26 15:44 | 2026-11-26 15:44 | 已完成 | 只读验收，未修改源码、测试、文档或 Golden 基准；证据目录 tests/results/20261126-008/review/。通过门禁：全量 pytest 924 passed/0 failed/0 skipped（64.82s，JUnit 确认 Golden 9 项核心用例实跑）；编号校验 420/26 域/102 文件/1748 声明通过；fetch_holdout --check 7/7 齐全；run_eval --selfcheck 34/34 通过且 Holdout 返回 no_gt；compileall、四入口 --help、task_list_cli check 通过；tests/basic-benchmark/ 保持 8 份只读 PDF；Attention 端到端实测 PDF_SKILL_CACHE_MUTATION_CHECK=1 零异常，耗时 12.00s→7.31s（-39.1%），14 张 PNG 与 Markdown 逐字节一致；Probe F 确认 nist-ai-600-1 无编号题注行（0 图 0 表属锚点定位边界）。检出待处理项：(1) P2 core/pdf_to_markdown.py::_export_layout_only 漏传 scan_ctx['gathered'].is_dual_column 给 extract_text_with_format(text_layer_dual=...)，带框线两列表格单栏样例上完整提取判 1 栏而仅布局导出判 2 栏；(2) P2 lib/clip_limit.py::_actual_column_gutter 用 min(x0)/max(x1) 易被单个外凸标签或 overfull 行击穿（1 个偏左标签返 None、3 个偏左标签将 left_end 错估为 68pt；真实 Holdout ResNet 10/12、SQuAD 8/10 命中），且 refine_clip_x_range 仍以 page_center 而非实测栏沟中点判左右栏（非居中版心右栏短题注被错夹左栏）；(3) P2 tests/eval/fetch_holdout.py 下载后先 replace 目标文件再校验 sha256，错包会残留磁盘阻塞重跑；(4) P3 git diff --check HEAD 失败（tests/eval/README-20260731.md:81 末尾多空行），test_page_parse_cache_20261126.py 存在 F821 未定义 Dict（get_type_hints 抛 NameError）、F401 SimpleNamespace 未用、F841 images 未断言与 L311 未关闭 open_pdf，assess.py:625 import fitz 未用；(5) P3 lib/pdf_backend.py 负预算未钳制 0、_dict_text 异常前先标记 extracted 且跨实例真实重解析仍计 hits+=1；(6) P3 WBS §9.1 标题仍写 V0.6.14，§9.2 末尾与 §9.4 仍把已落地的按页缓存、old-version 清理和 0.7.0 封板列为待办/待决策；(7) 边界提醒：Windows 端尚未实机复验 BUG-166，阶段 2 的人工 GT 标注仍为 0 条（DEV-013/014 未闭环），5 个未跟踪文件提交前须 git add。 |
+| CHK-099 | 检查 | 修复并复验 CHK-098 的三项 P2 和三组 P3 问题 | 2026-11-26 16:29 | 2026-11-26 16:30 | 已完成 | 承接 [[CHK-098]]。验证仅布局和完整提取共用双栏结论；栏沟优先使用较宽正文行的行首众数，抗重复外凸标签和孤立越界行，偏心版面按实测栏沟中点定栏。冻结 Holdout 临时文件通过 SHA-256 才发布，坏包不残留，清单路径限单段，现有不匹配文件保留。缓存负预算钳制、首次异常可重试、真实解析不计命中均有回归；补齐类型注解和资源关闭，清掉未用导入和 EOF 空行，修正 WBS 过时状态。四组定向 48 项通过；Holdout 检查 7/7、评测器自检 34/34、语法编译 108 文件、四入口帮助和指定 Ruff 规则通过。ResNet 与 SQuAD 栏沟探针命中 12/12、9/10，BERT 16/16；不是 GT 指标。重用既有编号，全集、JSON、源码覆盖和三图已同步；420 编号、26 域、103 文件、1772 声明一致，三个 SVG 经 Quick Look 重新渲染。只读基准八份哈希未变。全量强制 Golden 等待中，Windows 实机、人工 GT 与正式 KPI 不在本次关闭范围。；最终以 PDF_GOLDEN_REEXTRACT=1 运行全量 pytest：943 通过、0 失败、0 跳过，Golden 9/9，218.94 秒，5 条 SWIG 弃用警告。JUnit：tests/results/20261126-091/pytest.xml。没有更新 Golden 基准；README 中英文回归统计同步。 |
+| CHK-100 | 检查 | 独立复核 CHK-099 对 CHK-098 全部 3 项 P2 与 3 组 P3 的修复结果，确认可提交 V0.7.0 | 2026-11-26 16:37 | 2026-11-26 16:37 | 已完成 | 只读复核，未改动业务源码、测试或文档；证据目录 tests/results/20261126-093/review/。原始失败探针逐项重放全部转绿：(1) Probe A：带框线两列表格单栏样例上完整提取与仅布局导出均判 num_columns=1；(2) Probe B：B1 单个偏左标签、B2 三个偏左标签、B3 右栏 overfull 行均准确回到 (300.0, 320.0)，B4 偏心版面右栏短题注按实测栏沟中点归右栏得 Rect(262.0,300.0,531.0,450.0) 不再截断；真实 Holdout 栏沟命中率升至 ResNet 12/12、BERT 16/16、SQuAD 9/10；(3) Probe C：typing.get_type_hints(_count_underlying_parses) 通过且 test_page_parse_cache 清理 F401/F821/F841 与资源关闭，assess.py 清理未使用 import fitz；(4) Probe D：负预算钳制 0，跨实例真实 dict 解析计 misses+=1 不虚增 hits，异常不误标 extracted；(5) Probe E：fetch_holdout 下载错 sha256 返回 rc=1 且零文件残留，load_manifest 拦截路径分隔符/..。全量门禁通过：pytest 943 passed/0 failed/0 skipped（62.67s，JUnit 确认 9 项核心 Golden 实跑）；git diff --check HEAD 通过；verify_numbering 420 编号/26 域/103 文件/1772 声明一致；fetch_holdout --check 7/7；run_eval --selfcheck 34/34；compileall、四入口 --help、task_list_cli check 通过；run_all.py 已登记全部 37 个套件；README/阅读说明计数均同步为 943 与 420/103/1772；tests/basic-benchmark/ 保持 8 份只读 PDF。两项非阻塞 P4 观察（不阻断提交）：(1) WBS 表格 WP-5.3 验收标准行仍写旧计数 415/98/1687；(2) fetch_holdout._is_plain_name 仅在 load_manifest 校验，直调 download_document 未重复校验。提交前提醒：纳入 6 个未跟踪文件，保持 Windows 未实机全量与人工 GT 0 条的边界口径。 |
 
 ## 测试数据
 
@@ -441,6 +453,8 @@
 | TST-068 | 检查 | CHK-094 修复验证：11 项合成对照、869 项强制重提全量、编号/文档/SVG 门禁 | 2026-11-25 18:48 | 2026-11-25 19:36 | 已完成 | 把 tests/results/20261125-182/probe.py 复制到 tests/results/20261125-183/chk094-probe 后对照 HEAD 与修复后输出：页眉同名正文保留在正文、表格 42/43 保留、稀疏尾页左栏两段后右栏两段、Layout 栏数恢复 2、通栏正文配双列表格恢复逐行、粗体 x**2 与两个连续反斜杠逐字回读、右栏列表不再缩进、未确认跨页列表保留分页标记、页面中部 42 阻断确认、显式 full 在关闭图表时生成 layout_model.json。全量 PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q：869 passed / 0 failed / 0 skipped（284.52s，Golden 9/9 强制重提，日志 tests/results/20261125-183/pytest.log）。编号校验 415 编号 / 26 域 / 98 文件 / 1668 声明；三张 SVG 重生成并 qlmanage 渲染；compileall、四入口 --help、git diff --check、台账 check 通过；tests/basic-benchmark 仅含 8 份 PDF。 |
 | TST-069 | 检查 | CHK-095 五项修复验证：10 项回归先红后绿、边界探针与原 11 项探针复跑、双栏矩阵与 8 份基准对照、强制重提全量 879 | 2026-11-25 20:40 | 2026-11-25 21:31 | 已完成 | TDD：10 项新回归在修复前全部按预期失败（[[BUG-223]] 反例、[[BUG-230]] 反例、[[BUG-226]] 三项、[[BUG-231]]、[[BUG-233]]），修复后全部通过；另有 3 个正例（两端式页脚的页码仍剔除、页码左右交替与带封面偏移时仍能连接跨页列表）修复前后均通过。探针：把 tests/results/20261125-185 的 boundary_probe.py 与 probe.py 复制到 experiments/fix-chk095-20261125/probes 复跑，边界 5 个场景全部符合预期（星号列表为 1 个列表 2 项、页脚带孤立数值 42 不再连接两段编号正文、两个表格场景逐行输出、仅导出布局后索引仍 9 项且无 PNG 被删），原 11 项探针输出与复核时逐字节相同。双栏回归：两端对齐 60 组乘 2 种排版漏判 0，单栏合成变体误判 0（修复前 1 例），8 份 benchmark 与 design/2-ref 的 3 份均判单栏，32 种合成版式矩阵全部符合。8 份 benchmark 修改前后对照（关闭图表模式）：Markdown 逐字节相同，段落数、标题数与层级、阅读顺序均不变。全量 `PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts -q`：879 passed、0 failed、0 skipped（250.69 秒），Golden 9/9 强制重提取落在 20261125-187。compileall、四入口 --help、git diff --check 与编号校验通过；tests/basic-benchmark 仅 8 份 PDF。证据在 experiments/fix-chk095-20261125/（修改前源码副本 before/、判据评估日志、探针日志、基准对照结果）。修复后的独立复核尚未进行。；独立复核已完成，原测试结果复现，扩展场景与门禁证据见 [[CHK-096]]。 |
 | TST-070 | 检查 | 验证 CHK-096 修复：16 个失败场景转绿、正式探针、8 份基准对照及 895 项全量 | 2026-11-25 22:24 | 2026-11-25 22:43 | 已完成 | tests/results/20261125-190/：定向红灯 16 失败、3 既有场景通过；收窄网格判据后定向 183 通过。edge-final.log 和 acceptance-final.log 重放 CHK-096、CHK-095 正式 CLI：同源布局输出拒绝且源 SHA 不变、重复标签及 42/43 保留、窄网格按行列、独立数字仍是正文、镜像页脚仍只生成一组列表、粗体项目保留，三档仅布局导出保护既有索引及 9 张 PNG。关闭图表时 8 份基准 Markdown 与结构块对照一致。PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q --basetemp=tests/results/20261125-190/full --junitxml=tests/results/20261125-190/pytest-full.xml：895 passed、0 failed、0 skipped，322.54 秒；JUnit Golden 9 项均执行，8 份重提产物位于 20261125-192。中间一次全量于收窄网格判据时停止，未作为通过依据。四入口 --help、compileall、git diff --check、编号校验通过，台账写后 check。基准输入目录维持 8 份 PDF。 |
+| TST-071 | 检查 | 验证按页解析缓存：912 项强制重提全绿、8 份基准两种模式输出逐字节对照、提速量化 | 2026-11-26 13:25 | 2026-11-26 13:45 | 已完成 | HEAD feda896 与工作区对照：fig 与 figtab 两种模式各 8 份，共 477 个文件；375 张 PNG 与 16 份 Markdown 逐字节相同，JSON 归一化后零剩余差异（只有 generated_at、extracted_at、run_id 与输出路径不同）。耗时 fig 164.5s→96.8s（-41.2%），figtab 240.3s→127.6s（-46.9%）。PDF_GOLDEN_REEXTRACT=1 全量 912 passed、0 skipped，Golden 9/9 实际执行，重提批次 tests/results/20261126-004，基线 tests/results/20261124-005 未改写。证据 tests/results/20261126-005/cache-verify/。 |
+| TST-072 | 检查 | V0.7.0 终验：924 项强制重提全绿、Golden 零漂移、编号与渲染检查 | 2026-11-26 15:05 | 2026-11-26 15:10 | 已完成 | PDF_GOLDEN_REEXTRACT=1 全量 924 passed、0 skipped，Golden 9/9 实际执行，重提批次 tests/results/20261126-007（源码指纹 8c7efcc667e1），基线 tests/results/20261124-005 未改写。compileall（正式 scripts、tests/scripts、tests/eval、tools）与四入口 --help 通过。编号校验通过：420 编号 / 26 域 / 102 文件（55+47）/ 1748 声明；全集 md 导航表 26 个域逐域一致。三张 SVG 用 qlmanage 渲染为有效 PNG，泳道图落款为当前工作区 0.7.0 · 2026-11-26。 |
 
 ## 文档维护
 
@@ -546,6 +560,10 @@
 | DOC-098 | 文档 | 同步 CHK-096 五项修复的编号三件套、索引图、命令行参考及测试基线 | 2026-11-25 22:37 | 2026-11-25 22:43 | 已完成 | 同步助手 experiments/sync-numbering-20260930/sync_numbering_chk096_fix_20261125.py 更新受影响的 F05.007/F05.008/F05.010/F21.002/F21.016/F22.013/F26.030/F26.038/F26.045 等实现与行号，删除已停用的局部函数引用，已发布功能编号无废弃或重排。415 项 / 26 域 / 98 文件 / 1687 声明校验通过。三 SVG 重生成，索引图更新声明计数并用 CairoSVG 和 MuPDF 渲染检查，另两张哈希一致。命令行参考补布局路径校验，README/WBS 更新 895 基线和修复记录。 |
 | DOC-099 | 文档 | 版本号确认 0.6.14 并将 README、SKILL.md、CLI 参考、WBS、阅读说明与编号资料同步到最终工作区 | 2026-11-26 00:05 | 2026-11-26 00:30 | 已完成 | 用户要求版本升到 0.6.14 并更新全部文档。版本串已由 [[DOC-094]] 落为 0.6.14，本轮复核 README、`skills/pdf-markdown-summary/SKILL.md`、`scripts/__init__.py` 三处一致，`draw_flows.py` 泳道落款为「当前工作区 0.6.14 · 2026-11-25」，无需再改。文档：README 中英「已完成/Implemented」补正文阅读顺序与双栏、页边与页码清理、Markdown 字面保真、列表与跨页续接、布局导出与写入保护五项，基线日期更新为 2026-11-26；SKILL.md 新增 Markdown Structure Guarantees；`references/pdf-to-markdown.md` 补 Conversion Policy 说明；`references/cli-options.md` 补 `extract_pdf_assets` 的 `--layout-model-detail` 行；WBS 头部修订说明、关联台账、5.3 声明数（1651→1687）与 9.1 日期同步；阅读说明头部日期改为 2026-11-26 并新增「2026-11-26 V0.6.14 封板同步」小节。编号资料：未改源码与测试，功能编号 415 / 26 域 / 98 文件 / 1687 声明不变，`verify_numbering_dynamic_20260930.py` 通过；三张 SVG 由 `draw_feature_index.py` 重生成，内容逐字节无变化，无需调图。验证：`PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q`（独立 basetemp/junit）895 passed、0 failed、0 skipped、292.44s，JUnit 确认 8 份 Golden 图表用例与 baseline 覆盖用例实际执行；`compileall`、四入口 `--help`、`git diff --check`、台账 check 通过；`tests/basic-benchmark` 仍为 8 份只读 PDF。证据 `tests/results/20261126-001/`。未提交 Git。 |
 | DOC-100 | 文档 | 撰写 V0.6.14 提交说明并核算 Build1615 | 2026-11-26 09:54 | 2026-11-26 09:54 | 已完成 | 以 HEAD ddf525f（V0.6.13-Build1488）对照全部 25 个未提交文件，无暂存和未跟踪文件。沿用 DOC-079/DOC-089 口径：新增或修改源码函数 40、功能编号描述 22、测试函数 43（含重命名合并计 1）、工具和版本脚本 2、文档 11、重要执行动作 9，台账不计，增量 127，1488+127=1615。标题 V0.6.14-Build1615-20261126，字数核算含标题、换行和空白不超过 350 字。核对 20261126-001 的 JUnit 为 895 通过、0 失败、0 跳过，9 项 Golden 实际执行；功能编号 415/1687 及 git diff --check HEAD 通过。仅撰写说明与同步台账，未执行 Git 提交。 |
+| DOC-101 | 文档 | 版本号提升到 0.7.0 并同步编号资料、SVG、阅读说明、README 与 CLI 参考 | 2026-11-26 14:55 | 2026-11-26 15:20 | 已完成 | 版本串三处（README、SKILL.md、scripts/__init__.py）改为 0.7.0；draw_flows.py 落款改为当前工作区 0.7.0 · 2026-11-26。两轮链式同步（sync_numbering_v070_20261126.py 与 sync_numbering_v070b_20261126.py）新增 F03.014、F25.025、F26.046～F26.048，重生成三张 SVG。阅读说明更新版本、计数与关键源码表 8 处过时行号（多数为之前几轮遗留），去掉 old-version 提法。cli-options.md 增 Page Parse Cache 一节并补充 --layout-driven 说明。README 中英文补入按页缓存、栏位同源、双栏栏位收边、Holdout 集四项能力，回归基线 895→924，去掉已失效的旧快照条目，改进方向补入三项。；SKILL.md 在可选 Layout 后端说明后补一句按页解析缓存（默认开启、1 GiB、不改输出、PDF_SKILL_PARSE_CACHE_MB=0 关闭）。WBS 文档第 9.1、9.2 节与头部修订说明同步到 V0.7.0，关闭「版式模型栏检测未同步表格页判别」待定项并登记新增待办。Holdout 评估报告 tests/results/20261126-005/Holdout评估报告-20261126.md（由 write_report.py 从各 _summary.json 生成）。 |
+| DOC-102 | 文档 | 重建 GT 标注规范并更正评测器提示与评测器说明 | 2026-11-26 15:03 | 2026-11-26 15:20 | 已完成 | 评测器提示引用的 tests/annotations/SCHEMA-20260731.md 已随空目录删除，按现行代码重写为 tests/annotations/SCHEMA-20261126.md（gt.json 字段、LabelMe 标签约定、渲染与转换命令、退出条件与现状），文档内命令均实测；run_eval.py 的提示指向新文件。tests/eval/README 补 Holdout 一节。run_eval.py 对 Holdout 预测返回 status: no_gt。 |
+| DOC-103 | 文档 | 版本号定为 0.6.15，并检查、同步全部现行文档的版本与计数 | 2026-11-26 17:35 | 2026-11-26 17:58 | 已完成 | 用户要求版本升到 0.6.15 并检查所有文档是否最新。版本串四处一致：README 中英头部、SKILL.md、`scripts/__init__.py`、`draw_flows.py` 泳道落款（0.6.15 · 2026-11-26）。现行文档修正：阅读说明头部由 0.7.0 改为 0.6.15，末节标题改「2026-11-26 V0.6.15 同步」；WBS 头部修订说明、性质行、9.1 标题与 9.2 段落的发布版本统一为 `V0.6.15`，注明由计划名 0.7.0 调整，9.2 数字更新为 [[DEV-040]] 后的 950 passed 与 103 文件 / 1774 声明；编号表 JSON 与功能全集 md 的 F26.046/F26.047 描述前缀「V0.7.0 阶段」改「V0.6.15 阶段」（各 2 处）；`tests/annotations/SCHEMA-20261126.md` 的台账引用同步。复核 README、SKILL.md、cli-options、AGENTS 与 tests/eval README：按页缓存、Holdout、布局导出与最新计数均已登记，无 0.6.14/0.7.0 现行残留（历史台账与历史章节保留原样）。验证：`PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q` 950 passed、0 failed、0 errors、0 skipped（206.47s，junit `tests/results/20261126-100/`），Golden 9 项核心用例实跑；编号校验 420 编号 / 26 域 / 103 文件 / 1774 声明一致；三张 SVG 重生成幂等，索引图随描述更新、另两张不变，qlmanage 渲染通过并目视泳道落款；compileall、四入口 `--help`、`git diff --check`、台账 check 通过；benchmark 仍为 8 份只读 PDF。未提交 Git。 |
+| DOC-104 | 文档 | 撰写 V0.6.15 提交说明并用任务台账技能按 DOC-041 口径核算 Build1750 | 2026-11-26 18:05 | 2026-11-26 18:25 | 已完成 | 以 HEAD feda896（V0.6.14-Build1615）对照全部 42 个未提交文件（36 修改、6 未跟踪）。用 task-list-initialization 的 build_accounting_cli 两阶段核算：scan 后复核清单，功能登记表 101 项中仅行号/哈希漂移的 82 项按非实质修改排除，保留 5 项新增与 12 项描述修改；4 项模块级残差排除（版本行已归配置组）；Holdout 清单计 1 项独立能力。结果 代码与功能 64、测试与脚本 54、配置 4、文档 8、重要执行动作 5，增量 135，1615+135=1750。标题 V0.6.15-Build1750-20261126；正文 348 字含空白（318 字不含空白）≤350。证据 experiments/build-accounting-20261126/。未提交 Git。 |
 
 ## 功能开发
 
@@ -563,8 +581,8 @@
 | DEV-010 | 开发 | A2-1/A2-2：全页配对与多框 | 2026-08-06 13:00 | 2026-08-06 15:00 | 已完成 | `lib/pairing.py`：pair_page（贪心一对一匹配，edge_distance 代替 center distance 适合高瘦图框）、_find_multi_frames（gap≤30pt+水平/垂直对齐 -> 多框并集）、pair_layout_regions（全 PDF 配对）、pairing_report（JSON 报告含 duplicate_occupancy 统计）；RegionBBox 新增 edge_distance 方法；core/extract_pdf_assets.py 集成：flag on 时产出 layout_pairing.json；8 份 benchmark PDF 实测：86 pairs / 0 duplicate groups（A0 基线 8组/16条 -> 0）/ 1 multi-frame asset（Qwen3-Omni）；Attention golden PASSED |
 | DEV-011 | 开发 | A3-1/A3-2/A3-3/A3-4/A3-5：精修改造+截断修复 | 2026-08-06 16:00 | 2026-08-06 23:30 | 已完成 | `lib/quality.py`（置信度四态评估：accepted/accepted_with_margin/review_required/rejected）、`lib/refiners/base.py`（RefinementStep Protocol + _clamp_movement max_move=30pt/max_tighten=15pt + LegacyBoundaryGuardStep threshold=20pt/expand_ratio=0.5）、`lib/refiners/figure.py`（LegacyBoundaryGuard->ObjectSnap->ConservativeTextTrim->ConservativeAutocrop 四步管道）、`lib/refiners/table.py`（同结构+水平联合+表头保护）、`lib/pipeline.py`（后端编排：匹配->精修->质量评估->应用/回退->layout_refinement.json 报告 + _bbox_coverage safety net _MIN_LEGACY_COVERAGE=0.55）；A3 初版评估发现截断率从基线 5.95%升至 13.10%，新增 LegacyBoundaryGuardStep 仅扩展显著内缩于 legacy 的边界（>20pt gap 按 0.5 比例扩展）+ coverage 安全网，最终 8 份 benchmark 截断率降至 7.19%（排除 4 个预存截断后有效 4.91%低于基线）、purity mean 0.7769（基线 0.7346）、coverage mean 0.9774；16 个模块级常量（A1/A2 的 6+A3 的 10）；Attention golden PASSED、127 tests passed |
 | DEV-012 | 开发 | A4-2：阈值校准 | 2026-08-06 23:30 | 2026-08-06 23:30 | 已完成 | A3 参数调优完成：LegacyBoundaryGuardStep threshold=20pt/expand_ratio=0.5（经 A3v2/v3/v4 三轮对比选定 v3）；pipeline.py _MIN_LEGACY_COVERAGE=0.55（精修结果覆盖 legacy 不足 55% 时回退）；legacy IoU diff 阈值≥0.3 保持；quality.py 置信度阈值 HIGH=0.85/MEDIUM=0.65/LOW=0.40 保持不变。A3v3 最终指标：截断率 7.19%（有效 4.91%）、purity 0.7769、coverage 0.9774 |
-| DEV-013 | 开发 | A4-1：holdout 集搭建 | 2026-08-06 23:30 | - | 进行中 | `tests/holdout/` 目录结构已创建 + README.md（holdout 要求：cross-publisher、扫描件/旋转/跨页/同页多图/无边框表、≥5 份 PDF ≥50 标注、退出条件 alignment≥90%/truncation≤5%/pairing≥85%/excess≤10%）；需人工提供 holdout PDF 并完成 GT 标注后方可执行 A4-3 正式评估 |
-| DEV-014 | 开发 | A4-3：holdout 正式 KPI 评估 | - | - | 待开发 | 依赖 A4-1 holdout 集就绪；在独立 holdout 上按 §2 口径运行 run_eval.py 并与退出条件对比，达标后方可对外宣称数字 |
+| DEV-013 | 开发 | A4-1：holdout 集搭建 | 2026-08-06 23:30 | - | 进行中 | `tests/holdout/` 目录结构已创建 + README.md（holdout 要求：cross-publisher、扫描件/旋转/跨页/同页多图/无边框表、≥5 份 PDF ≥50 标注、退出条件 alignment≥90%/truncation≤5%/pairing≥85%/excess≤10%）；需人工提供 holdout PDF 并完成 GT 标注后方可执行 A4-3 正式评估；2026-11-26：7 份 Holdout PDF 已落地（[[DEV-038]]），清单在 tests/eval/holdout_manifest.json；GT 仍无人工标注，A4-1 保持进行中。 |
+| DEV-014 | 开发 | A4-3：holdout 正式 KPI 评估 | - | - | 待开发 | 依赖 A4-1 holdout 集就绪；在独立 holdout 上按 §2 口径运行 run_eval.py 并与退出条件对比，达标后方可对外宣称数字；2026-11-26：评测器对 Holdout 预测的查找路径已验证，无 GT 时返回 no_gt；无标注指标与未修问题见 [[CHK-097]]、[[ADJ-017]]～[[ADJ-021]]；标注规范见 tests/annotations/SCHEMA-20261126.md。 |
 | DEV-015 | 调整 | golden 基准目录迁移：8 份 golden_index.json 从 tests/basic-benchmark/<stem>/images/ 移至 tests/results/20260810-001/<stem>/images/（与提取产物同批次）；basic-benchmark 恢复为纯 PDF 只读输入 | 2026-08-10 16:16 | 2026-08-10 16:30 | 已完成 | test_extraction_golden 新增 _find_golden_index（从 results 各批次找最新 golden，不校验指纹）；_resolve_golden_paths 去掉 basic-benchmark golden 逻辑和 benchmark_group 兼容；--update-golden 改写当前批次；.gitignore 加 tests/results/**/golden_index.json 例外；AGENTS.md §3/§8 同步 |
 | DEV-016 | 开发 | 主链三态验收 + 题注对账：留白不降级，污染/漏检落盘 | 2026-09-07 22:47 | 2026-09-07 23:10 | 已完成 | `lib/assess.py` 按布尔信号定级：标题/正文入框或正文引用 → rejected；截断/表带未收束/弱锚点/重复 PNG/对账补裁 → review_required；额外留白仍 accepted。四态字段保留，`accepted_with_margin` 仅 Layout 链使用。显式题注与裸 `Figure N`/`Table N` 纳入 expected；漏检补裁 PNG 进 index，Markdown 只插入 accepted / accepted_with_margin。污染候选不再静默跳过。 |
 | DEV-017 | 开发 | Markdown 把 accepted 图表插回正文对应题注位置，不再一律堆到文末 | 2026-09-30 11:20 | 2026-09-30 11:29 | 已完成 | `pdf_to_markdown.py` 新增 `_place_assets_in_document`：按题注段落匹配 Figure/Table ident，内容在题注上方则插在题注前，否则插在题注后；正文引用不抢槽；未匹配资产仍进文末提取资产节。见 test_pdf_to_markdown_cli.py 三条新用例。 |
@@ -585,6 +603,12 @@
 | DEV-032 | 开发 | 修复 CHK-094 十一项审查问题（BUG-222~232）并补 10 项回归 | 2026-11-25 18:48 | 2026-11-25 19:36 | 已完成 | 源码改动 5 个文件：lib/text_extract.py（页边删除、页码隔离、双栏采样拆分与稀疏页栏位继承、跨页列表页边证据、rich_text 生成期转义）、lib/layout_model.py（逐页字号参照）、lib/markdown.py（信任 rich_text、换栏清空缩进栈）、lib/models.py（continues_previous_page）、core/pdf_to_markdown.py（续接字段判定分页标记、显式布局导出）。测试在 test_wp2_3_text_unification_20261125.py 新增 5 项、test_markdown_structure_20261123.py 新增 5 项。编号 415 / 1668 声明，F21.017 与 F21.016 描述同步；验证见 [[TST-068]]。未提交 Git。 |
 | DEV-033 | 开发 | 修复 CHK-095 复核重开的四项边界与一项回归：BUG-223/226/230/231/233 | 2026-11-25 20:29 | 2026-11-25 21:25 | 已完成 | 承接 [[CHK-095]]。源码改动 3 个文件：lib/text_extract.py（页码识别、跨页列表数字判据、表格页判别）、lib/markdown.py（列表块行首的转义星号）、core/pdf_to_markdown.py（新增 _export_layout_only 并更正帮助文本）。各项修法：(1) [[BUG-223]] `_find_page_number_blocks`：极页边的数字若与同页其他文字共处一行，只有当那些文字是跨页重复的页眉页脚时才保留页码候选，与表格标签同行的数字保留；8 份 benchmark 被识别为页码的块数修改前后一致。(2) [[BUG-226]] 新增 `_min_column_gap`（右列最小起点减左列最大右缘）、`_page_is_side_by_side_table`（同页至少两行与窄行同量级字号的通栏正文，且留白超过 max(40pt, 页宽 8%)）与 `_page_offers_column_evidence`；这类表格页不提供双栏证据，稀疏页按学到的栏位同样不继承，没有通栏正文的页保持原判据。判据先用数据评估：「栏距除以行宽」在右不齐双栏（0.54～0.83）与两列表格（0.46～0.89）上完全重叠，已否决；两列最小留白方案在 102 个合成页与现有夹具上 0 不符，并顺带消除了 [[CHK-091]] 记录的两列表格主导页误判。(3) [[BUG-230]] `_confirm_ordered_lists` 新增嵌套函数 `_is_page_number_like`：跨页可越过的纯数字须等于所在页号，或与相邻页的数字块构成逐页加一。(4) [[BUG-231]] 图表与表格都关闭但显式指定 `--layout-model-detail` 时不再调用资产提取入口，由 `_export_layout_only` 直接构建并写出 layout_model.json，index.json 与已有图表 PNG 不被触碰；导出失败按资产提取失败上报。(5) [[BUG-233]] `_render_list_block` 把行首已转义为字面星号的项目符号一并规范为列表标记。测试新增 10 项（参数化后）：test_wp2_3_text_unification_20261125.py 6 项、test_markdown_structure_20261123.py 2 项。未新增功能编号：新助手归 F05.007、F05.008、F05.010、F21.014，测试归 F26.030 与 F26.045，编号 415 / 1683 声明，见 [[DOC-097]]。验证见 [[TST-069]]。未提交 Git。 |
 | DEV-034 | 开发 | 修复 CHK-096 的布局覆写、极页边表格数字、窄列网格、跨页列表及粗体星号 | 2026-11-25 22:22 | 2026-11-25 22:43 | 已完成 | 两入口把派生 layout_model.json 加入写盘前路径身份校验（[[BUG-154]]）。正文收集只在页边待剔除或双栏判定冲突时探测实线网格，确认入格的块保留页边标签和值、排除双栏采样并按单元格行列排序（[[BUG-223]]、[[BUG-226]]）。页码按位置/印刷页序偏移或相邻镜像侧边确认；页边过滤完成后任何保留正文均阻断跨页列表（[[BUG-230]]）。星号列表标记外提，项目内容保留粗斜体（[[BUG-233]]）。BUG-231 三档仅布局导出语义复跑保持。证据见 [[TST-070]]、编号与文档见 [[DOC-098]]。 |
+| DEV-035 | 开发 | V0.7.0 阶段 1.1：PDFPage 层按页解析缓存 | 2026-11-26 13:00 | 2026-11-26 13:45 | 已完成 | 实现 lib/pdf_backend.py 的 _ParseCache：按「文件身份 + 页号 + 调用 + 实参」缓存 get_text 的 dict 与 text 结果及 get_drawings，命中前校验页面内容流、旋转与裁剪框，LRU 加字节预算（默认 1 GiB，PDF_SKILL_PARSE_CACHE_MB），变异检测开关 PDF_SKILL_CACHE_MUTATION_CHECK；caption_detection.py 与 assess.py 收敛到同一入口。get_text("dict") 会改变同页随后的渲染像素，图表基准是提取之后的状态，因此每个文档实例每页首次调用仍真实执行。新增回归 test_page_parse_cache_20261126.py（17 条）。验证见 [[TST-071]]。 |
+| DEV-036 | 开发 | V0.7.0 阶段 1.2：版式模型的双栏结论与文本层同源 | 2026-11-26 13:50 | 2026-11-26 14:32 | 已完成 | 修复 [[BUG-234]]、[[BUG-235]]。功能编号 F06.011、F05.008、F05.014 描述更新，新增回归套件 F26.047（7 条）。全量强制重提 919 passed、Golden 9/9，重提批次 tests/results/20261126-006，基线未改写。 |
+| DEV-037 | 开发 | V0.7.0 阶段 1.3：卫生清理 | 2026-11-26 14:35 | 2026-11-26 15:05 | 已完成 | old-version 文案：AGENTS.md 第 2 节去掉已删除目录、第 5 节改写为历史代码归档并保留章节号，README 去掉两处旧快照说明，编号表排除范围去掉 old-version。[[ADJ-012]] 核实后核销。10 个测试文件删除冗余的独立运行器与 run_all_tests，共 501 行（运行器本体 395 行），连带 3 个不再使用的 import；这些运行器的清单早已落后于文件内的测试（如 test_caption_anchor_quality 有 87 个测试只列 61 个）。删除前后 216 个用例数不变且全过。 |
+| DEV-038 | 开发 | 阶段 2.1：冻结 Holdout 集落地（7 份） | 2026-11-26 13:44 | 2026-11-26 14:20 | 已完成 | 首次真正放入 PDF（[[DEV-013]] 在 2026-08 只建了目录与说明，2026-09-23 因空目录被删）。清单 tests/eval/holdout_manifest.json 与下载器 tests/eval/fetch_holdout.py（F25.025）：每份 PDF 独立目录，sha256 校验，对不上不覆盖。版式、书签、页数与亮点均为实测（缩略图目视、get_toc、文本扫描、跨页表格几何探测）。--check 7 份齐全。覆盖等宽双栏（CVPR、ACL、ACL）、不等宽双栏（ACM）、单栏（JMLR、ICLR）与 Word 报告；含跨栏宽表、无边框三线表、跨页长表、横向密集宽表与多行数字脚注。 |
+| DEV-039 | 开发 | 阶段 2.2：Holdout 端到端评估与 pymupdf4llm 后端评估 | 2026-11-26 14:40 | 2026-11-26 15:35 | 已完成 | 默认模式与 --tables screenshot 各跑一遍，7 份退出码全 0；在资产提取入口上做后端 off 与 pymupdf4llm 的逐项对比。评估中发现并修复 [[BUG-236]]。未修问题记为 [[ADJ-017]]～[[ADJ-021]]。正式六项 KPI 需要人工 GT，未产生数字（[[DEV-014]]）。 |
+| DEV-040 | 开发 | 修复 CHK-100 两项 P4 观察：WBS WP-5.3 计数与 fetch_holdout 直调路径兜底校验 | 2026-11-26 17:03 | 2026-11-26 17:20 | 已完成 | 承接 [[CHK-100]]。WBS WP-5.3 验收标准单元格的旧计数 415 编号 / 26 域 / 98 文件 / 1687 声明 更新为 420 编号 / 26 域 / 103 文件 / 1774 声明。`tests/eval/fetch_holdout.py` 新增 `_plain_entry_parts`：`check_document` 与 `download_document` 在函数内各自复验文档号与文件名只能单段名称，下载入口先校验再建目录，绕过 `load_manifest` 直调也不会写到 Holdout 根目录之外；`load_manifest` 改为复用同一助手，报错文案不变。`tests/scripts/test_holdout_fetch_20261126.py` 新增一个 7 参数直调回归。不新增功能编号，实现与回归都归属 F25.025；编号三件套与三张 SVG 已同步，动态校验 420/26/103/1774 一致。定向 19 passed；全量 pytest 两次均为 950 passed、0 failed、0 skipped（62.36s / 220.44s，Golden 9/9 实跑）；`fetch_holdout --check` 7/7；compileall 与台账 check 通过。 |
 
 ## 配置运维
 
@@ -606,14 +630,14 @@
 
 | 分类 | 总数 | 已完成 | 待开发/待修复 | 完成率 |
 | --- | --- | --- | --- | --- |
-| 代码 Bug | 233 | 233 | 0 | 100% |
-| 调整事项 | 16 | 14 | 2 | 87.5% |
-| 检查事项 | 96 | 96 | 0 | 100% |
-| 测试数据 | 70 | 70 | 0 | 100% |
-| 文档维护 | 100 | 100 | 0 | 100% |
-| 功能开发 | 34 | 32 | 2 | 94.1% |
+| 代码 Bug | 236 | 236 | 0 | 100% |
+| 调整事项 | 21 | 15 | 6 | 71.4% |
+| 检查事项 | 100 | 100 | 0 | 100% |
+| 测试数据 | 72 | 72 | 0 | 100% |
+| 文档维护 | 104 | 104 | 0 | 100% |
+| 功能开发 | 40 | 38 | 2 | 95.0% |
 | 配置运维 | 11 | 11 | 0 | 100% |
-| **总计** | 560 | 556 | 4 | 99.3% |
+| **总计** | 584 | 576 | 8 | 98.6% |
 
 ## 项目阅读与诊断记录（2026-09-07）
 
@@ -2738,5 +2762,116 @@ V0.6.13-Build1488-20261125
 | `python3 tools/feature-registry/verify_numbering_dynamic_20260930.py` | 415 编号 / 26 域 / 98 文件(55+43) / 1687 声明，一致 |
 | `python3 tools/feature-registry/draw_feature_index.py` | 3 张 SVGs，415 编号；与工作区文件哈希一致 |
 | `compileall`、四入口 `--help`、`git diff --check`、台账 check | 通过 |
+
+未提交 git。
+
+---
+
+## 2026-11-26 CHK-100 两项 P4 观察修复（对应 [[DEV-040]]）
+
+用户要求立即修复 [[CHK-100]] 记录的两项 P4 非阻塞观察。两项都不改 PDF 处理链路，也不新增功能编号。
+
+### 变更范围
+
+- `design/3-plans/PDF架构目标实现度检查报告与架构收敛WBS-20261123.md`：WP-5.3 验收标准单元格计数由 415 编号 / 26 域 / 98 文件 / 1687 声明 改为 420 编号 / 26 域 / 103 文件 / 1774 声明（本轮新增 1 个函数与 1 个用例后重新校验）。
+- `tests/eval/fetch_holdout.py`：新增 `_plain_entry_parts`，`check_document` 与 `download_document` 在函数内复验文档号与文件名只能是单段名称，`download_document` 先校验再 `mkdir`；`load_manifest` 复用同一助手，报错文案与清单入口行为不变。
+- `tests/scripts/test_holdout_fetch_20261126.py`：新增 7 参数回归用例，覆盖带路径分隔符、上级目录、空文档号、点号文件名等直调场景，断言不发起下载、不建目录、Holdout 根目录保持为空。
+- `design/4-analysis/` 编号三件套与三张 SVG：`experiments/sync-numbering-20260930/sync_numbering_chk100_p4_20261126.py` 同步 F25.025 描述与 2 处新增声明（行号、哈希、引用），`draw_feature_index.py` 重生成 SVG，索引图声明数行改为 1,774。
+- `README.md` 中英文回归基线 943 → 950；`design/4-analysis/PDF脚本协作图阅读说明-20260930.md` 现行声明数 1772 → 1774。
+
+### 未修改项与理由
+
+- 功能编号身份不变：`_plain_entry_parts` 服务于 F25.025 的「Holdout 清单校验与重建」，新用例归属同一功能，故只更新描述与实现引用，不新增或重排编号。
+- WBS 中 2026-11-26 的封板与阶段 2 段落（L214、L216）保留当时的 415/1687 与 420/102/1748 记录，属历史批次快照，不回改；只更新仍作为现行验收标准的 WP-5.3 单元格。
+- `skills/` 正式实现未改，四入口 `--help` 与 Golden 基准无需更新；本次全量为常规复跑（未强制重提取），基准未更新。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `python3 -m pytest tests/scripts/test_holdout_fetch_20261126.py -q` | 19 passed |
+| `python3 -m pytest tests/scripts/ -q` | **950 passed、0 failed、0 skipped**（两次复跑 62.36s 与 220.44s），Golden 9/9 实际执行 |
+| `python3 tests/eval/fetch_holdout.py --check` | 7/7 齐全，异常 0 份 |
+| `python3 tools/feature-registry/verify_numbering_dynamic_20260930.py` | 420 编号 / 26 域 / 103 文件 / 1774 声明，AST-JSON-索引-全集-SVG 一致 |
+| `python3 tools/feature-registry/draw_feature_index.py` | 3 张 SVG，420 编号 |
+| `compileall`（两个改动文件）、`git diff --check`、`task_list_cli.py check` | 通过 |
+
+未提交 git；Windows 端未实机跑全量，人工 GT 仍为 0 条。
+
+## 2026-11-26 版本号定为 0.6.15 与全部文档版本一致性检查（对应 [[DOC-103]]）
+
+用户要求把版本号升到 0.6.15，并检查所有文档是否最新。[[DOC-101]] 曾按计划名把版本串写成 0.7.0；本轮按用户要求定为 0.6.15，并把现行文档里的发布版本标记统一过来，历史台账条目与历史章节保持原样。
+
+### 版本串与文档范围
+
+- 版本串四处：README 中英头部、`SKILL.md`、`scripts/__init__.py`、`draw_flows.py` 泳道落款（0.6.15 · 2026-11-26）。
+- 阅读说明：头部版本 0.7.0→0.6.15，末节标题改为「2026-11-26 V0.6.15 同步」；现行计数 420 个编号（347+73）、103 个文件、1774 条声明与实际一致。
+- WBS：头部修订说明、性质行、9.1 标题与 9.2 段落的发布版本统一为 `V0.6.15`，并注明由计划名 0.7.0 调整；9.2 的回归数字更新为 [[DEV-040]] 之后的 950 passed 与 103 文件 / 1774 声明。
+- 编号资料：F26.046、F26.047 描述中的「V0.7.0 阶段」改为「V0.6.15 阶段」（JSON 与全集 md 各 2 处），编号、归属与源码哈希不变。
+- 标注规范：`tests/annotations/SCHEMA-20261126.md` 的台账引用改为 V0.6.15。
+- README、SKILL.md、cli-options、AGENTS 与 tests/eval README 复核：按页解析缓存、Holdout、布局导出与最新计数均已登记，无 0.6.14 / 0.7.0 的现行残留。
+
+### 未修改项与理由
+
+- 历史记录保留原样：台账的 DOC-101 条目、WBS 的 V0.6.14 封板段、阅读说明的 V0.6.14 小节都是当时事实，不回改。
+- 编号资料中描述某批回归「V0.6.14 回归」属实（V0.6.14-Build1615 已提交为 feda896），保留。
+- 三张 SVG 重生成幂等；索引图已随描述更新重绘，泳道图与展开图内容不变。
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q`（20261126-100） | **950 passed、0 failed、0 errors、0 skipped**（206.47s），Golden 9 项核心用例实跑 |
+| `python3 tools/feature-registry/verify_numbering_dynamic_20260930.py` | 420 编号 / 26 域 / 103 文件(55+48) / 1774 声明，一致 |
+| `python3 tools/feature-registry/draw_feature_index.py` + qlmanage | 3 张 SVG 生成且幂等，渲染通过，泳道落款 0.6.15 |
+| `compileall`、四入口 `--help`、`git diff --check`、台账 check | 通过 |
+
+未提交 git。
+
+## 2026-11-26 V0.6.15 提交说明撰写与 Build1750 核算（对应 [[DOC-104]]）
+
+按用户要求，针对 HEAD feda896（V0.6.14-Build1615-20261126）之上的全部未提交代码与文档撰写提交说明，并使用 `task-list-initialization` 技能的 Build 核算 CLI 按 DOC-041 五类口径计算。
+
+### 候选复核（scan → decisions）
+
+- 功能登记表 101 个候选里，只有 5 项新增（F03.014、F25.025、F26.046～F26.048）与 12 项描述实质修改计分；82 项仅引用行号/哈希漂移，按「非实质修改」排除。
+- 4 项模块级残差排除：`scripts/__init__.py` 与 `draw_flows.py` 仅版本串（已计入发布版本配置组），`fetch_holdout.py` 与 `pdf_backend.py` 的函数级变更已逐项计分。
+- `tests/eval/holdout_manifest.json` 归为独立能力（7 份冻结 Holdout 清单）。
+- 三张 SVG 各计 1 项配置；发布版本串归为 1 组；文档 8 项（编号全集与覆盖索引归组）。
+
+### 计分明细
+
+| 类别 | 分数 | 主要组成 |
+| --- | --- | --- |
+| 代码与功能 | 64 | 源码函数 46（pdf_backend 19、caption_detection 9、fetch_holdout 7、clip_limit 3、其余 8）；功能登记 5 新增 + 12 描述修改；Holdout 清单 1 |
+| 测试与脚本 | 54 | 新增回归 41（缓存 17、栏位同源 7、通栏图收边 9、Holdout 8）、测试夹具 1、测试/工具脚本 12 |
+| 配置 | 4 | 发布版本串组 1、三张 SVG 各 1 |
+| 文档 | 8 | README、AGENTS、SKILL、cli-options、WBS、阅读说明、编号资料组、tests/eval README |
+| 重要执行动作 | 5 | 全量回归、Holdout 评估、编号校验与 SVG 重生成、8 份基准 A/B、版本一致性检查 |
+| **合计** | **135** | 1615 + 135 = **1750** |
+
+### 拟提交信息
+
+标题：`V0.6.15-Build1750-20261126`
+
+正文（348 字含空白，318 字不含空白）：
+
+```text
+V0.6.15-Build1750-20261126
+
+1. 按页解析缓存（F03.014）：get_text 与 get_drawings 按文件、页、调用复用，LRU 预算与失效校验；8 份基准输出不变，提速 41%～47%。
+2. 栏位同源（F06.011/F05.008/F11.004）：双栏须文本层确认，栏沟取本页正文，通栏图不再夹成半幅（BUG-234～236）。
+3. Holdout 落地（F25.025）：7 份冻结集与清单重建，端到端及 pymupdf4llm 对比评估。
+4. 新增 41 条回归，删除冗余测试运行器并清理 old-version 文案；全量 950 passed、Golden 9/9，编号 420/1774。
+5. 版本与现行文档同步到 0.6.15。
+```
+
+### 验证记录
+
+| 命令或操作 | 结果 |
+| --- | --- |
+| `build_accounting_cli.py scan/count` | 增量 135，Build 1750；扫描指纹 dd37932…，清单与报告在 `experiments/build-accounting-20261126/` |
+| `PDF_GOLDEN_REEXTRACT=1 python3 -m pytest tests/scripts/ -q`（20261126-100） | 950 passed、0 failed、0 errors、0 skipped，Golden 9/9 |
+| 编号校验、三张 SVG、compileall、四入口 `--help`、`git diff --check`、台账 check | 通过 |
 
 未提交 git。

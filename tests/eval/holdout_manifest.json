@@ -1,0 +1,128 @@
+{
+  "schema": "pdf-skill-holdout-manifest/1",
+  "frozen_on": "2026-11-26",
+  "note": "冻结 Holdout 集（与 Basic Benchmark 的 8 份文档不重叠）。PDF 本体放在 tests/holdout/（已 gitignore，不入库），克隆后用 tests/eval/fetch_holdout.py 重建。版本号写死在地址里，上游改版不影响本集；sha256 不符说明文件不是冻结时的那一份。layout/bookmarks/pages/highlights 为 2026-11-26 实测（缩略图目视、get_toc、文本扫描），不含推断。",
+  "documents": [
+    {
+      "id": "arxiv-1512.03385v1-resnet",
+      "file": "arxiv-1512.03385v1-resnet.pdf",
+      "title": "Deep Residual Learning for Image Recognition",
+      "url": "https://arxiv.org/pdf/1512.03385v1",
+      "source_page": "https://arxiv.org/abs/1512.03385v1",
+      "layout": "双栏-等宽",
+      "template": "CVPR/IEEE 会议模板（pdfTeX）",
+      "bookmarks": 0,
+      "pages": 12,
+      "highlights": [
+        "跨栏带框线宽表",
+        "无边框三线表",
+        "多行数字脚注"
+      ],
+      "sha256": "1e0651b6810ecba34a3dbc5b5b0209226f889004607c1f203540a48d64e5a93a"
+    },
+    {
+      "id": "arxiv-1810.04805v2-bert",
+      "file": "arxiv-1810.04805v2-bert.pdf",
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      "url": "https://arxiv.org/pdf/1810.04805v2",
+      "source_page": "https://arxiv.org/abs/1810.04805v2",
+      "layout": "双栏-等宽",
+      "template": "ACL 会议模板（pdfTeX，A4）",
+      "bookmarks": 0,
+      "pages": 16,
+      "highlights": [
+        "多行数字脚注",
+        "含 Table 题注 5 页"
+      ],
+      "sha256": "5692a5514787a8c6727b4ff3b726a3385798bc68e12138d1d4af83947e2acf6e"
+    },
+    {
+      "id": "arxiv-1912.13318v1-layoutlm",
+      "file": "arxiv-1912.13318v1-layoutlm.pdf",
+      "title": "LayoutLM: Pre-training of Text and Layout for Document Image Understanding",
+      "url": "https://arxiv.org/pdf/1912.13318v1",
+      "source_page": "https://arxiv.org/abs/1912.13318v1",
+      "layout": "双栏-不等宽",
+      "template": "ACM 会议模板（pdfTeX，左栏约 57%）",
+      "bookmarks": 19,
+      "pages": 13,
+      "highlights": [
+        "带书签（2 级）",
+        "不等宽双栏",
+        "含 Table 题注 3 页"
+      ],
+      "sha256": "2e4362ab545c37f4e802afd24346e8d11539dc4480dc68deb45afc4fe9e80d6f"
+    },
+    {
+      "id": "arxiv-1606.05250v2-squad",
+      "file": "arxiv-1606.05250v2-squad.pdf",
+      "title": "SQuAD: 100,000+ Questions for Machine Comprehension of Text",
+      "url": "https://arxiv.org/pdf/1606.05250v2",
+      "source_page": "https://arxiv.org/abs/1606.05250v2",
+      "layout": "双栏-等宽",
+      "template": "ACL 会议模板（pdfTeX）",
+      "bookmarks": 12,
+      "pages": 10,
+      "highlights": [
+        "带书签（2 级）",
+        "跨栏宽表",
+        "密集数值表",
+        "含 Table 题注 5 页"
+      ],
+      "sha256": "8ad64643fb9504c287c24b51ac5bd669de4e882b3d3b9d02d8b661a515ef10cc"
+    },
+    {
+      "id": "arxiv-1910.10683v4-t5",
+      "file": "arxiv-1910.10683v4-t5.pdf",
+      "title": "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer",
+      "url": "https://arxiv.org/pdf/1910.10683v4",
+      "source_page": "https://arxiv.org/abs/1910.10683v4",
+      "layout": "单栏",
+      "template": "JMLR 期刊模板（pdfTeX）",
+      "bookmarks": 59,
+      "pages": 67,
+      "highlights": [
+        "带书签（5 级）",
+        "横向密集宽表（第 57 页）",
+        "含 Table 题注 15 页"
+      ],
+      "sha256": "ad07e47cedf437a4156419ce5d3076e08a3e59bbfd6dac7cc53df1009cdcbe7f"
+    },
+    {
+      "id": "arxiv-2003.10555v1-electra",
+      "file": "arxiv-2003.10555v1-electra.pdf",
+      "title": "ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators",
+      "url": "https://arxiv.org/pdf/2003.10555v1",
+      "source_page": "https://arxiv.org/abs/2003.10555v1",
+      "layout": "单栏",
+      "template": "ICLR 会议模板（pdfTeX）",
+      "bookmarks": 18,
+      "pages": 18,
+      "highlights": [
+        "带书签（2 级）",
+        "多行数字脚注",
+        "含 Table 题注 6 页"
+      ],
+      "sha256": "6219a802dca3be0027fc88bb2ecd56806e6610ebfe4d083a4c18dd896f45b9ae"
+    },
+    {
+      "id": "nist-ai-600-1",
+      "file": "nist-ai-600-1.pdf",
+      "title": "Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile (NIST AI 600-1)",
+      "url": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf",
+      "source_page": "https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence",
+      "layout": "单栏",
+      "template": "机构报告（Acrobat PDFMaker for Word）",
+      "bookmarks": 28,
+      "pages": 64,
+      "highlights": [
+        "Word 排版",
+        "带书签（3 级）",
+        "页脚多行长脚注",
+        "带页眉的报告体",
+        "跨页长表（第 44→45、47→48 页）"
+      ],
+      "sha256": "6e73620ab6b64e90ef2c04bf0e0d6246185a2f4b1b13cab0df494496cff89b6a"
+    }
+  ]
+}

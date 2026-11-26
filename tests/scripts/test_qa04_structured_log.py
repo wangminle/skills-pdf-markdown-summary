@@ -229,31 +229,3 @@ def _make_text_only_pdf(path: Path) -> None:
     page.insert_text((48, 96), "Second paragraph for good measure.", fontsize=12)
     doc.save(path)
     doc.close()
-
-
-def main() -> int:
-    tests = [
-        test_log_event_writes_jsonl,
-        test_run_end_always_written_even_when_no_fallback,
-        test_run_end_counts_match_index_json,
-    ]
-    passed = 0
-    failed = 0
-
-    for t in tests:
-        try:
-            t()
-            passed += 1
-        except AssertionError as e:
-            print(f"FAIL {t.__name__}: {e}")
-            failed += 1
-        except Exception as e:
-            print(f"ERROR {t.__name__}: {e}")
-            failed += 1
-
-    print(f"\n测试结果: {passed} 通过, {failed} 失败")
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

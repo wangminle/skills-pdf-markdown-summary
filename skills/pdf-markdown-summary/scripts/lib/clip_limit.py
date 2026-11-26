@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import fitz
@@ -298,6 +298,58 @@ def limit_clip_by_neighbor_captions(
 
     return limited
 
+def _dominant_edge(values: List[float]) -> Optional[float]:
+    """一列坐标里出现最多的取值（按 1pt 归并），至少出现 3 次；并列取较小坐标。
+
+    同一栏的正文行起点相同，图内标签与越界行的起点各行其是：取众数不会被单个外凸元素带偏。
+    """
+    if len(values) < 3:
+        return None
+    counts: Dict[float, int] = {}
+    for value in values:
+        key = round(value)
+        counts[key] = counts.get(key, 0) + 1
+    edge, count = max(counts.items(), key=lambda item: (item[1], -item[0]))
+    return float(edge) if count >= 3 else None
+
+
+def _actual_column_gutter(
+    model: Any, page_num: int, page_width: float,
+) -> Optional[Tuple[float, float]]:
+    """从本页文本单元取实际的栏沟两缘：左栏正文右缘与右栏正文起点；证据不足返回 None。
+
+    优先用较宽的正文行确定两栏行首，防止重复的短图内标签抢占众数。
+    左栏取有正文支持的最远右缘；孤立的跨栏越界行不参与。
+    栏位按双峰中线划分，左栏宽图里偏右的标签会被标成右栏；通栏行不参与。
+    取值是否可信（是否落在按栏距估算的栏沟附近）由调用方判断。
+    """
+    units = (getattr(model, 'text_units', None) or {}).get(page_num) or []
+    lines = [
+        unit for unit in units
+        if getattr(unit, 'column', -1) in (0, 1) and unit.bbox.width <= page_width * 0.55
+    ]
+    left = [unit for unit in lines if unit.column == 0]
+    right = [unit for unit in lines if unit.column == 1]
+    clusters = []
+    for column in (left, right):
+        body = [unit for unit in column if getattr(unit, "text_type", None) == "paragraph"]
+        wide_body = [unit for unit in body if unit.bbox.width >= page_width * 0.18]
+        for candidates in (wide_body, body, column):
+            start = _dominant_edge([unit.bbox.x0 for unit in candidates])
+            if start is not None:
+                clusters.append([unit.bbox for unit in candidates if abs(unit.bbox.x0 - start) <= 3.0])
+                break
+        else:
+            return None
+    left, right = clusters
+    # 众数簇内用真实坐标，不损失亚点精度
+    right_start = min(rect.x0 for rect in right)
+    left_ends = [rect.x1 for rect in left if rect.x1 < right_start]
+    if len(left_ends) < 3 or len(left) - len(left_ends) > 1:
+        return None
+    return max(left_ends), right_start
+
+
 def refine_clip_x_range(
     clip: Any,
     caption_rect: Any,
@@ -321,7 +373,8 @@ def refine_clip_x_range(
     解决双栏/半栏场景下截取全页宽度导致混入另一栏正文的问题。
 
     策略：
-    1. 如果有版式模型且检测到双栏，使用栏边界缩小 x 范围
+    1. 如果有版式模型且检测到双栏，使用栏边界缩小 x 范围；题注同时伸进左右两栏
+       （通栏图表）时不按栏收窄，朝向栏沟一侧的余量不越过栏沟
     2. 根据图注 x 位置确定所属列
     3. 筛选在裁剪区域 y 范围内的对象，用其 x union 缩小范围
     4. 确保 x 范围不小于页面宽度的 min_width_ratio
@@ -377,16 +430,38 @@ def refine_clip_x_range(
     ):
         page_center = page_rect.x0 + page_width / 2
         caption_center = (caption_rect.x0 + caption_rect.x1) / 2
+        column_gap = layout_model.column_gap if hasattr(layout_model, 'column_gap') else 20.0
+        left_end = page_center - column_gap / 2      # 左栏文字右缘
+        right_start = page_center + column_gap / 2   # 右栏文字起点
+        # 有本页文本单元时取实际的栏沟两缘：版心不在页面正中时，按栏距估算的栏沟会偏到
+        # 邻栏文字上。实测值须落在估算的栏沟附近才采用，离谱的取值（整栏是图）不可信
+        actual_gutter = _actual_column_gutter(layout_model, page_num, page_width)
+        tolerance = page_width * 0.12
+        if actual_gutter is not None and (
+            abs(actual_gutter[0] - left_end) <= tolerance
+            and abs(actual_gutter[1] - right_start) <= tolerance
+        ):
+            left_end, right_start = actual_gutter
+        # 通栏图表的题注向左右两栏各伸进去一段，单栏题注不可能伸进另一栏。只按题注
+        # 中心偏向中线哪一侧定栏位，中心偏 1pt 就会把通栏图截成半幅。
+        span_reach = max(6.0, page_width * 0.04)
+        caption_spans_columns = (
+            caption_rect.x0 < left_end - span_reach
+            and caption_rect.x1 > right_start + span_reach
+        )
 
-        if caption_center < page_center:
+        if caption_spans_columns:
+            if debug:
+                print("Column clamp skipped: caption spans both columns")
+        # 左右栏以栏沟中点为界，版心不在页面正中时它不等于页面中线
+        elif caption_center < (left_end + right_start) / 2:
             col_left = layout_model.margin_left if hasattr(layout_model, 'margin_left') else page_rect.x0 + 30
-            col_right = page_center - (layout_model.column_gap / 2 if hasattr(layout_model, 'column_gap') else 10)
             x_left = max(x_left, col_left - x_margin)
-            x_right = min(x_right, col_right + x_margin)
+            # 外扩余量不得越过栏沟伸进邻栏文字
+            x_right = min(x_right, left_end + x_margin, right_start - 2.0)
         else:
-            col_left = page_center + (layout_model.column_gap / 2 if hasattr(layout_model, 'column_gap') else 10)
             col_right = layout_model.margin_right if hasattr(layout_model, 'margin_right') else page_rect.x1 - 30
-            x_left = max(x_left, col_left - x_margin)
+            x_left = max(x_left, right_start - x_margin, left_end + 2.0)
             x_right = min(x_right, col_right + x_margin)
 
     def _band_has_native_evidence() -> bool:

@@ -173,7 +173,7 @@ Use `--below`/`--above` to force a direction when automatic detection picks the 
 | `--debug-captions` | flag | off | Print caption scoring details |
 | `--debug-visual` | flag | off | Emit debug overlay images showing clip regions |
 | `--adaptive-line-height` / `--no-adaptive-line-height` | flag | enabled | Adaptive line height |
-| `--layout-driven` | enum | `on` | Layout-driven mode: `auto` / `on` / `off` (column detection, double-column awareness) |
+| `--layout-driven` | enum | `on` | Layout-driven mode: `auto` / `on` / `off` (column detection, double-column awareness). A two-column result from the layout model is kept only when the text layer's document-level detection agrees, so side-by-side tables on a single-column page never squeeze a full-width figure into half a page |
 | `--layout-model-detail` | enum | `blocks` | `layout_model.json` detail: `summary` / `blocks` / `full`; `full` disables text truncation and exports every line-level text unit. Before writing, layout and derived asset paths are identity-checked: a path that resolves to the source PDF or another output is rejected |
 | `--layout-backend` | enum | `off` | Optional semantic layout backend: `off` / `pymupdf4llm` (default `off`; also `PDF_SUMMARY_LAYOUT_BACKEND`). When enabled, emits shadow reports (`layout_integration.json`, `layout_pairing.json`, `layout_refinement.json`) and may refine crops; dependency via `requirements-layout.txt`, missing dep falls back to `off` |
 
@@ -184,6 +184,17 @@ Use `--below`/`--above` to force a direction when automatic detection picks the 
 | `--log-level` | enum | INFO | Log level: `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `--log-file` | str | none | Log file path |
 | `--log-jsonl` | str | none | Structured JSONL log path |
+
+### Page Parse Cache (Environment Variables)
+
+`get_text("dict")`, `get_text("text")` and `get_drawings()` results are cached in-process per file, page and call, and shared across re-opens of the same PDF within one run. The cache does not change any output. There are no CLI flags for it; both variables are read once at import.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PDF_SKILL_PARSE_CACHE_MB` | `1024` | Cache budget in MiB; `0` disables caching, a non-integer value falls back to the default. Entries are evicted least-recently-used first; a single entry larger than the budget is not cached. |
+| `PDF_SKILL_CACHE_MUTATION_CHECK` | unset | Debug guard: any non-empty value enables it. Every cache hit is fingerprinted and compared with the stored value; a caller that mutated the cached object in place raises `RuntimeError`. Slows extraction, so use it for regression tests and debugging only |
+
+A hit is served only when the page state (content streams, rotation, crop and media box) still matches and the file identity (real path, size, modification time) is unchanged. In-memory documents are never cached. The first `get_text("dict")` on a page in each document instance is always executed for real, because it changes how MuPDF renders that page afterwards and figure screenshots must stay byte-identical.
 
 ## Common Tuning Scenarios
 

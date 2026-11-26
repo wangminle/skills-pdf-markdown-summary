@@ -388,6 +388,8 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
             include_details=(detail_mode != "summary"),
             include_units=(detail_mode != "summary"),
             full_text_export=(detail_mode == "full"),
+            # 上面 gather 已给出文档级判定（含框线表格单元格剔除），版式模型直接复用
+            text_layer_dual=bool(getattr(gathered_text, "is_dual_column", False)),
         )
 
     # === A1: Layout 语义区域后端（feature flag） ===

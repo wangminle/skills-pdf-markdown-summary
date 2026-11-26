@@ -14,14 +14,14 @@ QA-01 + QA-06 正则表达式与解析函数单元测试
 8. 续页标记（(continued), 续, 接上页）
 9. QC 引用统计（正文中的图表引用检测）
 
-使用方式：
-  python3 tests/scripts/test_regex_patterns.py
+使用方式（套件由 run_all.py 统一用 pytest 执行）：
+  python3 -m pytest tests/scripts/test_regex_patterns.py
 """
 
 import re
 import sys
 import os
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Set, Tuple
 from dataclasses import dataclass
 
 # 项目根目录：tests/scripts/ -> 向上三级
@@ -686,7 +686,6 @@ def _collect_edge_cases() -> List[RegexResult]:
     return results
 
 
-
 # =============================================================================
 # pytest 入口（返回 None，避免 PytestReturnNotNoneWarning）
 # =============================================================================
@@ -722,97 +721,3 @@ def test_qc_categorization() -> None:
 def test_edge_cases() -> None:
     """pytest: 断言 _collect_edge_cases 全部通过。"""
     _assert_all_passed(_collect_edge_cases())
-
-# ============================================================================
-# 主测试运行器
-# ============================================================================
-
-def run_all_tests(verbose: bool = False) -> Tuple[int, int, List[RegexResult]]:
-    """运行所有测试"""
-    all_results: List[RegexResult] = []
-
-    test_suites = [
-        ("Figure 标识符提取", _collect_figure_idents),
-        ("Table 标识符提取", _collect_table_idents),
-        ("罗马数字转换", _collect_roman_numerals),
-        ("标识符解析", _collect_parse_figure_ident),
-        ("QC 引用统计 (QA-06)", _collect_qc_reference_counting),
-        ("实现一致性检查 (Bug-5)", _collect_implementation_consistency),
-        ("QA-06 分类功能", _collect_qc_categorization),
-        ("边界情况", _collect_edge_cases),
-    ]
-
-    for suite_name, test_func in test_suites:
-        if verbose:
-            print(f"\n{'='*60}")
-            print(f"测试套件: {suite_name}")
-            print('='*60)
-
-        results = test_func()
-        all_results.extend(results)
-
-        if verbose:
-            for r in results:
-                status = "OK" if r.passed else "FAIL"
-                print(f"  {status} {r.name}: {r.message}")
-
-    passed = sum(1 for r in all_results if r.passed)
-    failed = sum(1 for r in all_results if not r.passed)
-
-    return passed, failed, all_results
-
-
-def main(argv: Optional[List[str]] = None) -> int:
-    """主函数"""
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="QA-01 + QA-06 正则表达式与解析函数单元测试"
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="显示详细测试输出"
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="以 JSON 格式输出结果"
-    )
-
-    args = parser.parse_args(argv)
-
-    print("\n" + "#"*60)
-    print("# QA-01 + QA-06 正则表达式与解析函数单元测试")
-    print("#"*60)
-
-    passed, failed, results = run_all_tests(verbose=args.verbose)
-
-    print("\n" + "="*60)
-    print(f"测试结果: {passed} 通过, {failed} 失败")
-    print("="*60)
-
-    if args.json:
-        import json as json_mod
-        output = {
-            "passed": passed,
-            "failed": failed,
-            "results": [
-                {"name": r.name, "passed": r.passed, "message": r.message}
-                for r in results
-            ]
-        }
-        print(json_mod.dumps(output, ensure_ascii=False, indent=2))
-
-    # 显示失败的测试
-    if failed > 0 and not args.verbose:
-        print("\n失败的测试:")
-        for r in results:
-            if not r.passed:
-                print(f"  FAIL {r.name}: {r.message}")
-
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

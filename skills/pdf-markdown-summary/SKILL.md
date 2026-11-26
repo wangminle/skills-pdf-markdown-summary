@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.14**.
+Current package version: **0.6.15**.
 
 ## Core Workflow
 
@@ -52,6 +52,9 @@ full-page pairing, and boundary refinement. Emits shadow reports
 (`layout_integration.json`, `layout_pairing.json`, `layout_refinement.json`).
 Requires `pip install -r requirements-layout.txt`; missing dependency falls back to `off`.
 See `references/cli-options.md` for details.
+
+Page parse cache is on by default (1 GiB budget) and never changes any output;
+set `PDF_SKILL_PARSE_CACHE_MB=0` to disable it.
 
 ## Output Rules
 

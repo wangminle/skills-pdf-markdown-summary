@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """中低优先级健壮性与一致性修复回归测试。"""
 
-import os
 import sys
 import tempfile
 import importlib.util
@@ -589,42 +588,3 @@ final:
         logs = analyzer.scan_logs(pdf_dir)
         assert logs and "refine_fallback" in logs[0]
         assert "ink below mass/density threshold" in logs[0]
-
-
-def main() -> int:
-    tests = [
-        test_managed_pdf_document_closes_on_exception,
-        test_caption_without_objects_gets_no_position_score,
-        test_extract_figures_skips_reference_without_smart_index,
-        test_process_pdf_reuses_markdown_extraction,
-        test_summarize_reuse_requires_existing_assets,
-        test_summarize_reuse_does_not_extract_again,
-        test_shared_patterns_and_stable_debug_number,
-        test_collect_draw_items_uses_item_geometry_fallback,
-        test_figure_contexts_find_supplementary_mentions,
-        test_far_side_text_detection_ignores_short_figure_internal_title,
-        test_object_refinement_preserves_near_edge_when_many_small_objects_would_be_cut,
-        test_object_refinement_preserves_near_edge_when_vertical_text_labels_would_be_cut,
-        test_table_clip_expands_to_rendered_horizontal_rule_between_caption_and_header,
-        test_estimate_far_side_text_coverage_detects_far_paragraphs,
-        test_evaluate_refinement_acceptance_checks_ink_and_coverage,
-        test_determine_direction_prefers_moderate_local_over_global,
-        test_table_no_refine_preserves_baseline_clip,
-        test_figure_fallback_skips_short_phase_a_and_writes_structured_event,
-        test_analyze_debug_batch_reads_phase_d_and_structured_fallback_logs,
-    ]
-    passed = 0
-    failed = 0
-    for test in tests:
-        try:
-            test()
-            passed += 1
-        except Exception as exc:
-            print(f"FAIL {test.__name__}: {exc}")
-            failed += 1
-    print(f"\n测试结果: {passed} 通过, {failed} 失败")
-    return 0 if failed == 0 else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
