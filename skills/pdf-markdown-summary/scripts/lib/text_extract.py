@@ -92,12 +92,10 @@ def looks_like_structural_heading(
     """短粗体不一定是章节标题。
 
     页码、公式、单字母、裸节号，以及正文字号的表头（FEELING ITEMS）
-    会把 Markdown 切碎。编号标题任何字号都保留；其余标题要求明显大于正文，
-    或略大于正文且具有独立行与明显段间距的联合排版证据。
+    会把 Markdown 切碎。粗体编号标题任何字号都保留；非粗体数字/CJK 编号标题需明显大于正文；
+    其余标题要求明显大于正文，或略大于正文且具有独立行与明显段间距的联合排版证据。
     中文字符计入标题长度计数，编号后允许直接跟中文（如「1 绪论」「第一章 绪论」）。
     """
-    if not is_bold:
-        return False
     stripped = (text or "").strip()
     if not stripped or len(stripped) >= 120:
         return False
@@ -108,13 +106,21 @@ def looks_like_structural_heading(
         return False
     if re.fullmatch(r"\d{1,4}", stripped) or re.fullmatch(r"\d+(?:\.\d+)*", stripped):
         return False
-    if font_size < 11.5 and _SMALL_TABLE_METRIC_RE.match(stripped):
-        return False
-    if (
+    numbered = bool(
         _SECTION_HEADING_RE.match(stripped)
         or _CJK_SECTION_HEADING_RE.match(stripped)
         or _ROMAN_ALPHA_HEADING_RE.match(stripped)
+    )
+    if sum(_has_list_marker_line(line) for line in stripped.splitlines()) >= 2:
+        return False
+    if not is_bold and not (
+        (_SECTION_HEADING_RE.match(stripped) or _CJK_SECTION_HEADING_RE.match(stripped))
+        and font_size >= max(11.5, body_font_size * 1.12)
     ):
+        return False
+    if font_size < 11.5 and _SMALL_TABLE_METRIC_RE.match(stripped):
+        return False
+    if numbered:
         if len(stripped) < 50:
             return True
         # BUG-190：长度放宽到 120 后，表格数据行与算法伪代码（如
@@ -238,6 +244,11 @@ def _span_is_italic(span: Dict[str, Any]) -> bool:
 
 
 _STYLE_MARKERS = {"b": "**", "i": "*", "bi": "***"}
+
+
+def _escape_literal_markdown(text: str) -> str:
+    """把纯文本中的字面星号与反斜杠转义，样式标记不经过本函数。"""
+    return text.replace("\\", "\\\\").replace("*", "\\*")
 
 
 def _ends_with_odd_backslashes(text: str) -> bool:
@@ -419,7 +430,7 @@ def format_spans_as_markdown(spans: List[Dict[str, Any]]) -> str:
             if not lead and open_marker:
                 joined_last = runs[idx - 1][1].rstrip()[-1:]
             if _star_marker_is_unambiguous(prev, core[0], core[-1], after, joined_last):
-                core = core.replace("\\", "\\\\").replace("*", "\\*")
+                core = _escape_literal_markdown(core)
                 marker = _STYLE_MARKERS[style]
                 if parts and _ends_with_odd_backslashes(parts[-1]):
                     parts[-1] += "\\"  # 行尾反斜杠会转义开标记
@@ -432,9 +443,12 @@ def format_spans_as_markdown(spans: List[Dict[str, Any]]) -> str:
                 core = ""
 
         if core:
-            if open_marker and core[0] in "*_":
-                core = "\\" + core[0] + core[1:]  # 会并入闭标记
-            parts.append(core)
+            # 未进入样式标记的文本仍是 PDF 原文，星号/反斜杠按字面转义；
+            # 与标记相邻的星号已由转义本身隔开，不再手工补反斜杠。
+            escaped = _escape_literal_markdown(core)
+            if open_marker and escaped.startswith("_"):
+                escaped = "\\" + escaped  # 会并入闭标记
+            parts.append(escaped)
             open_marker = False
 
         if trail:
@@ -588,14 +602,65 @@ def _promote_centered_headings(
                 para.is_full_width = True
 
 
+def _promote_centered_interruptions(
+    paragraphs: List[Any],
+    page_widths: Dict[int, float],
+) -> None:
+    """上下均有双栏内容的居中显示块可作为栏带边界。"""
+    from collections import defaultdict
+
+    by_page: Dict[int, List[Any]] = defaultdict(list)
+    for para in paragraphs:
+        by_page[para.page].append(para)
+    for page, page_paras in by_page.items():
+        page_width = float(page_widths.get(page, 0.0) or 0.0)
+        if page_width <= 0:
+            continue
+        mid = page_width * 0.5
+        for para in page_paras:
+            if para.is_heading or para.is_full_width or para.para_type != "paragraph":
+                continue
+            x0, y0, x1, y1 = para.bbox
+            if not (x0 < mid - 8.0 and x1 > mid + 8.0):
+                continue
+            if abs((x0 + x1) / 2.0 - mid) > page_width * 0.15:
+                continue
+            evidence = {
+                column: (
+                    any(
+                        other is not para and other.column == column
+                        and not other.is_full_width and other.bbox[3] <= y0 + 2.0
+                        for other in page_paras
+                    ),
+                    any(
+                        other is not para and other.column == column
+                        and not other.is_full_width and other.bbox[1] >= y1 - 2.0
+                        for other in page_paras
+                    ),
+                )
+                for column in (0, 1)
+            }
+            if all(above and below for above, below in evidence.values()):
+                para.column = -1
+                para.is_full_width = True
+
+
 def sort_paragraphs_reading_order(
     paragraphs: List[Any],
     *,
     is_dual_column: bool,
+    dual_column_pages: Optional[set[int]] = None,
+    table_positions: Optional[Dict[int, Tuple[float, float]]] = None,
 ) -> List[Any]:
-    """双栏阅读顺序：通栏块按 y 切开栏带，带内先左后右。"""
+    """按栏带排序；网格内使用单元格行、列坐标代替文字坐标。"""
+    table_positions = table_positions or {}
+
+    def position(para: Any) -> Tuple[float, float, float, float]:
+        y, x = table_positions.get(id(para), (para.bbox[1], para.bbox[0]))
+        return y, x, para.bbox[1], para.bbox[0]
+
     if not is_dual_column or not paragraphs:
-        return sorted(paragraphs, key=lambda p: (p.page, p.bbox[1], p.bbox[0]))
+        return sorted(paragraphs, key=lambda p: (p.page, *position(p)))
 
     from collections import defaultdict
 
@@ -606,13 +671,16 @@ def sort_paragraphs_reading_order(
     ordered: List[Any] = []
     for page in sorted(by_page):
         page_paras = by_page[page]
+        if dual_column_pages is not None and page not in dual_column_pages:
+            ordered.extend(sorted(page_paras, key=position))
+            continue
         tagged: List[Tuple[Any, int]] = []
         for para in page_paras:
             col = getattr(para, "column", -1)
             if getattr(para, "is_full_width", False):
                 col = -1
             tagged.append((para, col))
-        tagged.sort(key=lambda item: (item[0].bbox[1], item[0].bbox[0]))
+        tagged.sort(key=lambda item: position(item[0]))
 
         idx = 0
         while idx < len(tagged):
@@ -627,11 +695,11 @@ def sort_paragraphs_reading_order(
                 idx += 1
             left = sorted(
                 (p for p, c in band if c == 0),
-                key=lambda p: (p.bbox[1], p.bbox[0]),
+                key=position,
             )
             right = sorted(
                 (p for p, c in band if c == 1),
-                key=lambda p: (p.bbox[1], p.bbox[0]),
+                key=position,
             )
             ordered.extend(left)
             ordered.extend(right)
@@ -907,6 +975,213 @@ def estimate_body_font_size(chars_by_size: Dict[float, int]) -> float:
     return round(sum(size * chars for size, chars in best) / total, 4)
 
 
+def _page_line_samples(
+    all_blocks: List[Dict[str, Any]],
+    page_width: float,
+) -> Dict[int, Dict[str, Any]]:
+    """按页采样行级宽度、起点与字号，供文档级和页级双栏判定共用。"""
+    page_samples: Dict[int, Dict[str, Any]] = {}
+    for block in all_blocks:
+        page_index = int(block.get("page_index", 0))
+        sample = page_samples.setdefault(page_index, {
+            "x0": [], "widths": [], "wide_chars": 0, "narrow_chars": 0, "wide_lines": 0,
+            "wide_sizes": [], "narrow_sizes": [], "narrow_line_chars": [],
+            "narrow_line_counts": [], "page_width": page_width,
+        })
+        pw = float(block.get("page_width") or page_width)
+        ph = float(block.get("page_height") or 792.0)
+        sample["page_width"] = pw
+        block_line_count = len([
+            line for line in block.get("lines") or []
+            if any(
+                str(span.get("text", "") or "").strip()
+                for span in line.get("spans", [])
+            )
+        ])
+        for line in block.get("lines") or []:
+            lb = line.get("bbox")
+            if not lb or len(lb) < 4:
+                continue
+            y_center = (float(lb[1]) + float(lb[3])) / 2.0
+            if y_center < ph * 0.05 or y_center > ph * 0.95:
+                continue
+            line_text = "".join(
+                sanitize_extracted_text(str(sp.get("text", "") or ""))
+                for sp in line.get("spans", [])
+            ).strip()
+            if not line_text:
+                continue
+            spans = line.get("spans") or []
+            main_span = max(spans, key=lambda sp: len(str(sp.get("text", "") or "")))
+            font_size = float(main_span.get("size", 0) or 0)
+            width = max(0.0, float(lb[2]) - float(lb[0]))
+            if width >= pw * 0.55:
+                sample["wide_chars"] += len(line_text)
+                sample["wide_lines"] += 1
+                sample["wide_sizes"].append(font_size)
+            elif pw * 0.12 <= width < pw * 0.52 and len(line_text) >= 8:
+                sample["narrow_chars"] += len(line_text)
+                sample["x0"].append(float(lb[0]))
+                sample["widths"].append(width)
+                sample["narrow_sizes"].append(font_size)
+                sample["narrow_line_chars"].append(len(line_text))
+                sample["narrow_line_counts"].append(block_line_count)
+
+    for sample in page_samples.values():
+        if sample["wide_lines"] < 5 or not sample["narrow_sizes"]:
+            continue
+        body_size = float(median(sample["wide_sizes"]))
+        keep = [
+            index for index, size in enumerate(sample["narrow_sizes"])
+            if size >= body_size * 0.85
+        ]
+        if len(keep) != len(sample["narrow_sizes"]):
+            sample["x0"] = [sample["x0"][index] for index in keep]
+            sample["widths"] = [sample["widths"][index] for index in keep]
+            sample["narrow_line_chars"] = [sample["narrow_line_chars"][index] for index in keep]
+            sample["narrow_line_counts"] = [sample["narrow_line_counts"][index] for index in keep]
+            sample["narrow_chars"] = sum(sample["narrow_line_chars"])
+    return page_samples
+
+
+def _page_is_wide_dominated(sample: Dict[str, Any]) -> bool:
+    """满宽正文主导的页不提供双栏证据。
+
+    字符占比之外再看窄行来源：表格/并排标签通常是大量单行块，而双栏正文
+    段落一般由多行组成。仅靠 1.5 倍字符阈值会让「五行通栏正文 + 五行双列
+    表格」通过双栏检测（CHK-094）。
+    """
+    if sample["wide_lines"] < 5:
+        return False
+    if sample["wide_chars"] > sample["narrow_chars"] * 1.5:
+        return True
+    line_counts = sample.get("narrow_line_counts") or []
+    if not line_counts:
+        return False
+    median_lines = float(median(line_counts))
+    return median_lines <= 1.5 and sample["narrow_chars"] >= sample["wide_chars"] * 0.5
+
+
+# 两列之间的留白超过它（pt 与页宽比例取大者）就远超正常栏距：双栏正文的栏距
+# 一般在 10～30pt，并排的表格列、左右分列的标签之间才留这么宽的空白。
+_TABLE_COLUMN_GAP_MIN_PT = 40.0
+_TABLE_COLUMN_GAP_PAGE_RATIO = 0.08
+# 表格页上方的通栏正文至少这么多行；通栏标题通常只有一两行，且字号明显更大。
+_TABLE_WIDE_BODY_LINES_MIN = 2
+_TABLE_WIDE_BODY_SIZE_RATIO = 1.15
+
+
+def _min_column_gap(
+    x0_values: List[float],
+    width_values: List[float],
+    peaks: Tuple[float, float],
+    page_width: float,
+) -> Optional[float]:
+    """两列之间的最小水平留白：右列最小起点减左列最大右缘。
+
+    只统计起点落在左右栏位置附近的窄行，栏内的居中公式、右对齐编号等
+    不参与；左列取最大右缘，所以右不齐的正文不会被当成宽留白。
+    """
+    left_peak, right_peak = peaks
+    tolerance = max(12.0, page_width * 0.04)
+    left_edges = [
+        x0 + width for x0, width in zip(x0_values, width_values)
+        if abs(x0 - left_peak) <= tolerance
+    ]
+    right_starts = [x0 for x0 in x0_values if abs(x0 - right_peak) <= tolerance]
+    if not left_edges or not right_starts:
+        return None
+    return min(right_starts) - max(left_edges)
+
+
+def _page_is_side_by_side_table(
+    sample: Dict[str, Any],
+    peaks: Optional[Tuple[float, float]] = None,
+) -> bool:
+    """同页有通栏正文、且两列之间留白远大于正常栏距：这是单栏排版里的并列表格。
+
+    通栏正文指与窄行同量级字号的通栏行；通栏标题字号更大、只有一两行，不算。
+    双栏正文的栏距窄，不会触发；没有通栏正文的页一律返回 False，交给原有
+    判据（CHK-094 的稀疏双栏尾页左右两段之间留白也很大，不能只看留白）。
+    """
+    narrow_sizes = sample.get("narrow_sizes") or []
+    body_size = float(median(narrow_sizes)) if narrow_sizes else 0.0
+    wide_body_lines = sum(
+        1 for size in sample.get("wide_sizes") or []
+        if body_size <= 0 or size <= body_size * _TABLE_WIDE_BODY_SIZE_RATIO
+    )
+    if wide_body_lines < _TABLE_WIDE_BODY_LINES_MIN:
+        return False
+    page_width = float(sample.get("page_width") or 0.0)
+    if page_width <= 0:
+        return False
+    if peaks is None:
+        peaks = _column_peaks(sample["x0"], sample["widths"], page_width)
+    if peaks is None:
+        return False
+    gap = _min_column_gap(sample["x0"], sample["widths"], peaks, page_width)
+    return gap is not None and gap > max(_TABLE_COLUMN_GAP_MIN_PT, page_width * _TABLE_COLUMN_GAP_PAGE_RATIO)
+
+
+def _page_offers_column_evidence(sample: Dict[str, Any]) -> bool:
+    """这一页的窄行能否作为双栏正文的证据。"""
+    if _page_is_wide_dominated(sample):
+        return False
+    return not _page_is_side_by_side_table(sample)
+
+
+def _column_peaks(
+    x0_values: List[float],
+    width_values: List[float],
+    page_width: float,
+) -> Optional[Tuple[float, float]]:
+    """20 桶 bisect_right 直方图 + 栏距/峰距校验，返回左右峰位置。"""
+    if len(x0_values) < 6:
+        return None
+
+    bin_count = 20
+    first_edge = min(x0_values)
+    last_edge = max(x0_values)
+    if first_edge == last_edge:
+        return None
+    bin_width = (last_edge - first_edge) / bin_count
+    bins = [first_edge + i * bin_width for i in range(bin_count)] + [last_edge]
+    hist = [0] * bin_count
+    bin_values: List[List[float]] = [[] for _ in range(bin_count)]
+    for value in x0_values:
+        bin_idx = max(0, min(bin_count - 1, bisect_right(bins, value) - 1))
+        hist[bin_idx] += 1
+        bin_values[bin_idx].append(value)
+
+    threshold = (sum(hist) / bin_count) * 1.5
+    peaks_idx = [i for i, count in enumerate(hist) if count > threshold]
+    if len(peaks_idx) < 2:
+        return None
+
+    top_peaks = sorted(peaks_idx, key=lambda i: hist[i], reverse=True)[:2]
+    top_peaks.sort()
+    left_count = hist[top_peaks[0]]
+    right_count = hist[top_peaks[1]]
+    if left_count < 3 or right_count < 3:
+        return None
+    if (left_count + right_count) < len(x0_values) * 0.40:
+        return None
+
+    # BUG-188：峰位置取桶内样本均值，而不是桶左边界。取桶左边界会把右峰最多
+    # 左移一个桶宽（约峰间距/20）；两端对齐时中位行宽≈栏宽，等价于把栏距少算
+    # 一个桶宽，栏距 10～18pt 的标准双栏会被判成单栏。
+    peak1_x = sum(bin_values[top_peaks[0]]) / len(bin_values[top_peaks[0]])
+    peak2_x = sum(bin_values[top_peaks[1]]) / len(bin_values[top_peaks[1]])
+    peak_sep = peak2_x - peak1_x
+    med_line_width = float(median(width_values))
+    candidate_gap = peak_sep - med_line_width
+    valid_gap = 0 < candidate_gap <= 0.30 * page_width
+    valid_sep = 0.18 * page_width <= peak_sep <= 0.60 * page_width
+    if not (valid_gap and valid_sep):
+        return None
+    return peak1_x, peak2_x
+
+
 def detect_dual_column_from_blocks(
     all_blocks: List[Dict[str, Any]],
     page_width: float,
@@ -921,91 +1196,69 @@ def detect_dual_column_from_blocks(
     if not all_blocks or page_width <= 0:
         return False
 
-    page_samples: Dict[int, Dict[str, Any]] = {}
-    for block in all_blocks:
-        page_index = int(block.get("page_index", 0))
-        sample = page_samples.setdefault(page_index, {
-            "x0": [], "widths": [], "wide_chars": 0, "narrow_chars": 0, "wide_lines": 0,
-        })
-        pw = float(block.get("page_width") or page_width)
-        ph = float(block.get("page_height") or 792.0)
-        for line in block.get("lines") or []:
-            lb = line.get("bbox")
-            if not lb or len(lb) < 4:
-                continue
-            y_center = (float(lb[1]) + float(lb[3])) / 2.0
-            if y_center < ph * 0.05 or y_center > ph * 0.95:
-                continue
-            line_text = "".join(
-                sanitize_extracted_text(str(sp.get("text", "") or ""))
-                for sp in line.get("spans", [])
-            ).strip()
-            if not line_text:
-                continue
-            width = max(0.0, float(lb[2]) - float(lb[0]))
-            if width >= pw * 0.55:
-                sample["wide_chars"] += len(line_text)
-                sample["wide_lines"] += 1
-            elif pw * 0.12 <= width < pw * 0.52 and len(line_text) >= 8:
-                sample["narrow_chars"] += len(line_text)
-                sample["x0"].append(float(lb[0]))
-                sample["widths"].append(width)
-
+    page_samples = _page_line_samples(all_blocks, page_width)
     wide_dominated_pages = sum(
-        1 for sample in page_samples.values()
-        if sample["wide_lines"] >= 5 and sample["wide_chars"] > sample["narrow_chars"]
+        1 for sample in page_samples.values() if _page_is_wide_dominated(sample)
     )
+    # 通栏正文 + 宽留白两列的表格页与满宽主导页一样，不提供双栏证据（CHK-095/BUG-226）。
     eligible = [
         sample for sample in page_samples.values()
-        if not (sample["wide_lines"] >= 5 and sample["wide_chars"] > sample["narrow_chars"])
+        if _page_offers_column_evidence(sample)
     ]
     dual_candidate_pages = sum(1 for sample in eligible if len(sample["x0"]) >= 6)
     if wide_dominated_pages >= 8 and wide_dominated_pages >= dual_candidate_pages * 6:
         return False
     x0_values = [value for sample in eligible for value in sample["x0"]]
     width_values = [value for sample in eligible for value in sample["widths"]]
-    if len(x0_values) < 6:
-        return False
+    return _column_peaks(x0_values, width_values, page_width) is not None
 
-    bin_count = 20
-    first_edge = min(x0_values)
-    last_edge = max(x0_values)
-    if first_edge == last_edge:
-        return False
-    bin_width = (last_edge - first_edge) / bin_count
-    bins = [first_edge + i * bin_width for i in range(bin_count)] + [last_edge]
-    hist = [0] * bin_count
-    bin_values: List[List[float]] = [[] for _ in range(bin_count)]
-    for value in x0_values:
-        bin_idx = max(0, min(bin_count - 1, bisect_right(bins, value) - 1))
-        hist[bin_idx] += 1
-        bin_values[bin_idx].append(value)
 
-    threshold = (sum(hist) / bin_count) * 1.5
-    peaks_idx = [i for i, count in enumerate(hist) if count > threshold]
-    if len(peaks_idx) < 2:
-        return False
+def detect_dual_column_pages(
+    all_blocks: List[Dict[str, Any]],
+    page_width: float,
+) -> set[int]:
+    """返回可确认双栏的 1-based 页号集合。
 
-    top_peaks = sorted(peaks_idx, key=lambda i: hist[i], reverse=True)[:2]
-    top_peaks.sort()
-    left_count = hist[top_peaks[0]]
-    right_count = hist[top_peaks[1]]
-    if left_count < 3 or right_count < 3:
-        return False
-    if (left_count + right_count) < len(x0_values) * 0.40:
-        return False
+    文档级判定为双栏后，证据不足（窄行少于 6 条）的页不直接判单栏，而是
+    用已确认页学习到的左右栏起点验证；只有明确落在栏位上的页才继承双栏
+    （CHK-094 稀疏尾页）。
+    """
+    if not all_blocks or page_width <= 0:
+        return set()
+    if not detect_dual_column_from_blocks(all_blocks, page_width):
+        return set()
 
-    # BUG-188：峰位置取桶内样本均值，而不是桶左边界。取桶左边界会把右峰最多
-    # 左移一个桶宽（约峰间距/20）；两端对齐时中位行宽≈栏宽，等价于把栏距少算
-    # 一个桶宽，栏距 10～18pt 的标准双栏会被判成单栏。
-    peak1_x = sum(bin_values[top_peaks[0]]) / len(bin_values[top_peaks[0]])
-    peak2_x = sum(bin_values[top_peaks[1]]) / len(bin_values[top_peaks[1]])
-    peak_sep = peak2_x - peak1_x
-    med_line_width = float(median(width_values))
-    candidate_gap = peak_sep - med_line_width
-    valid_gap = 0 < candidate_gap <= 0.30 * page_width
-    valid_sep = 0.18 * page_width <= peak_sep <= 0.60 * page_width
-    return valid_gap and valid_sep
+    page_samples = _page_line_samples(all_blocks, page_width)
+    confirmed: Dict[int, Tuple[float, float]] = {}
+    for page_index, sample in page_samples.items():
+        if not _page_offers_column_evidence(sample):
+            continue
+        peaks = _column_peaks(sample["x0"], sample["widths"], sample["page_width"])
+        if peaks is not None:
+            confirmed[page_index] = peaks
+    if not confirmed:
+        return set()
+
+    left_peak = float(median([peaks[0] for peaks in confirmed.values()]))
+    right_peak = float(median([peaks[1] for peaks in confirmed.values()]))
+    for page_index, sample in page_samples.items():
+        if page_index in confirmed or not _page_offers_column_evidence(sample):
+            continue
+        if not 2 <= len(sample["x0"]) < 6:
+            continue
+        tolerance = max(6.0, sample["page_width"] * 0.03)
+        left_hits = sum(1 for x0 in sample["x0"] if abs(x0 - left_peak) <= tolerance)
+        right_hits = sum(1 for x0 in sample["x0"] if abs(x0 - right_peak) <= tolerance)
+        # 两栏都至少两条独立窄行才算「证据不足的双栏页」；单栏页里偶发
+        # 一条右对齐签名不能据此把整页改成栏内先左后右的顺序。
+        if left_hits < 2 or right_hits < 2:
+            continue
+        # 页上有通栏正文、两列之间又是表格式的宽留白：按学到的栏位看也一样，
+        # 这是单栏页里的并排内容，不继承栏位（CHK-095/BUG-226）。
+        if _page_is_side_by_side_table(sample, (left_peak, right_peak)):
+            continue
+        confirmed[page_index] = (left_peak, right_peak)
+    return {page_index + 1 for page_index in confirmed}
 
 
 def write_gathered_text_json(
@@ -1039,6 +1292,9 @@ def write_gathered_text_json(
                 "is_bold": p.is_bold,
                 "is_full_width": p.is_full_width,
                 "line_count": int(getattr(p, "line_count", 0)),
+                "continues_previous_page": bool(
+                    getattr(p, "continues_previous_page", False)
+                ),
             }
             for p in result.paragraphs
         ],
@@ -1065,7 +1321,8 @@ _CONTENTS_HEADINGS = {"contents", "table of contents", "目录", "目 录"}
 
 
 _CAPTION_KIND_PREFIX_RE = re.compile(
-    r"^(?:(?:figure|fig\.?|table|tab\.?)\b|图|图表|附图|表)",
+    r"^(?:(?:extended\s+data\s+figure|supplementary\s+(?:figure|table)|"
+    r"figure|fig\.?|table|tab\.?)\b|图|图表|附图|表)",
     re.IGNORECASE,
 )
 _UNICODE_LIST_BULLET_RE = re.compile(r"^[•▪▫◦‣⁃➢➣➤]\s*\S")
@@ -1139,11 +1396,11 @@ def _looks_like_list_item(text: str, *, allow_single_non_unicode: bool = False) 
 
 
 def _confirm_ordered_lists(paragraphs: List[GatheredParagraph]) -> None:
-    """用连续编号和排版邻接确认会触发 CommonMark 的有序列表标记。"""
+    """在已剔除确认页眉、页脚和页码的正文中识别有序列表。"""
     candidates: Dict[int, Tuple[Tuple[int, str], Tuple[int, str]]] = {}
     confirmed: set[int] = set()
     for index, paragraph in enumerate(paragraphs):
-        if paragraph.para_type != "list":
+        if paragraph.para_type not in ("paragraph", "list"):
             continue
         markers = [
             (int(match[1]), match[2])
@@ -1171,6 +1428,64 @@ def _confirm_ordered_lists(paragraphs: List[GatheredParagraph]) -> None:
             and -4.0 <= gap <= max(14.0, font_size * 1.3)
         ):
             confirmed.update((index - 1, index))
+
+    for index, (_first, last) in candidates.items():
+        paragraph = paragraphs[index]
+        same_page = [
+            next_index for next_index in candidates
+            if next_index > index and paragraphs[next_index].page == paragraph.page
+        ]
+        if not same_page:
+            continue
+        next_index = same_page[0]
+        following = paragraphs[next_index]
+        between = paragraphs[index + 1:next_index]
+        if candidates[next_index][0] != (last[0] + 1, last[1]):
+            continue
+        if (
+            following.column != paragraph.column
+            or abs(following.bbox[0] - paragraph.bbox[0]) > 18.0
+            or not between
+        ):
+            continue
+        if all(
+            mid.para_type == "list"
+            and mid.column == paragraph.column
+            and mid.bbox[0] > paragraph.bbox[0] + 4.0
+            and mid.bbox[1] >= paragraph.bbox[1]
+            and mid.bbox[3] <= following.bbox[3]
+            and all(
+                _ORDERED_LIST_ITEM_RE.match(line.strip())
+                and not _ORDERED_MARKER_RE.match(line.strip())
+                for line in mid.text.splitlines() if line.strip()
+            )
+            for mid in between
+        ):
+            confirmed.update((index, next_index))
+
+    # 已确认的页码（含左右交替）不会进入正文。任何保留的中间块会打断
+    # CommonMark 列表，因此这里和渲染端都要求相邻，数字也不例外。
+    for index, (_first, last) in candidates.items():
+        paragraph = paragraphs[index]
+        next_index = index + 1
+        if next_index not in candidates:
+            continue
+        next_first, _next_last = candidates[next_index]
+        following = paragraphs[next_index]
+        if (
+            following.page != paragraph.page + 1
+            or next_first != (last[0] + 1, last[1])
+            or following.column != paragraph.column
+            or abs(following.bbox[0] - paragraph.bbox[0]) > 18.0
+            or paragraph.font_size <= 0
+            or not 0.9 <= following.font_size / paragraph.font_size <= 1.1
+        ):
+            continue
+        confirmed.update((index, next_index))
+        following.continues_previous_page = True
+
+    for index in confirmed:
+        paragraphs[index].para_type = "list"
 
     for index in candidates.keys() - confirmed:
         lines = [ln.strip() for ln in paragraphs[index].text.splitlines() if ln.strip()]
@@ -1338,6 +1653,179 @@ def _contents_entry_indices(blocks: List[Dict[str, Any]]) -> set[int]:
     return {index for index, page in candidates.items() if page in named_pages or leader_counts[page] >= 3}
 
 
+def _find_page_number_blocks(
+    all_blocks: List[Dict[str, Any]], table_blocks: Optional[set[int]] = None,
+) -> set[int]:
+    """仅接受跨页同位置、与正文隔离且页码值随页号固定偏移的纯数字块。
+
+    页脚区的独立数字可能是页码，也可能是表格末行/统计值；只凭「数字跨页
+    连续」会把 42、43 这类表格值删掉（CHK-094）。这里额外要求数字块与
+    同页其他文本有明显纵向间距，或位于极页边（>96%）的页脚带。
+    极页边也不能单独作数：表格末行同样可能贴到页边，数字与标签各成一块
+    且纵向完全重叠（CHK-095）。所以数字所在行上若还有别的文字，只有当
+    那些文字是跨页重复的页眉页脚（两端式页脚）时才保留页码候选。
+    已知表格单元格不参与；相邻页的候选还可以用镜像页边位置确认。
+    """
+    table_blocks = table_blocks or set()
+    by_page: Dict[int, List[int]] = {}
+    edge_text_pages: Dict[str, set[int]] = {}
+    for index, block in enumerate(all_blocks):
+        page = int(block.get("page") or int(block.get("page_index", 0)) + 1)
+        by_page.setdefault(page, []).append(index)
+        if index in table_blocks:
+            continue
+        block_bbox = block.get("bbox") or (0, 0, 0, 0)
+        block_height = float(block.get("page_height") or 0.0)
+        if block_height <= 0:
+            continue
+        block_y_center = (float(block_bbox[1]) + float(block_bbox[3])) / 2.0
+        if block_y_center <= block_height * 0.10 or block_y_center >= block_height * 0.90:
+            edge_text_pages.setdefault(str(block.get("text", "") or "").strip(), set()).add(page)
+
+    def _vertical_gap(first: Tuple[float, float, float, float], second: Tuple[float, float, float, float]) -> float:
+        return max(0.0, float(second[1]) - float(first[3]), float(first[1]) - float(second[3]))
+
+    def _shares_line(
+        first: Tuple[float, float, float, float],
+        second: Tuple[float, float, float, float],
+    ) -> bool:
+        """两个块是否落在同一视觉行（纵向重叠超过较矮者的一半）。"""
+        overlap = min(float(first[3]), float(second[3])) - max(float(first[1]), float(second[1]))
+        shorter = min(float(first[3]) - float(first[1]), float(second[3]) - float(second[1]))
+        return shorter > 0 and overlap >= shorter * 0.5
+
+    candidates: List[Tuple[int, int, int, int, int, bool]] = []
+    for index, block in enumerate(all_blocks):
+        if index in table_blocks:
+            continue
+        text = str(block.get("text", "") or "").strip()
+        if not re.fullmatch(r"\d{1,4}", text):
+            continue
+        bbox = block.get("bbox") or (0, 0, 0, 0)
+        page_height = float(block.get("page_height") or 0.0)
+        page_width = float(block.get("page_width") or 0.0)
+        if page_height <= 0 or page_width <= 0:
+            continue
+        y_center = (float(bbox[1]) + float(bbox[3])) / 2.0
+        relative_y = y_center / page_height
+        depth = min(relative_y, 1.0 - relative_y)
+        if not 0.0 <= depth < 0.10:
+            continue
+        page = int(block.get("page") or int(block.get("page_index", 0)) + 1)
+        row_text_is_repeated_footer = all(
+            other not in table_blocks
+            and len(edge_text_pages.get(str(all_blocks[other].get("text", "") or "").strip(), ())) >= 2
+            for other in by_page.get(page, [])
+            if other != index
+            and _shares_line(bbox, all_blocks[other].get("bbox") or bbox)
+        )
+        if not row_text_is_repeated_footer:
+            continue
+        height = max(0.0, float(bbox[3]) - float(bbox[1]))
+        min_gap = min(
+            (
+                _vertical_gap(bbox, all_blocks[other].get("bbox") or bbox)
+                for other in by_page.get(page, [])
+                if other != index
+            ),
+            default=float("inf"),
+        )
+        isolated = min_gap >= max(8.0, height * 0.75)
+        forced_margin = depth <= 0.04
+        if not (isolated or forced_margin):
+            continue
+        offset = int(text) - page
+        x_center = (float(bbox[0]) + float(bbox[2])) / 2.0
+        candidates.append((
+            index,
+            page,
+            offset,
+            round(x_center / page_width * 20),
+            round(depth * 20),
+            relative_y > 0.5,
+        ))
+
+    groups: Dict[Tuple[int, int, int], List[Tuple[int, int]]] = {}
+    by_page_and_offset: Dict[Tuple[int, int], List[Tuple[int, int, int]]] = {}
+    for index, page, offset, x_bucket, depth_bucket, is_footer in candidates:
+        if is_footer:
+            groups.setdefault((offset, x_bucket, depth_bucket), []).append((index, page))
+        by_page_and_offset.setdefault((page, offset), []).append((index, x_bucket, depth_bucket))
+
+    confirmed: set[int] = set()
+    for indices in groups.values():
+        if len({page for _index, page in indices}) >= 2:
+            confirmed.update(index for index, _page in indices)
+
+    # 交替页码要求相邻页、相同的印刷页码偏移、镜像侧边及近似的页边距离。
+    # 单个恰好等于页序的正文数字，或相邻页中部的连续数值，都没有这组证据。
+    for index, page, offset, x_bucket, depth_bucket, _is_footer in candidates:
+        for other, other_x, other_depth in by_page_and_offset.get((page + 1, offset), ()):
+            if (
+                (x_bucket - 10) * (other_x - 10) < 0
+                and abs(x_bucket - other_x) >= 6
+                and abs(x_bucket + other_x - 20) <= 2
+                and abs(depth_bucket - other_depth) <= 1
+            ):
+                confirmed.update((index, other))
+    return confirmed
+
+
+def _find_ruled_table_cells(
+    doc: PDFDocument, blocks: List[Dict[str, Any]], column_pages: set[int],
+    edge_removals: set[int],
+) -> Dict[int, Tuple[Tuple[float, ...], Tuple[float, ...]]]:
+    """只接纳与页边剔除或双栏判定直接冲突的网格。"""
+    pages = column_pages | {blocks[index]["page"] for index in edge_removals}
+    by_page: Dict[int, List[int]] = {}
+    for index, block in enumerate(blocks):
+        if block["page"] in pages:
+            by_page.setdefault(block["page"], []).append(index)
+
+    matched = {}
+    for page, indices in by_page.items():
+        pdf_page = doc[page - 1]
+        raw = getattr(pdf_page, "raw", pdf_page)
+        find_tables = getattr(raw, "find_tables", None)
+        if not callable(find_tables):
+            continue
+        # 仅用已存在的绘制线条确认网格，避免把双栏正文的对齐文字解释成表格。
+        try:
+            finder = find_tables(strategy="lines_strict")
+        except (RuntimeError, TypeError, ValueError) as exc:
+            logger.debug("Ruled table detection skipped on page %s: %s", page, exc)
+            continue
+        for table in getattr(finder, "tables", ()):
+            if table.col_count < 2:
+                continue
+            grid = tuple(table.bbox)
+            cells = [tuple(cell) for row in table.rows for cell in row.cells if cell]
+            hits = {}
+            for index in indices:
+                x0, y0, x1, y1 = blocks[index]["bbox"]
+                if not (grid[0] - 2 <= x0 < x1 <= grid[2] + 2 and grid[1] - 2 <= y0 < y1 <= grid[3] + 2):
+                    continue
+                for cell in cells:
+                    cx0, cy0, cx1, cy1 = cell
+                    if (
+                        cx0 - 2 <= x0 < x1 <= cx1 + 2
+                        and cx0 <= (x0 + x1) / 2 < cx1 and cy0 <= (y0 + y1) / 2 < cy1
+                        and min(y1, cy1) - max(y0, cy0) >= (y1 - y0) * 0.75
+                    ):
+                        hits[index] = cell
+                        break
+            if len({cell[0] for cell in hits.values()}) < 2:
+                continue
+            row_counts = Counter(cell[1] for cell in set(hits.values()))
+            # 单栏页面的流程图和插画也可能画对齐边框。除非网格中确有即将
+            # 丢失的页边文本，否则只用多条有数据的成对单元格反证双栏。
+            if edge_removals.intersection(hits) or (
+                page in column_pages and sum(count >= 2 for count in row_counts.values()) >= 2
+            ):
+                matched.update({index: (grid, cell) for index, cell in hits.items()})
+    return matched
+
+
 @managed_pdf_document
 def gather_structured_text(
     pdf_path: str,
@@ -1373,22 +1861,20 @@ def gather_structured_text(
     page_count = doc.page_count
 
     all_blocks = native_blocks if native_blocks is not None else iter_native_text_blocks(doc)
-    header_candidates: List[str] = []
-    footer_candidates: List[str] = []
+    header_candidates: List[Tuple[int, str]] = []
+    footer_candidates: List[Tuple[int, str]] = []
     font_sizes: List[float] = []
     chars_by_size: Counter = Counter()
 
-    for block in all_blocks:
+    for index, block in enumerate(all_blocks):
         block_text = block["text"]
         bbox = block["bbox"]
         page_height = float(block.get("page_height") or doc[0].rect.height)
         y_center = (bbox[1] + bbox[3]) / 2
-        if y_center < page_height * 0.05:
-            if len(block_text) < 100:
-                header_candidates.append(block_text)
-        elif y_center > page_height * 0.95:
-            if len(block_text) < 100:
-                footer_candidates.append(block_text)
+        if y_center < page_height * 0.10:
+            header_candidates.append((index, block_text))
+        elif y_center > page_height * 0.90:
+            footer_candidates.append((index, block_text))
         lines = block.get("lines") or []
         for line in lines:
             for span in line.get("spans", []):
@@ -1399,22 +1885,36 @@ def gather_structured_text(
                     clean_span = sanitize_extracted_text(str(span.get("text", "") or "")).strip()
                     chars_by_size[round(size, 2)] += len(clean_span)
 
-    header_counter = Counter(header_candidates)
-    footer_counter = Counter(footer_candidates)
-
+    page_number_blocks = _find_page_number_blocks(all_blocks)
     threshold = max(2, page_count * 0.3)
-    headers_to_remove = {text for text, count in header_counter.items() if count >= threshold}
-    footers_to_remove = {text for text, count in footer_counter.items() if count >= threshold}
+    header_counts = Counter(text for _index, text in header_candidates)
+    footer_counts = Counter(text for _index, text in footer_candidates)
+
+    edge_removals = page_number_blocks | {
+        index
+        for candidates, counts in ((header_candidates, header_counts), (footer_candidates, footer_counts))
+        for index, text in candidates
+        if counts[text] >= threshold
+    }
+    doc_page_width = float(all_blocks[0].get("page_width") or doc[0].rect.width) if all_blocks else 0.0
+    is_dual_column = detect_dual_column_from_blocks(all_blocks, doc_page_width)
+    dual_column_pages = detect_dual_column_pages(all_blocks, doc_page_width) if is_dual_column else set()
+    table_cells = _find_ruled_table_cells(doc, all_blocks, dual_column_pages, edge_removals)
+    if table_cells:
+        page_number_blocks = _find_page_number_blocks(all_blocks, set(table_cells))
+        header_counts = Counter(text for index, text in header_candidates if index not in table_cells)
+        footer_counts = Counter(text for index, text in footer_candidates if index not in table_cells)
+        column_blocks = [block for index, block in enumerate(all_blocks) if index not in table_cells]
+        is_dual_column = detect_dual_column_from_blocks(column_blocks, doc_page_width)
+        dual_column_pages = detect_dual_column_pages(column_blocks, doc_page_width) if is_dual_column else set()
+
+    headers_to_remove = {text for text, count in header_counts.items() if count >= threshold}
+    footers_to_remove = {text for text, count in footer_counts.items() if count >= threshold}
 
     if debug:
         print(f"[DEBUG] Detected headers to remove: {headers_to_remove}")
         print(f"[DEBUG] Detected footers to remove: {footers_to_remove}")
 
-    if all_blocks:
-        doc_page_width = float(all_blocks[0].get("page_width") or doc[0].rect.width)
-        is_dual_column = detect_dual_column_from_blocks(all_blocks, doc_page_width)
-    else:
-        is_dual_column = False
     num_columns = 2 if is_dual_column else 1
 
     typical_font_size = (
@@ -1431,18 +1931,32 @@ def gather_structured_text(
 
     contents_entries = _contents_entry_indices(all_blocks)
     paragraphs: List[GatheredParagraph] = []
+    table_positions: Dict[int, Tuple[float, float]] = {}
 
     for index, block in enumerate(all_blocks):
         plain = sanitize_extracted_text(block["text"])
 
-        if not plain or plain in headers_to_remove or plain in footers_to_remove:
-            continue
-
         bbox = tuple(block["bbox"])
         page = int(block["page"])
+        page_height = float(block.get("page_height") or doc[0].rect.height)
+        y_center = (bbox[1] + bbox[3]) / 2.0
+        in_header_zone = y_center < page_height * 0.10
+        in_footer_zone = y_center > page_height * 0.90
+        table_cell = table_cells.get(index)
+        if (
+            not plain or index in page_number_blocks or (
+                table_cell is None and (
+                    (in_header_zone and plain in headers_to_remove)
+                    or (in_footer_zone and plain in footers_to_remove)
+                )
+            )
+        ):
+            continue
+
         page_width = float(block.get("page_width") or doc[0].rect.width)
         column, is_full_width = classify_block_column(
-            bbox, page_width, is_dual_column=is_dual_column
+            table_cell[0] if table_cell else bbox, page_width,
+            is_dual_column=page in dual_column_pages,
         )
 
         lines = block.get("lines", [])
@@ -1503,7 +2017,7 @@ def gather_structured_text(
             ):
                 rich_text = candidate
 
-        paragraphs.append(GatheredParagraph(
+        paragraph = GatheredParagraph(
             page=page,
             text=plain,
             rich_text=rich_text,
@@ -1517,18 +2031,26 @@ def gather_structured_text(
             para_type=para_type,
             font_name=font_name,
             line_count=line_count,
-        ))
+        )
+        if table_cell:
+            _, cell = table_cell
+            table_positions[id(paragraph)] = (cell[1], cell[0])
+        paragraphs.append(paragraph)
 
     toc_entries = _extract_pdf_toc(doc)
     _apply_toc_fallback(paragraphs, toc_entries, body_font_size=body_font_size)
     if is_dual_column:
-        _promote_centered_headings(paragraphs, {
+        page_widths = {
             int(block["page"]): float(block.get("page_width") or doc[0].rect.width)
             for block in all_blocks
-        })
+        }
+        dual_page_paragraphs = [p for p in paragraphs if p.page in dual_column_pages]
+        _promote_centered_headings(dual_page_paragraphs, page_widths)
+        _promote_centered_interruptions(dual_page_paragraphs, page_widths)
 
     paragraphs = sort_paragraphs_reading_order(
-        paragraphs, is_dual_column=is_dual_column
+        paragraphs, is_dual_column=is_dual_column, dual_column_pages=dual_column_pages,
+        table_positions=table_positions,
     )
 
     # 重排阅读顺序后再检查同页同栏相邻紧凑列表项，避免双栏交错块阻断列表升级

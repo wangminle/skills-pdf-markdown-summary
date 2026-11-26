@@ -256,7 +256,8 @@ _EXPLICIT_CAPTION_PREFIX_RE = re.compile(
     # 子图尾巴（3a / 5-b / 6(c)）与 idents.py 的 FIGURE_LINE_RE 保持同一套
     # 可选模式，否则 "Figure 3a:" 会被主正则匹配、却不算显式题注，
     # 导致 inventory reconcile 系统性缺子图。
-    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+"
+    r"^(?:extended\s+data\s+figure|supplementary\s+(?:figure|table)|figure|fig\.?|table|tab\.?|图|表)"
+    r"\s*(?:[A-Z]?\d+|[IVXLCDM]{1,5})"
     r"(?:\s*[-–]?\s*[A-Za-z]|\s*\([A-Za-z]\))?"
     r"\s*",
     re.IGNORECASE,
@@ -275,7 +276,8 @@ _PERIOD_BODY_OPENER_RE = re.compile(
     re.IGNORECASE,
 )
 _PERIOD_BODY_CITATION_RE = re.compile(
-    r"^(?:figure|fig\.?|table|图|表)\s*[A-Z]?\d+\s*\.\s*(\S.*)$",
+    r"^(?:extended\s+data\s+figure|supplementary\s+(?:figure|table)|figure|fig\.?|table|tab\.?|图|表)"
+    r"\s*(?:[A-Z]?\d+|[IVXLCDM]{1,5})\s*\.\s*(\S.*)$",
     re.IGNORECASE | re.DOTALL,
 )
 

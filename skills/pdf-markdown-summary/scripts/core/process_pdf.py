@@ -26,6 +26,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--preset", default="robust", choices=["robust"])
     parser.add_argument("--allow-continued", action="store_true", default=False, help="Allow repeated-caption continuation items; structurally matched captionless table pages are recovered automatically")
     parser.add_argument("--ocr", choices=["off", "auto", "force"], default="off")
+    parser.add_argument(
+        "--layout-model-detail", default="blocks", choices=["summary", "blocks", "full"],
+        help="Detail level for layout_model.json (summary/blocks/full; default: blocks)",
+    )
     return parser.parse_args(argv)
 
 
@@ -52,6 +56,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.preset,
         "--ocr",
         args.ocr,
+        "--layout-model-detail",
+        args.layout_model_detail,
     ]
     if args.out:
         markdown_args.extend(["--out", args.out])

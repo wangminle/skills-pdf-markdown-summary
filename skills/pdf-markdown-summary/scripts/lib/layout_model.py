@@ -197,15 +197,30 @@ def detect_columns(
         print("\n[DEBUG] Column Detection")
         print("=" * 70)
 
-    # 采样前5页的段落文本
+    # 采样前5页的段落文本；字号参照取同页通栏正文，避免后面单栏页的
+    # 大字号把前面双栏正文的小字号窄行全部滤掉（CHK-094）。
     x0_values = []
     width_values = []
     for pno in list(all_units.keys())[:5]:
         units = all_units.get(pno, [])
+        page_wide_sizes = [
+            float(unit.font_size)
+            for unit in units
+            if unit.text_type == 'paragraph' and unit.bbox.width >= page_width * 0.55
+        ]
+        body_size = (
+            float(median(page_wide_sizes)) if len(page_wide_sizes) >= 2 else 0.0
+        )
         for unit in units:
-            if unit.text_type == 'paragraph':
-                x0_values.append(unit.bbox.x0)
-                width_values.append(unit.bbox.width)
+            if unit.text_type != 'paragraph':
+                continue
+            if (
+                body_size > 0 and unit.bbox.width < page_width * 0.55
+                and float(unit.font_size) < body_size * 0.85
+            ):
+                continue
+            x0_values.append(unit.bbox.x0)
+            width_values.append(unit.bbox.width)
 
     if not x0_values or len(x0_values) < 10:
         if debug:

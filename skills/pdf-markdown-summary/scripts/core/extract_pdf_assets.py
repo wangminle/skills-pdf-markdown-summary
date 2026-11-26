@@ -316,6 +316,7 @@ def main_modular(argv: Optional[List[str]] = None) -> int:
             (text_dir, True, "文本目录"),
             (out_text, False, "输出文本"),
             (index_json, False, "index JSON"),
+            (layout_model_json if args.layout_driven != "off" else None, False, "布局 JSON"),
             (manifest_path, False, "manifest CSV"),
             (args.log_file, False, "文本日志"),
             (args.log_jsonl, False, "JSONL 日志"),

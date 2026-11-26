@@ -51,6 +51,16 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--preset", default="robust", choices=["robust"], help="Asset extraction preset")
     parser.add_argument("--allow-continued", action="store_true", default=False, help="Allow repeated-caption continuation items; structurally matched captionless table pages are recovered automatically")
+    parser.add_argument(
+        "--layout-model-detail", default=None, choices=["summary", "blocks", "full"],
+        help=(
+            "Detail level for layout_model.json (summary/blocks/full; default: none, "
+            "which runs asset extraction at blocks). "
+            "An explicit value also exports the layout model when both --images and --tables are off; "
+            "that layout-only run writes layout_model.json alone and leaves index.json and existing "
+            "figure/table PNGs untouched"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -74,6 +84,7 @@ def _resolve_outputs(args: argparse.Namespace) -> Dict[str, str]:
         "text_dir": text_dir,
         "out_md": out_md,
         "asset_dir": asset_dir,
+        "layout_model_json": os.path.join(asset_dir, "layout_model.json"),
         "report_json": os.path.abspath(args.report_json or os.path.join(text_dir, "conversion_report.json")),
         "blocks_json": os.path.abspath(args.blocks_json or os.path.join(text_dir, "markdown_blocks.json")),
     }
@@ -91,11 +102,19 @@ def _paragraphs_to_document(pdf_path: str, title: str, validation=None, *, gathe
     blocks: List[MarkdownBlock] = []
     last_page: Optional[int] = None
     for paragraph in gathered.paragraphs:
+        text = paragraph.text.strip()
         if paragraph.page != last_page:
-            blocks.append(MarkdownBlock(type="page_break", page=paragraph.page))
+            # 只有抽取阶段已确认的跨页列表续接才省略分页标记；仅凭编号连续
+            # 会把另一页上独立缩进的 3./4. 误并进上一页列表（CHK-094）。
+            joins_ordered_list = bool(
+                blocks and blocks[-1].type == "list"
+                and paragraph.para_type == "list"
+                and getattr(paragraph, "continues_previous_page", False)
+            )
+            if not joins_ordered_list:
+                blocks.append(MarkdownBlock(type="page_break", page=paragraph.page))
             last_page = paragraph.page
 
-        text = paragraph.text.strip()
         if not text:
             continue
 
@@ -108,6 +127,9 @@ def _paragraphs_to_document(pdf_path: str, title: str, validation=None, *, gathe
             "is_bold": bool(getattr(paragraph, "is_bold", False)),
             "para_type": paragraph.para_type,
             "line_count": int(getattr(paragraph, "line_count", 0)),
+            "continues_previous_page": bool(
+                getattr(paragraph, "continues_previous_page", False)
+            ),
         }
         if getattr(paragraph, "is_heading", False):
             level = int(getattr(paragraph, "heading_level", 0) or 0) or 2
@@ -208,9 +230,49 @@ def _split_assets_for_markdown(
     return inserted, omitted
 
 
+def _export_layout_only(layout_detail: str, paths: Dict[str, str]) -> Dict[str, Any]:
+    """图表与表格都关闭、但显式指定了布局导出档位：只写 layout_model.json。
+
+    不经过资产提取入口：那里总会用本轮结果覆盖 index.json，再按「未被索引
+    引用」清理同一 PDF 已有的图表 PNG。本轮没有提取任何资产，沿用它会把
+    上一轮的索引清空并删掉图表（CHK-095/BUG-231）。
+    """
+    import lib.text_extract as _text_extract
+
+    asset_dir = paths["asset_dir"]
+    layout_json = paths["layout_model_json"]
+    scan_ctx = _text_extract.get_reusable_scan_context(paths["pdf_path"]) or {}
+    try:
+        os.makedirs(asset_dir, exist_ok=True)
+        # 与 extract_pdf_assets.main_modular 对 --layout-model-detail 的映射保持一致。
+        _text_extract.extract_text_with_format(
+            paths["pdf_path"],
+            out_json=layout_json,
+            native_blocks=scan_ctx.get("native_blocks"),
+            include_details=layout_detail != "summary",
+            include_units=layout_detail != "summary",
+            full_text_export=layout_detail == "full",
+        )
+    except Exception as exc:
+        print(f"ERROR: layout model export failed: {exc}", file=sys.stderr)
+        return {
+            "enabled": True, "exit_code": 1, "items": [], "omitted": [],
+            "extracted_count": 0, "index_json": "", "layout_model_json": layout_json,
+        }
+    return {
+        "enabled": False, "items": [], "index_json": "", "layout_model_json": layout_json,
+    }
+
+
 def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Dict[str, Any]:
-    if args.images == "off" and args.tables == "off":
+    layout_detail = getattr(args, "layout_model_detail", None)
+    assets_disabled = args.images == "off" and args.tables == "off"
+    # 两个资产开关都关闭且未显式指定布局导出时，才整段跳过；显式
+    # --layout-model-detail 仍要生成 layout_model.json（CHK-094）。
+    if assets_disabled and layout_detail is None:
         return {"enabled": False, "items": [], "index_json": ""}
+    if assets_disabled:
+        return _export_layout_only(layout_detail, paths)
 
     from core.extract_pdf_assets import main as extract_main
     from lib.output import load_index_json_items
@@ -227,6 +289,9 @@ def _run_asset_extraction(args: argparse.Namespace, paths: Dict[str, str]) -> Di
     ]
     if args.allow_continued:
         extraction_args.append("--allow-continued")
+    extraction_args.extend([
+        "--layout-model-detail", layout_detail or "blocks",
+    ])
     if args.images == "off":
         extraction_args.append("--no-figures")
     if args.tables == "off":
@@ -749,16 +814,16 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from lib.output import validate_output_targets
 
-    problems = validate_output_targets(
-        [
-            (paths["out_md"], False, "输出 Markdown"),
-            (paths["asset_dir"], True, "资源目录"),
-            (paths["text_dir"], True, "文本目录"),
-            (paths["blocks_json"], False, "blocks JSON"),
-            (paths["report_json"], False, "report JSON"),
-        ],
-        protected_paths=[paths["pdf_path"]],
-    )
+    output_targets = [
+        (paths["out_md"], False, "输出 Markdown"),
+        (paths["asset_dir"], True, "资源目录"),
+        (paths["text_dir"], True, "文本目录"),
+        (paths["blocks_json"], False, "blocks JSON"),
+        (paths["report_json"], False, "report JSON"),
+    ]
+    if args.layout_model_detail is not None or args.images != "off" or args.tables != "off":
+        output_targets.append((paths["layout_model_json"], False, "布局 JSON"))
+    problems = validate_output_targets(output_targets, protected_paths=[paths["pdf_path"]])
     if problems:
         for problem in problems:
             print(f"[ERROR] {problem}", file=sys.stderr)

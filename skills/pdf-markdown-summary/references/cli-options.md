@@ -29,6 +29,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--ocr` | enum | `off` | OCR mode: `off` / `auto` / `force` — currently a pure no-op; it only records a `not_implemented` status in the conversion report |
 | `--preset` | enum | `robust` | Asset extraction preset (only `robust`) |
 | `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
+| `--layout-model-detail` | enum | none | `layout_model.json` detail: `summary` / `blocks` / `full`; when omitted, asset extraction runs at `blocks`. `full` disables text truncation and exports every line-level text unit. An explicit value also exports the layout model when both `--images off` and `--tables off` are set; that layout-only run writes `layout_model.json` alone and leaves `index.json` and existing figure/table PNGs untouched. Before writing, the CLI rejects layout paths that resolve to the source PDF or another output, including link aliases |
 
 ## summarize_pdf
 
@@ -51,6 +52,7 @@ The high-level shims live in `scripts/` and load their implementation from `scri
 | `--preset` | enum | `robust` | Parameter preset |
 | `--allow-continued` | flag | off | Allow repeated-caption continuation items; matching captionless table pages are recovered automatically |
 | `--ocr` | enum | `off` | OCR mode (same as above: currently a pure no-op) |
+| `--layout-model-detail` | enum | `blocks` | Forward the selected `summary` / `blocks` / `full` layout detail level to `pdf_to_markdown` |
 
 `process_pdf` computes asset/text paths that match `pdf_to_markdown`, then invokes `summarize_pdf` with `--reuse-existing` so the PDF is parsed only once.
 
@@ -172,6 +174,7 @@ Use `--below`/`--above` to force a direction when automatic detection picks the 
 | `--debug-visual` | flag | off | Emit debug overlay images showing clip regions |
 | `--adaptive-line-height` / `--no-adaptive-line-height` | flag | enabled | Adaptive line height |
 | `--layout-driven` | enum | `on` | Layout-driven mode: `auto` / `on` / `off` (column detection, double-column awareness) |
+| `--layout-model-detail` | enum | `blocks` | `layout_model.json` detail: `summary` / `blocks` / `full`; `full` disables text truncation and exports every line-level text unit. Before writing, layout and derived asset paths are identity-checked: a path that resolves to the source PDF or another output is rejected |
 | `--layout-backend` | enum | `off` | Optional semantic layout backend: `off` / `pymupdf4llm` (default `off`; also `PDF_SUMMARY_LAYOUT_BACKEND`). When enabled, emits shadow reports (`layout_integration.json`, `layout_pairing.json`, `layout_refinement.json`) and may refine crops; dependency via `requirements-layout.txt`, missing dep falls back to `off` |
 
 ### Logging

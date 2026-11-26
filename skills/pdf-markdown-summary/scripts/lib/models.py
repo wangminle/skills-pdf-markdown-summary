@@ -340,6 +340,23 @@ class TextBlock:
     column: int
 
 
+def _text_unit_to_dict(unit: EnhancedTextUnit, *, full_text_export: bool) -> Dict[str, Any]:
+    return {
+        'text': unit.text if full_text_export else unit.text[:200],
+        'bbox': [
+            round(unit.bbox.x0, 2), round(unit.bbox.y0, 2),
+            round(unit.bbox.x1, 2), round(unit.bbox.y1, 2),
+        ],
+        'font_name': unit.font_name,
+        'font_size': round(float(unit.font_size), 2),
+        'font_weight': unit.font_weight,
+        'font_flags': int(unit.font_flags),
+        'color': list(unit.color) if unit.color is not None else None,
+        'text_type': unit.text_type,
+        'column': unit.column,
+    }
+
+
 @dataclass
 class DocumentLayoutModel:
     """
@@ -390,7 +407,7 @@ class DocumentLayoutModel:
         Args:
             include_details: 是否包含 text_blocks 的 bbox/type 细节
             include_units: include_details=True 时是否导出逐行 units 明细
-            full_text_export: 是否取消 block.text/unit.text 的截断以导出全文
+            full_text_export: 是否取消文本截断并额外导出全部行级 text_units
         """
         result = {
             'page_size': self.page_size,
@@ -432,23 +449,20 @@ class DocumentLayoutModel:
                         block_info['sample'] = full_text[:100]
                     if include_units:
                         block_info['units'] = [
-                            {
-                                'text': u.text if full_text_export else u.text[:200],
-                                'bbox': [round(u.bbox.x0, 2), round(u.bbox.y0, 2),
-                                         round(u.bbox.x1, 2), round(u.bbox.y1, 2)],
-                                'font_name': u.font_name,
-                                'font_size': round(float(u.font_size), 2),
-                                'font_weight': u.font_weight,
-                                'font_flags': int(u.font_flags),
-                                'color': list(u.color) if u.color is not None else None,
-                                'text_type': u.text_type,
-                                'column': u.column,
-                            }
+                            _text_unit_to_dict(u, full_text_export=full_text_export)
                             for u in block.units
                         ]
                     page_blocks.append(block_info)
                 text_blocks_detail[str(page_num)] = page_blocks
             result['text_blocks'] = text_blocks_detail
+
+        if full_text_export:
+            result['text_units'] = {
+                str(page_num): [
+                    _text_unit_to_dict(unit, full_text_export=True) for unit in units
+                ]
+                for page_num, units in self.text_units.items()
+            }
 
         return result
 
@@ -476,6 +490,7 @@ class GatheredParagraph:
         para_type: 段落类型（heading / caption / list / paragraph）
         font_name: 首行主 span 字体名
         line_count: 块内非空文本行数
+        continues_previous_page: 本块是否由抽取阶段确认续接上一页的同一有序列表
     """
     page: int
     text: str
@@ -490,6 +505,7 @@ class GatheredParagraph:
     para_type: str = "paragraph"
     font_name: str = ""
     line_count: int = 0
+    continues_previous_page: bool = False
 
 
 @dataclass

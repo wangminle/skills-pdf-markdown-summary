@@ -7,7 +7,7 @@ description: Convert PDFs, especially research papers and technical reports, int
 
 Use this skill to convert PDFs into Markdown, extract Figure/Table PNG assets, and prepare text-plus-image materials for paper reading summaries.
 
-Current package version: **0.6.13**.
+Current package version: **0.6.14**.
 
 ## Core Workflow
 
@@ -80,6 +80,14 @@ The asset extractor includes:
 - Captionless table continuation recovery on adjacent pages when continuation markers, repeated headers, and horizontal rules agree. This runs automatically; `--allow-continued` controls repeated-caption items. Recovered fragments receive boundary checks and may require review.
 - Optional semantic-layout evidence, full-page one-to-one pairing, multi-frame grouping, conservative refinement, and four-state quality reporting.
 - Debug overlays showing `baseline`, `phase_a`, `phase_b`, `phase_d` (post-autocrop), and `final` regions.
+
+## Markdown Structure Guarantees
+
+- Reading order is decided per page: confirmed double-column pages teach column origins, sparse trailing pages inherit them, and a full-width body beside a two-column grid is read row by row instead of column by column.
+- Repeated headers and footers are removed only inside the margin band; bottom numbers are treated as page numbers only when isolated from body text and consistent with a printed page sequence, so table cells and label rows keep their numbers.
+- Headings, tables, and list items escape literal asterisks, backslashes, and HTML-like angle brackets exactly once, so inline bold such as `x**2`, consecutive backslashes, and escaped bullet characters survive a CommonMark round-trip.
+- Crossing a column or page resets list indentation; cross-page ordered lists keep their page marker unless continuation was confirmed during extraction.
+- `--layout-model-detail summary|blocks|full` controls `layout_model.json`; with both figures and tables off, an explicit level writes that file alone. Layout and derived asset paths are identity-checked before writing.
 
 ## References
 

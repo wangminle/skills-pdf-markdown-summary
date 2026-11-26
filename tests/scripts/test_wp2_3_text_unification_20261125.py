@@ -717,6 +717,23 @@ def test_gemini_embedded_second_contribution_keeps_ordered_list_semantics() -> N
     assert not second.text.lstrip().startswith("2.")
     assert first.para_type == second.para_type == "list"
 
+    from markdown_it import MarkdownIt
+
+    from core.pdf_to_markdown import _paragraphs_to_document
+    from lib.markdown import render_block
+
+    document = _paragraphs_to_document(
+        "gemini.pdf", "Gemini",
+        SimpleNamespace(text_layer_ratio=1.0, has_text_layer=True, warnings=[]),
+        gathered=gathered,
+    )
+    block = next(b for b in document.blocks if "Split-Phase SDC Detection" in b.text)
+    tokens = MarkdownIt("commonmark").parse(render_block(block))
+    assert any(
+        token.type == "ordered_list_open" and token.attrGet("start") == 2
+        for token in tokens
+    )
+
 
 def test_structured_font_metadata_comes_from_the_same_main_span(tmp_path: Path) -> None:
     from lib.text_extract import gather_structured_text
@@ -812,3 +829,591 @@ def test_confirm_ordered_lists_chains_multi_item_block_and_demotes_isolated_midl
     ]
     _confirm_ordered_lists(isolated)
     assert [p.para_type for p in isolated] == ["paragraph", "paragraph"]
+
+
+def test_cross_page_ordered_list_skips_only_page_furniture() -> None:
+    """WP-3.3：跨页 1./2. 可越过页码与小号页眉，普通正文不得作为跳过的桥梁。"""
+    from lib.text_extract import _confirm_ordered_lists, gather_structured_text
+
+    def para(text, page, y0, y1, size=10.9, para_type="paragraph"):
+        return GatheredParagraph(
+            page=page, text=text, bbox=(75.0, y0, 400.0, y1),
+            is_heading=False, font_size=size, para_type=para_type, line_count=1,
+        )
+
+    # 真页脚在 gather 阶段剔除（见镜像页码端到端测试）；剩余数字即使恰好
+    # 等于所在页号，也属于正文并阻断续接。
+    paragraphs = [
+        para("1. First policy item", 18, 748.0, 759.0),
+        para("18", 18, 780.0, 789.0, size=8.0),
+        para("2. Second policy item", 19, 87.0, 112.0),
+    ]
+    _confirm_ordered_lists(paragraphs)
+    assert [p.para_type for p in paragraphs] == ["paragraph", "paragraph", "paragraph"]
+
+    prose_between = [
+        para("1. First policy item", 18, 748.0, 759.0),
+        para("Ordinary prose continues on the next page before any new item.", 19, 55.0, 80.0),
+        para("2. Second policy item", 19, 87.0, 98.0, para_type="list"),
+    ]
+    _confirm_ordered_lists(prose_between)
+    assert prose_between[0].para_type == "paragraph"
+    assert prose_between[-1].para_type == "paragraph"
+
+    false_positive = [
+        para(
+            "This report states an isolated numbered reference.\n1. The first isolated reference",
+            1, 110.0, 140.0, para_type="list",
+        ),
+        para("This is a genuine short footnote giving further evidence.", 1, 175.0, 185.0, size=8.0),
+        para("1", 1, 750.0, 758.0, size=8.0),
+        para("This is a genuine small-font source note, not a running heading.", 2, 55.0, 65.0, size=8.0),
+        para("2. The second isolated reference", 2, 240.0, 251.0, para_type="list"),
+    ]
+    _confirm_ordered_lists(false_positive)
+    assert false_positive[0].para_type == "paragraph"
+    assert false_positive[-1].para_type == "paragraph"
+    assert false_positive[1].para_type == false_positive[3].para_type == "paragraph"
+
+    benchmark = PROJECT_ROOT / "tests" / "basic-benchmark"
+    gathered = gather_structured_text(str(next(benchmark.glob("gemini_v2_5*.pdf"))))
+    first = next(p for p in gathered.paragraphs if p.text == "1. Child sexual abuse and exploitation")
+    following = next(p for p in gathered.paragraphs if p.text.startswith("2. Hate speech"))
+    assert (first.page, following.page) == (18, 19)
+    assert first.para_type == following.para_type == "list"
+
+    from markdown_it import MarkdownIt
+
+    from core.pdf_to_markdown import _paragraphs_to_document
+    from lib.markdown import render_markdown
+
+    document = _paragraphs_to_document(
+        "gemini.pdf", "Gemini",
+        SimpleNamespace(text_layer_ratio=1.0, has_text_layer=True, warnings=[]),
+        gathered=gathered,
+    )
+    markdown = render_markdown(document)
+    lines = markdown.splitlines()
+    markers = [
+        index for index, line in enumerate(lines)
+        if line.startswith(("1. Child sexual abuse", "2. Hate speech", "6. Medical advice"))
+    ]
+    list_ranges = [
+        token.map for token in MarkdownIt("commonmark").parse(markdown)
+        if token.type == "ordered_list_open" and token.map is not None
+    ]
+    assert len(markers) == 3
+    assert any(all(start <= marker < end for marker in markers) for start, end in list_ranges)
+
+
+def test_mixed_dual_column_document_keeps_single_column_page_in_y_order(tmp_path: Path) -> None:
+    """BUG-202：文档级双栏不得把单栏页的右对齐签名移到页末。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "mixed-single-dual-pages.pdf"
+    with fitz.open() as doc, fitz.open() as left, fitz.open() as right:
+        page = doc.new_page(width=600, height=800)
+        left_page = left.new_page(width=600, height=800)
+        right_page = right.new_page(width=600, height=800)
+        for index in range(6):
+            y = 110 + index * 27
+            left_page.insert_text((45, y), f"Left-column paragraph number {index} explains the study.", fontsize=11)
+            right_page.insert_text((325, y), f"Right-column paragraph number {index} presents a result.", fontsize=11)
+        page.show_pdf_page(page.rect, left, 0)
+        page.show_pdf_page(page.rect, right, 0)
+        single = doc.new_page(width=600, height=800)
+        single.insert_text((45, 100), "First block of the single-column page starts on the left.", fontsize=11)
+        single.insert_text((327, 135), "Second block is a right-aligned signature.", fontsize=11)
+        single.insert_text((45, 174), "Third block resumes on the left below the signature.", fontsize=11)
+        single.insert_text((45, 220), "This is the last paragraph of the single column.", fontsize=11)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    page2 = [p.text for p in gathered.paragraphs if p.page == 2]
+
+    assert gathered.is_dual_column is True
+    assert page2 == [
+        "First block of the single-column page starts on the left.",
+        "Second block is a right-aligned signature.",
+        "Third block resumes on the left below the signature.",
+        "This is the last paragraph of the single column.",
+    ]
+
+
+def test_sparse_body_with_long_table_cells_stays_single_column(tmp_path: Path) -> None:
+    """CHK-091 表格残余：6 行宽正文 + 22 行小字号长单元格不是双栏正文。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "sparse-body-two-column-table.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=612, height=792)
+        for index in range(6):
+            page.insert_text(
+                (54, 70 + index * 12),
+                f"Body {index} ordinary full width prose spans the page with enough words to establish the main font.",
+                fontsize=10,
+            )
+        for row in range(22):
+            for x, side in ((58, "A"), (313, "B")):
+                text = f"{side}{row} table cell contains enough text to enter narrow-line geometry sampling"
+                while len(text) > 8 and fitz.get_text_length(text, fontsize=8) > 150.0:
+                    text = text[:-1]
+                page.insert_text((x, 460 + row * 11), text, fontsize=8)
+        doc.save(pdf)
+
+    from lib.text_extract import extract_text_with_format
+
+    assert gather_structured_text(str(pdf)).is_dual_column is False
+    assert extract_text_with_format(str(pdf)).num_columns == 1
+
+
+def test_single_page_long_abstract_does_not_hide_dual_column_body(tmp_path: Path) -> None:
+    """CHK-091 S16：单页通栏摘要略多于正文时仍识别下方的双栏正文。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "single-page-long-abstract.pdf"
+    with fitz.open() as doc, fitz.open() as left, fitz.open() as right:
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((54, 70), "A Unified Architecture for Two-Column Academic Paper Layout Analysis", fontsize=14)
+        for index in range(12):
+            page.insert_text(
+                (54, 126 + index * 12),
+                f"Abstract {index} provides enough full width prose to exercise the wide-character guard.",
+                fontsize=10,
+            )
+        left_page = left.new_page(width=612, height=792)
+        right_page = right.new_page(width=612, height=792)
+        for index in range(12):
+            page_text = f"Left {index} column body has ordinary prose with enough words for layout detection."
+            while fitz.get_text_length(page_text, fontsize=10) > 240.0:
+                page_text = page_text[:-1]
+            left_page.insert_text((54, 290 + index * 12), page_text, fontsize=10)
+            right_page.insert_text((318, 290 + index * 12), page_text.replace("Left", "Right"), fontsize=10)
+        page.show_pdf_page(page.rect, left, 0)
+        page.show_pdf_page(page.rect, right, 0)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+
+    assert gathered.is_dual_column is True
+    left = [p for p in gathered.paragraphs if "Left" in p.text]
+    right = [p for p in gathered.paragraphs if "Right" in p.text]
+    assert left and right
+    assert max(p.bbox[1] for p in left) < min(p.bbox[1] for p in right) or all(
+        p.column == 0 for p in left
+    ) and all(p.column == 1 for p in right)
+
+
+def test_bottom_numeric_blocks_require_page_sequence_evidence(tmp_path: Path) -> None:
+    """CHK-092：真实数字单元格保留，跨页同位置的页码序列仍剔除。"""
+    from lib.text_extract import gather_structured_text
+
+    genuine = tmp_path / "genuine-bottom-numbers.pdf"
+    with fitz.open() as doc:
+        for page_index, value in enumerate((42, 99)):
+            page = doc.new_page(width=612, height=792)
+            page.insert_text((72, 100), f"Ordinary body on page {page_index + 1}.", fontsize=11)
+            page.insert_text((300, 770), str(value), fontsize=9)
+        doc.save(genuine)
+    genuine_texts = [p.text for p in gather_structured_text(str(genuine)).paragraphs]
+    assert "42" in genuine_texts and "99" in genuine_texts
+
+    numbered = tmp_path / "actual-page-number-sequence.pdf"
+    with fitz.open() as doc:
+        for page_index in range(3):
+            page = doc.new_page(width=612, height=792)
+            page.insert_text((72, 100), f"Ordinary body on page {page_index + 1}.", fontsize=11)
+            page.insert_text((300, 770), str(page_index + 1), fontsize=9)
+        doc.save(numbered)
+    numbered_texts = [p.text for p in gather_structured_text(str(numbered)).paragraphs]
+    assert len(numbered_texts) == 3
+    assert all(text.startswith("Ordinary body") for text in numbered_texts)
+
+
+def test_repeated_margin_text_is_removed_only_in_margin_zone(tmp_path: Path) -> None:
+    """CHK-094：页眉/页脚同名文本只能删除实际位于页边的块，正文同名标题保留。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "repeated-margin-text.pdf"
+    with fitz.open() as doc:
+        for page_index in range(3):
+            page = doc.new_page(width=600, height=800)
+            if page_index < 2:
+                page.insert_text((55, 63), "Safety checklist", fontsize=10)
+                page.insert_text(
+                    (55, 230),
+                    "Detailed instructions follow." if page_index == 0
+                    else "Verify the safety constraints.",
+                    fontsize=10,
+                )
+            else:
+                page.insert_text((55, 280), "Safety checklist", fontsize=10)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    body_titles = [p for p in gathered.paragraphs if p.text == "Safety checklist"]
+
+    assert gathered.headers_removed == ["Safety checklist"]
+    assert [p.page for p in body_titles] == [3]
+    assert any("Detailed instructions follow." in p.text for p in gathered.paragraphs)
+    assert any("Verify the safety constraints." in p.text for p in gathered.paragraphs)
+
+
+def test_bottom_numeric_table_cells_survive_page_number_filter(tmp_path: Path) -> None:
+    """CHK-094：页底表格里的 42/43 虽然跨页连续，也不能按页码删除。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "bottom-table-numbers.pdf"
+    with fitz.open() as doc:
+        for page_index, (value, label) in enumerate(((42, "Tensile yield"), (43, "Young modulus"))):
+            page = doc.new_page(width=600, height=800)
+            page.insert_text((60, 130), f"Test measurements, batch {chr(65 + page_index)}.", fontsize=10)
+            page.insert_text((60, 740), str(value), fontsize=10)
+            page.insert_text((200, 724), label, fontsize=10)
+        doc.save(pdf)
+
+    texts = [p.text for p in gather_structured_text(str(pdf)).paragraphs]
+
+    assert "42" in texts and "43" in texts
+    assert "Tensile yield" in texts and "Young modulus" in texts
+
+
+def test_sparse_dual_column_page_inherits_confirmed_columns(tmp_path: Path) -> None:
+    """CHK-094：尾页窄行不足 6 条时沿用已确认的左右栏位，不左右交替。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "sparse-tail-columns.pdf"
+    with fitz.open() as doc:
+        dense = doc.new_page(width=600, height=800)
+        for index in range(4):
+            dense.insert_text((50, 100 + 50 * index), f"Left column text at row {index}.", fontsize=10)
+            dense.insert_text((330, 100 + 50 * index), f"Right column text at row {index}.", fontsize=10)
+        sparse = doc.new_page(width=600, height=800)
+        for index in range(2):
+            sparse.insert_text((50, 115 + 55 * index), f"Left sparse column paragraph {index}.", fontsize=10)
+            sparse.insert_text((330, 123 + 55 * index), f"Right sparse column paragraph {index}.", fontsize=10)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    sparse_paragraphs = [p for p in gathered.paragraphs if p.page == 2]
+
+    assert gathered.is_dual_column is True
+    assert [p.text for p in sparse_paragraphs] == [
+        "Left sparse column paragraph 0.",
+        "Left sparse column paragraph 1.",
+        "Right sparse column paragraph 0.",
+        "Right sparse column paragraph 1.",
+    ]
+    assert [p.column for p in sparse_paragraphs] == [0, 0, 1, 1]
+
+
+def test_single_column_page_with_two_column_table_keeps_row_order(tmp_path: Path) -> None:
+    """CHK-094：通栏正文 + 同字号双列表格仍按行输出标签和读数，不误判双栏。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "single-column-data-table.pdf"
+    wide = "The preceding discussion describes a method for checking readings in each recorded experiment."
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        for index in range(5):
+            page.insert_text((50, 150 + index * 19), f"{wide} {index}.", fontsize=10)
+        for index in range(5):
+            page.insert_text((50, 360 + index * 40), f"Descriptive label for the experiment group. {index}", fontsize=10)
+            page.insert_text((330, 373 + index * 40), f"Corresponding readings in this column. {index}", fontsize=10)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    table_rows = [
+        p.text for p in gathered.paragraphs
+        if p.text.startswith(("Descriptive label", "Corresponding readings"))
+    ]
+
+    assert gathered.num_columns == 1
+    assert table_rows == [
+        item
+        for index in range(5)
+        for item in (
+            f"Descriptive label for the experiment group. {index}",
+            f"Corresponding readings in this column. {index}",
+        )
+    ]
+
+
+def test_cross_page_list_confirmation_rejects_mid_page_numbers(tmp_path: Path) -> None:
+    """CHK-094：页面中部的 42 不是页码，不能充当跨页列表的桥梁。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "mid-page-number-list.pdf"
+    with fitz.open() as doc:
+        first = doc.new_page(width=600, height=800)
+        first.insert_text((60, 140), "1. Reported values use this reference label.", fontsize=10)
+        first.insert_text((100, 270), "42", fontsize=10)
+        second = doc.new_page(width=600, height=800)
+        second.insert_text((60, 430), "2. Records here use another reference label.", fontsize=10)
+        second.insert_text((80, 550), "Final unnumbered paragraph.", fontsize=10)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    numbered = [p for p in gathered.paragraphs if p.text.startswith(("1.", "2."))]
+
+    assert [p.para_type for p in numbered] == ["paragraph", "paragraph"]
+    assert any(p.text == "42" for p in gathered.paragraphs)
+
+
+@pytest.mark.parametrize(
+    "labels", [("Tensile yield", "Young modulus"), ("Total observations", "Total observations")],
+)
+def test_bottom_table_numbers_sharing_a_row_with_labels_survive_page_number_filter(
+    tmp_path: Path, labels: tuple[str, str],
+) -> None:
+    """CHK-095：极页边的表格数字与标签同行（各自独立成块）时不是页码。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "bottom-grid-independent-numbers.pdf"
+    with fitz.open() as doc:
+        for page_index, label in enumerate(labels):
+            page = doc.new_page(width=600, height=800)
+            page.insert_text((330, 782), label, fontsize=10)
+            page.insert_text((60, 130), f"Test measurements, batch {page_index + 1}.", fontsize=10)
+            page.insert_text((60, 782), str(42 + page_index), fontsize=10)
+            for y in (754, 792):
+                page.draw_line((45, y), (555, y))
+            for x in (45, 300, 555):
+                page.draw_line((x, 754), (x, 792))
+        doc.save(pdf)
+
+    texts = [p.text for p in gather_structured_text(str(pdf)).paragraphs]
+
+    assert "42" in texts and "43" in texts
+    assert [text for text in texts if text in labels] == list(labels)
+
+
+def test_page_number_beside_repeated_footer_text_is_still_removed(tmp_path: Path) -> None:
+    """两端式页脚：页码与跨页重复的页脚文字同一行，页码仍按序列剔除。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "footer-text-beside-page-number.pdf"
+    with fitz.open() as doc:
+        for page_index in range(3):
+            page = doc.new_page(width=600, height=800)
+            # 页码最后写入才与页脚文字分成两个原生块；写入顺序相反时两者并成一块，
+            # 页码不是独立数字块，本就不进入页码候选。
+            page.insert_text((330, 782), "Running footer text shared by every page.", fontsize=10)
+            page.insert_text((60, 130), f"Chapter body paragraph number {page_index + 1}.", fontsize=10)
+            page.insert_text((60, 782), str(page_index + 1), fontsize=10)
+        doc.save(pdf)
+
+    texts = [p.text for p in gather_structured_text(str(pdf)).paragraphs]
+
+    assert not any(text in {"1", "2", "3"} for text in texts)
+    assert not any(text.startswith("Running footer text") for text in texts)
+    assert len([text for text in texts if text.startswith("Chapter body")]) == 3
+
+
+@pytest.mark.parametrize("midpage_number", [None, "43"])
+def test_cross_page_list_confirmation_rejects_unconfirmed_edge_numbers(
+    tmp_path: Path, midpage_number: str | None,
+) -> None:
+    """CHK-095：页脚带里孤立的正文数值不是页码，不能连接两段独立的编号正文。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "edge-body-number.pdf"
+    with fitz.open() as doc:
+        first = doc.new_page(width=600, height=800)
+        first.insert_text((60, 690), "1. Reported values use this reference label.", fontsize=10)
+        first.insert_text((100, 750), "42", fontsize=10)
+        second = doc.new_page(width=600, height=800)
+        second.insert_text((60, 230), "2. Records here use another reference label.", fontsize=10)
+        if midpage_number:
+            second.insert_text((100, 410), midpage_number, fontsize=10)
+        second.insert_text((80, 550), "Final unnumbered paragraph.", fontsize=10)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    numbered = [p for p in gathered.paragraphs if p.text.startswith(("1.", "2."))]
+
+    assert [p.para_type for p in numbered] == ["paragraph", "paragraph"]
+    assert any(p.text == "42" for p in gathered.paragraphs)
+    if midpage_number:
+        assert any(p.text == midpage_number for p in gathered.paragraphs)
+
+
+def test_mirrored_footers_do_not_split_confirmed_list_in_markdown(tmp_path: Path) -> None:
+    from markdown_it import MarkdownIt
+
+    from core.pdf_to_markdown import main
+
+    pdf = tmp_path / "mirrored-footer-list.pdf"
+    with fitz.open() as doc:
+        for page_index in range(2):
+            page = doc.new_page(width=600, height=800)
+            first_y = 580 if page_index == 0 else 130
+            for item in range(2):
+                number = page_index * 2 + item + 1
+                page.insert_text((60, first_y + item * 26), f"{number}. Running list item number {number}.")
+            page.insert_text(((60, 780), (535, 780))[page_index], str(page_index + 1), fontsize=10)
+        doc.save(pdf)
+
+    out = tmp_path / "markdown" / "paper.md"
+    assert main(["--pdf", str(pdf), "--out", str(out), "--images", "off", "--tables", "off"]) == 0
+    markdown = out.read_text(encoding="utf-8")
+    tokens = MarkdownIt("commonmark").parse(markdown)
+    assert sum(t.type == "ordered_list_open" for t in tokens) == 1
+    assert sum(t.type == "list_item_open" for t in tokens) == 4
+    assert "<!-- page 2 -->" not in markdown
+    assert not {"1", "2"}.intersection(markdown.splitlines())
+
+
+@pytest.mark.parametrize(
+    "offset",
+    [
+        pytest.param(0, id="printed-number-equals-pdf-page"),
+        pytest.param(-1, id="printed-number-offset-by-cover-page"),
+    ],
+)
+def test_alternating_page_numbers_still_bridge_cross_page_lists(tmp_path: Path, offset: int) -> None:
+    """页码左右交替（或带固定偏移）时跨页同位置序列不成立，页码留在段落里，仍须能连接列表。
+
+    offset=-1 时多一页不带页码的封面：印刷页码比 PDF 页号小 1，只能靠
+    相邻页数字的连续性认出它是页码。
+    """
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / f"alternating-page-numbers-{offset}.pdf"
+    with fitz.open() as doc:
+        page_count = 2 - offset
+        for page_index in range(page_count):
+            page = doc.new_page(width=600, height=800)
+            item_number = page_index + 1 + offset
+            number = item_number
+            if number >= 1:
+                # 页码按页奇偶左右交替：跨页同位置的序列不成立，页码不会被提前删除
+                page.insert_text(((60, 780), (540, 40))[page_index % 2], str(number), fontsize=10)
+            if item_number >= 1:
+                page.insert_text((60, 300), f"{item_number}. Item number {item_number} of the list.", fontsize=10)
+            else:
+                page.insert_text((60, 300), "Cover page without a printed number.", fontsize=10)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    numbered = [p for p in gathered.paragraphs if p.text.startswith(("1. Item", "2. Item"))]
+
+    assert [p.para_type for p in numbered] == ["list", "list"]
+
+
+WIDE_BODY_SENTENCE = (
+    "The preceding discussion describes a method for checking readings in each recorded experiment."
+)
+
+
+def _draw_two_column_grid(page: "fitz.Page", ys: tuple, label: str) -> None:
+    """五行双列网格，每个单元格两行；带框线。
+
+    与 CHK-095 的复现探针同一写法：单元格两行用一次带换行的写入，提取器才会
+    把每个单元格作为一个两行的原生块；逐行分写会并成左右连片的整行块。
+    """
+    second_line = "A second long line within this cell."
+    for index in range(5):
+        page.insert_text((50, ys[0] + 17 + index * 55), f"Descriptive {label} group {index}\n{second_line}", fontsize=10)
+        page.insert_text((330, ys[0] + 22 + index * 55), f"Corresponding measurement group {index}\n{second_line}", fontsize=10)
+    for y in ys:
+        page.draw_line((45, y), (555, y))
+    for x in (45, 300, 555):
+        page.draw_line((x, ys[0]), (x, ys[-1]))
+
+
+@pytest.mark.parametrize("body_lines", [pytest.param(5, id="five-body-lines"), pytest.param(8, id="eight-body-lines")])
+def test_two_column_table_with_wrapped_cells_keeps_row_order(tmp_path: Path, body_lines: int) -> None:
+    """CHK-095：单元格换成两行后，双列表格仍不能被当成双栏正文。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / f"wide-body-wrapped-grid-{body_lines}.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        for index in range(body_lines):
+            page.insert_text((50, 150 + index * 19), WIDE_BODY_SENTENCE, fontsize=10)
+        _draw_two_column_grid(page, (326, 379, 434, 489, 544, 600), "experiment")
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    table_cells = [
+        p.text.splitlines()[0] for p in gathered.paragraphs
+        if p.text.startswith(("Descriptive experiment", "Corresponding measurement"))
+    ]
+
+    assert gathered.num_columns == 1
+    assert table_cells == [
+        text
+        for index in range(5)
+        for text in (f"Descriptive experiment group {index}", f"Corresponding measurement group {index}")
+    ]
+
+
+def test_sparse_page_with_wide_body_does_not_inherit_columns(tmp_path: Path) -> None:
+    """CHK-095：双栏正文之后的稀疏页若有通栏正文，其两列表格按行输出，不继承栏位。"""
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "sparse-two-row-grid.pdf"
+    with fitz.open() as doc:
+        dense = doc.new_page(width=600, height=800)
+        for index in range(4):
+            dense.insert_text((50, 100 + 50 * index), f"Left column text at row {index}.", fontsize=10)
+            dense.insert_text((330, 108 + 50 * index), f"Right column text at row {index}.", fontsize=10)
+        sparse = doc.new_page(width=600, height=800)
+        sparse.insert_text((50, 150), WIDE_BODY_SENTENCE, fontsize=10)
+        sparse.insert_text((50, 169), WIDE_BODY_SENTENCE, fontsize=10)
+        sparse.insert_text((50, 360), "Descriptive label for experiment group A.", fontsize=10)
+        sparse.insert_text((330, 373), "Corresponding readings for group A.", fontsize=10)
+        sparse.insert_text((50, 400), "Descriptive label for experiment group B.", fontsize=10)
+        sparse.insert_text((330, 413), "Corresponding readings for group B.", fontsize=10)
+        for y in (342, 388, 430):
+            sparse.draw_line((45, y), (555, y))
+        for x in (45, 300, 555):
+            sparse.draw_line((x, 342), (x, 430))
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    sparse_paragraphs = [p for p in gathered.paragraphs if p.page == 2]
+
+    assert gathered.is_dual_column is True
+    assert all(p.column == 0 for p in gathered.paragraphs if p.page == 1 and p.text.startswith("Left"))
+    assert [(p.column, p.text) for p in sparse_paragraphs] == [
+        (-1, WIDE_BODY_SENTENCE),
+        (-1, WIDE_BODY_SENTENCE),
+        (-1, "Descriptive label for experiment group A."),
+        (-1, "Corresponding readings for group A."),
+        (-1, "Descriptive label for experiment group B."),
+        (-1, "Corresponding readings for group B."),
+    ]
+
+
+@pytest.mark.parametrize("right_first", [False, True])
+def test_narrow_gutter_ruled_table_keeps_rows_and_cells_in_order(
+    tmp_path: Path, right_first: bool,
+) -> None:
+    from lib.text_extract import gather_structured_text
+
+    pdf = tmp_path / "ruled-table.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        for index in range(11):
+            page.insert_text((50, 100 + index * 19), WIDE_BODY_SENTENCE, fontsize=10)
+        for row in range(5):
+            y = 345 + row * 55
+            for x, dy, name in ((50, 0, "Label"), (320, -5 if right_first else 5, "Reading")):
+                page.insert_text(
+                    (x, y + dy),
+                    f"{name} cell {row} contains grouped results and extended\n"
+                    "The second line describes grouped results and extended",
+                    fontsize=10,
+                )
+        for y in (329, 391, 446, 501, 556, 610):
+            page.draw_line((45, y), (582, y))
+        for x in (45, 310, 582):
+            page.draw_line((x, 329), (x, 610))
+        doc.save(pdf)
+
+    result = gather_structured_text(str(pdf))
+    cells = [p.text.split()[:3] for p in result.paragraphs if p.text.startswith(("Label cell", "Reading cell"))]
+    assert result.num_columns == 1
+    assert cells == [[kind, "cell", str(row)] for row in range(5) for kind in ("Label", "Reading")]

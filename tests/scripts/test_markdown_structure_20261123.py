@@ -380,7 +380,7 @@ def test_centered_short_heading_above_columns_is_full_width(tmp_path: Path) -> N
     )
 
 
-def test_two_column_page_splits_at_wide_centered_blocks_only(tmp_path: Path) -> None:
+def test_two_column_page_splits_at_wide_and_centered_display_blocks(tmp_path: Path) -> None:
     path = tmp_path / "multi-band.pdf"
     with fitz.open() as pdf, fitz.open() as left, fitz.open() as right:
         page = pdf.new_page(width=600, height=800)
@@ -402,9 +402,11 @@ def test_two_column_page_splits_at_wide_centered_blocks_only(tmp_path: Path) -> 
     assert gathered.num_columns == 2
     assert paragraphs[wide + " (top)"].is_full_width
     assert paragraphs[wide + " (middle)"].is_full_width
-    assert not paragraphs["x + y = z"].is_full_width
+    assert paragraphs["x + y = z"].is_full_width
     assert order.index(wide + " (top)") < order.index("Left column paragraph number 0.")
-    assert order.index("Left column paragraph number 3.") < order.index("Right column paragraph number 0.")
+    assert order.index("Left column paragraph number 1.") < order.index("Right column paragraph number 0.")
+    assert order.index("Right column paragraph number 1.") < order.index("x + y = z")
+    assert order.index("x + y = z") < order.index("Left column paragraph number 2.")
     assert order.index("Right column paragraph number 3.") < order.index(wide + " (middle)")
     assert order.index(wide + " (middle)") < order.index("Left column paragraph number 4.")
     assert order.index("Left column paragraph number 7.") < order.index("Right column paragraph number 4.")
@@ -982,6 +984,465 @@ def test_markdown_list_and_fenced_equation_rendering() -> None:
     assert render_block(MarkdownBlock(type="paragraph", text=fenced)) == fenced
 
 
+def test_styled_unicode_bullets_render_as_real_lists_in_benchmark() -> None:
+    """WP-3.3/4.3：圆点自身的行内样式不得阻止列表规范化，后续强调仍保留。"""
+    from markdown_it import MarkdownIt
+
+    styled = MarkdownBlock(
+        type="list", text="• Alpha item", rich_text="*•* **Alpha item**",
+    )
+    assert render_block(styled) == "- **Alpha item**"
+    assert render_block(MarkdownBlock(
+        type="list", text="• Bold whole item", rich_text="**• Bold whole item**",
+    )) == "- **Bold whole item**"
+    assert render_block(MarkdownBlock(
+        type="list", text="•Bold word", rich_text="•**Bold word**",
+    )) == "- **Bold word**"
+
+    benchmark = PROJECT_ROOT / "tests" / "basic-benchmark"
+    pdf = next(benchmark.glob("Kearns*.pdf"))
+    markdown = render_markdown(_paragraphs_to_document(str(pdf), title="Kearns"))
+    tokens = MarkdownIt("commonmark").parse(markdown)
+
+    assert "*•*" not in markdown
+    assert "- **Optimized Trade Execution via Reinforcement Learning [14].**" in markdown
+    assert sum(token.type == "list_item_open" for token in tokens) >= 3
+
+
+def test_literal_hash_and_html_like_text_survive_commonmark() -> None:
+    """BUG-203：正文的 # 与 <EOS>/<pad> 不得变成标题或 HTML。"""
+    from markdown_it import MarkdownIt
+
+    from lib.markdown import _escape_inline_literals
+
+    assert _escape_inline_literals(
+        "**Bold**", has_markup=True, plain_text=" Bold ",
+    ) == "**Bold**"
+
+    source = "# Langs\n<EOS>\n<pad>\n7,168\n=\nRL*F\n\\\"false\\\""
+    rendered = render_block(MarkdownBlock(type="paragraph", text=source))
+    tokens = MarkdownIt("commonmark").parse(rendered)
+    assert not any(token.type == "heading_open" for token in tokens)
+    assert not any(token.type == "html_block" for token in tokens)
+    assert not any(token.type == "em_open" for token in tokens for child in token.children or [])
+    roundtrip = "".join(
+        child.content for token in tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+    assert "RL*F" in roundtrip
+    assert "\\\"false\\\"" in roundtrip
+    assert "=" in roundtrip
+    assert any(
+        child.type == "text" and "<EOS>" in child.content
+        for token in tokens for child in token.children or []
+    )
+
+    benchmark = PROJECT_ROOT / "tests" / "basic-benchmark"
+    qwen = render_markdown(_paragraphs_to_document(
+        str(next(benchmark.glob("2509*.pdf"))), title="Qwen",
+    ))
+    attention = render_markdown(_paragraphs_to_document(
+        str(next(benchmark.glob("1706*.pdf"))), title="Attention",
+    ))
+    qwen_tokens = MarkdownIt("commonmark").parse(qwen)
+    attention_tokens = MarkdownIt("commonmark").parse(attention)
+    assert not any(
+        token.type == "inline" and token.content in ("", "Langs")
+        and index > 0 and qwen_tokens[index - 1].type == "heading_open"
+        for index, token in enumerate(qwen_tokens)
+    )
+    assert not any(
+        token.type == "html_block" and token.content.strip() in ("<EOS>", "<pad>")
+        for token in attention_tokens
+    )
+
+    rich_tokens = MarkdownIt("commonmark").parse(render_block(MarkdownBlock(
+        type="paragraph", text="Bold and RL*F", rich_text="**Bold** and RL*F",
+    )))
+    assert any(
+        child.type == "strong_open" for token in rich_tokens for child in token.children or []
+    )
+    assert "RL*F" in "".join(
+        child.content for token in rich_tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+
+    kimi = render_markdown(_paragraphs_to_document(
+        str(next(benchmark.glob("2607*.pdf"))), title="Kimi",
+    ))
+    gemini = render_markdown(_paragraphs_to_document(
+        str(next(benchmark.glob("gemini*.pdf"))), title="Gemini",
+    ))
+    gpt = render_markdown(_paragraphs_to_document(
+        str(next(benchmark.glob("gpt*.pdf"))), title="GPT",
+    ))
+    kimi_tokens = MarkdownIt("commonmark").parse(kimi)
+    assert not any(
+        token.type == "inline" and token.content == "7,168"
+        and index > 0 and kimi_tokens[index - 1].type == "heading_open"
+        for index, token in enumerate(kimi_tokens)
+    )
+    gemini_text = "".join(
+        child.content for token in MarkdownIt("commonmark").parse(gemini)
+        for child in token.children or [] if child.type in ("text", "text_special")
+    )
+    gpt_text = "".join(
+        child.content for token in MarkdownIt("commonmark").parse(gpt)
+        for child in token.children or [] if child.type in ("text", "text_special")
+    )
+    assert "RL*F" in gemini_text
+    assert "\\\"false\\\"" in gpt_text
+
+
+def test_nested_and_alphabetic_lists_keep_structure(tmp_path: Path) -> None:
+    """BUG-205：数字父项跨字母子项连续，字母标记作为嵌套列表保留。"""
+    from markdown_it import MarkdownIt
+
+    pdf = tmp_path / "nested-list.pdf"
+    rows = [
+        (60, 75, "The workflow has two stages:"),
+        (72, 102, "1. First stage has a long explanation"),
+        (91, 116, "which continues on a second printed line."),
+        (91, 140, "(a) First prerequisite"),
+        (91, 155, "(b) Second prerequisite"),
+        (72, 180, "2. Second stage"),
+        (60, 220, "The following two alternative steps are equivalent:"),
+        (72, 250, "a) Run a local conversion"),
+        (72, 265, "b) Run conversion in another environment"),
+        (60, 300, "Unrelated body paragraph ends the list."),
+    ]
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        for x, y, text in rows:
+            page.insert_text((x, y), text, fontsize=10)
+        doc.save(pdf)
+
+    markdown = render_markdown(_paragraphs_to_document(str(pdf), title="Nested"))
+    tokens = MarkdownIt("commonmark").parse(markdown)
+
+    assert "\\1." not in markdown and "\\2." not in markdown
+    assert "    - (a) First prerequisite" in markdown
+    assert "- a) Run a local conversion" in markdown
+    assert sum(token.type == "list_item_open" for token in tokens) == 6
+    assert sum(token.type == "ordered_list_open" for token in tokens) == 1
+    assert sum(token.type == "bullet_list_open" for token in tokens) == 2
+
+
+def test_nested_sibling_list_blocks_keep_shared_indent() -> None:
+    """同级子项拆成多个 list 块时都应保留缩进，不得只缩进第一块。"""
+    from markdown_it import MarkdownIt
+
+    from lib.markdown import MarkdownDocument
+
+    document = MarkdownDocument(title="Nested siblings", source_pdf="synthetic.pdf")
+    document.blocks = [
+        MarkdownBlock(type="list", text="1. Parent item one", page=1, meta={"bbox": [72, 100, 320, 112]}),
+        MarkdownBlock(type="list", text="- Child item A", page=1, meta={"bbox": [92, 118, 320, 130]}),
+        MarkdownBlock(type="list", text="- Child item B", page=1, meta={"bbox": [92, 136, 320, 148]}),
+        MarkdownBlock(type="list", text="2. Parent item two", page=1, meta={"bbox": [72, 154, 320, 166]}),
+    ]
+    markdown = render_markdown(document)
+
+    assert "    - Child item A" in markdown
+    assert "    - Child item B" in markdown
+    assert "\n- Child item B" not in markdown
+    tokens = MarkdownIt("commonmark").parse(markdown)
+    # 两个父项 level 1；两个同级子项都在第一个父项内部的 level 3
+    assert [token.level for token in tokens if token.type == "list_item_open"] == [1, 3, 3, 1]
+    assert sum(token.type == "ordered_list_open" for token in tokens) == 1
+    assert sum(token.type == "bullet_list_open" for token in tokens) == 1
+
+
+def test_side_by_side_list_blocks_are_not_indented_as_sublists() -> None:
+    """同页并排的右栏列表 x0 更大但不在上一块下方，不得当作嵌套子项。"""
+    from lib.markdown import MarkdownDocument
+
+    document = MarkdownDocument(title="Columns", source_pdf="synthetic.pdf")
+    document.blocks = [
+        MarkdownBlock(type="list", text="- Left column item", page=12, meta={"bbox": [108, 685, 400, 697]}),
+        MarkdownBlock(type="list", text="- Right column item", page=12, meta={"bbox": [270, 685, 520, 697]}),
+    ]
+    markdown = render_markdown(document)
+
+    assert "\n- Right column item" in markdown
+    assert "    - Right column item" not in markdown
+
+
+def test_list_items_escape_literal_stars_backslashes_and_html_like_text() -> None:
+    """列表项的字面星号、反斜杠与类 HTML 文本不得被 CommonMark 解释（BUG-203/211 同类）。"""
+    from markdown_it import MarkdownIt
+
+    plain = "Use a*b*c notation and C:\\path\\to\\file, <EOS> and <pad>"
+    rendered = render_block(MarkdownBlock(type="list", text=f"- {plain}"))
+    tokens = MarkdownIt("commonmark").parse(rendered)
+
+    assert rendered.startswith("- ")
+    assert "\\*" in rendered and "\\\\" in rendered and "&lt;EOS>" in rendered
+    assert not any(token.type in ("html_block", "html_inline") for token in tokens)
+    assert not any(token.type == "em_open" for token in tokens for child in token.children or [])
+    roundtrip = "".join(
+        child.content for token in tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+    assert roundtrip == plain
+    # "* " 是列表标记而非字面星号：转义后仍是项目符号
+    assert render_block(MarkdownBlock(type="list", text="* first\n* second")) == "- first\n- second"
+
+    original = "• Reinforcement Learning (RL*F)"
+    styled = "• **Reinforcement Learning (RL\\*F)**"
+    styled_tokens = MarkdownIt("commonmark").parse(render_block(MarkdownBlock(
+        type="list", text=original, rich_text=styled,
+    )))
+    styled_text = "".join(
+        child.content for token in styled_tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+    assert "RL*F" in styled_text
+    assert any(
+        child.type == "strong_open" for token in styled_tokens for child in token.children or []
+    )
+
+
+def test_bold_backslashes_are_escaped_exactly_once() -> None:
+    """BUG-220：粗体样式 run 内已有的转义反斜杠不得再被转义一次。"""
+    from markdown_it import MarkdownIt
+
+    from lib.text_extract import format_spans_as_markdown
+
+    spans = [
+        {"text": "C:\\path and \\two", "font": "Times-Bold", "flags": 16},
+        {"text": " and normal", "font": "Times-Roman", "flags": 4},
+    ]
+    plain = "".join(span["text"] for span in spans)
+    rich = format_spans_as_markdown(spans)
+
+    rendered = render_block(MarkdownBlock(type="paragraph", text=plain, rich_text=rich))
+    tokens = MarkdownIt("commonmark").parse(rendered)
+    roundtrip = "".join(
+        child.content for token in tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+
+    assert roundtrip == plain
+    # 两个字面反斜杠各转义一次（输出 4 个），不得出现第二次转义
+    assert rendered.count("\\\\") == 2
+    assert any(child.type == "strong_open" for token in tokens for child in token.children or [])
+
+    list_rendered = render_block(MarkdownBlock(type="list", text=f"- {plain}", rich_text=f"- {rich}"))
+    list_tokens = MarkdownIt("commonmark").parse(list_rendered)
+    list_roundtrip = "".join(
+        child.content for token in list_tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+    assert list_roundtrip == plain
+
+
+def test_heading_and_table_blocks_escape_literal_markup() -> None:
+    """BUG-221：标题块与 table 块的字面星号、反斜杠与尖括号不得被 CommonMark 解释。"""
+    from markdown_it import MarkdownIt
+
+    md = MarkdownIt("commonmark")
+
+    def text_of(markdown: str) -> str:
+        tokens = md.parse(markdown)
+        return "".join(
+            child.content for token in tokens for child in token.children or []
+            if child.type in ("text", "text_special")
+        )
+
+    original = "3.2 A*B*C and C:\\path <EOS>"
+    heading = render_block(MarkdownBlock(type="heading", text=original, level=2))
+    heading_tokens = md.parse(heading)
+    assert heading_tokens[0].type == "heading_open"
+    assert not any(token.type == "em_open" for token in heading_tokens for child in token.children or [])
+    assert not any(token.type in ("html_block", "html_inline") for token in heading_tokens)
+    assert text_of(heading) == original
+
+    table_original = "| a * b * c | <EOS> |"
+    table = render_block(MarkdownBlock(type="table", text=table_original))
+    table_tokens = md.parse(table)
+    assert not any(token.type in ("html_block", "html_inline") for token in table_tokens)
+    assert text_of(table) == table_original
+    # 普通标题与井号开头标题的层级语义不变
+    assert render_block(MarkdownBlock(type="heading", text="1 Introduction", level=1)) == "# 1 Introduction"
+    assert render_block(MarkdownBlock(type="heading", text="# Langs", level=2)) == "## # Langs"
+
+
+def test_extended_caption_formats_and_nonbold_large_headings(tmp_path: Path) -> None:
+    """BUG-207/208：题注格式与资产标识符对齐，编号标题不依赖粗体。"""
+    pdf = tmp_path / "caption-heading-boundaries.pdf"
+    rows = [
+        (60, 75, "Helvetica", 16, "1 Introduction"),
+        (60, 113, "Helvetica", 10, "The first body paragraph provides ordinary prose about the method."),
+        (60, 155, "Helvetica-Bold", 10, "1. Install the package"),
+        (60, 170, "Helvetica-Bold", 10, "2. Run the setup command"),
+        (60, 219, "Helvetica-Bold", 10, "Figure 1: Ordinary caption"),
+        (60, 245, "Helvetica-Bold", 10, "Figure II: Roman numeral caption"),
+        (60, 271, "Helvetica-Bold", 10, "Extended Data Figure 1: Supplementary plot"),
+        (60, 297, "Helvetica-Bold", 10, "Supplementary Table 1: Results"),
+        (60, 323, "Helvetica-Bold", 10, "Tab. 2: Measurements"),
+        (60, 349, "Helvetica", 10, "Table 6. Also, we evaluate whether the effect generalizes."),
+        (60, 393, "Helvetica", 16, "2 Method"),
+        (60, 430, "Helvetica", 10, "Another body paragraph provides ordinary prose about the experiments."),
+    ]
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        for x, y, font, size, text in rows:
+            page.insert_text((x, y), text, fontname=font, fontsize=size)
+        doc.save(pdf)
+
+    paragraphs = gather_structured_text(str(pdf)).paragraphs
+    by_text = {p.text: p for p in paragraphs}
+
+    assert by_text["1 Introduction"].heading_level == 2
+    assert by_text["2 Method"].heading_level == 2
+    steps = by_text["1. Install the package\n2. Run the setup command"]
+    assert steps.is_heading is False
+    assert steps.para_type == "list"
+    for text in (
+        "Figure 1: Ordinary caption",
+        "Figure II: Roman numeral caption",
+        "Extended Data Figure 1: Supplementary plot",
+        "Supplementary Table 1: Results",
+        "Tab. 2: Measurements",
+    ):
+        assert by_text[text].para_type == "caption"
+    assert by_text[
+        "Table 6. Also, we evaluate whether the effect generalizes."
+    ].para_type == "paragraph"
+
+
+def test_full_layout_export_includes_unblocked_text_units(tmp_path: Path) -> None:
+    """BUG-209：full 必须包含未进入聚合块的全部行单元，且默认输出保持原结构。"""
+    from lib.text_extract import extract_text_with_format
+
+    pdf = tmp_path / "full-units.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        page.insert_text((50, 100), "An isolated one-line paragraph in the original PDF.", fontsize=10)
+        page.insert_text((50, 170), "A second isolated paragraph also belongs to the document.", fontsize=10)
+        doc.save(pdf)
+
+    model = extract_text_with_format(str(pdf))
+    full = model.to_dict(full_text_export=True)
+    default = model.to_dict()
+    expected = sum(len(units) for units in model.text_units.values())
+
+    assert expected == 2
+    assert "text_units" not in default
+    assert sum(len(units) for units in full["text_units"].values()) == expected
+    assert {
+        unit["text"] for units in full["text_units"].values() for unit in units
+    } == {
+        "An isolated one-line paragraph in the original PDF.",
+        "A second isolated paragraph also belongs to the document.",
+    }
+
+
+def test_layout_model_default_cli_matches_explicit_blocks(tmp_path: Path) -> None:
+    """WP-4.2：省略 --layout-model-detail 必须与显式 blocks 逐字节一致。"""
+    from core.extract_pdf_assets import main as assets_main
+
+    pdf = tmp_path / "default-blocks.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=420, height=320)
+        page.insert_text((48, 72), "Default layout export compatibility check.", fontsize=11)
+        doc.save(pdf)
+
+    outputs = {}
+    for mode in ("default", "blocks"):
+        out_dir = tmp_path / mode / "images"
+        args = [
+            "--pdf", str(pdf), "--out-dir", str(out_dir),
+            "--out-text", str(tmp_path / mode / "txt" / "paper.txt"),
+            "--no-figures", "--no-tables", "--layout-driven", "on",
+        ]
+        if mode == "blocks":
+            args.extend(["--layout-model-detail", "blocks"])
+        assert assets_main(args) == 0
+        outputs[mode] = (out_dir / "layout_model.json").read_bytes()
+
+    assert outputs["default"] == outputs["blocks"]
+
+
+def test_layout_detail_is_forwarded_by_markdown_and_process(tmp_path: Path, monkeypatch) -> None:
+    """WP-4.2：full/summary 不再局限于底层资产入口，process 继续透传。"""
+    import json
+
+    import core.process_pdf as process_pdf
+
+    pdf = tmp_path / "forward-layout-detail.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=420, height=320)
+        page.insert_text((48, 72), "Forward the selected layout detail level.", fontsize=11)
+        doc.save(pdf)
+
+    out_md = tmp_path / "full" / "paper.md"
+    assert main([
+        "--pdf", str(pdf), "--out", str(out_md), "--images", "figures", "--tables", "off",
+        "--layout-model-detail", "full",
+    ]) == 0
+    full = json.loads((out_md.parent / "images" / "layout_model.json").read_text(encoding="utf-8"))
+    assert "text_units" in full
+
+    calls = []
+
+    def fake_load(filename: str, _module_name: str):
+        if filename == "pdf_to_markdown.py":
+            return lambda argv: calls.append(argv) or 0
+        return lambda _argv: 0
+
+    monkeypatch.setattr(process_pdf, "_load_sibling_main", fake_load)
+    assert process_pdf.main([
+        "--pdf", str(pdf), "--out", str(tmp_path / "combined" / "paper.md"),
+        "--layout-model-detail", "summary",
+    ]) == 0
+    assert len(calls) == 1
+    option_index = calls[0].index("--layout-model-detail")
+    assert calls[0][option_index + 1] == "summary"
+
+
+def test_legacy_gathered_text_construction_and_consumers_remain_compatible(tmp_path: Path) -> None:
+    """WP-1.2：旧构造、Markdown 转换、JSON 落盘和图表上下文消费方保持兼容。"""
+    import json
+    from types import SimpleNamespace
+
+    from lib.figure_contexts import build_figure_contexts
+    from lib.models import AttachmentRecord, GatheredParagraph, GatheredText
+    from lib.text_extract import write_gathered_text_json
+
+    paragraphs = [
+        GatheredParagraph(1, "1 Legacy heading", (50, 40, 200, 55), True),
+        GatheredParagraph(
+            1, "The legacy consumer discusses Figure 1 in ordinary prose.",
+            (50, 80, 400, 95), False,
+        ),
+    ]
+    gathered = GatheredText("1.0", False, [], [], paragraphs)
+    validation = SimpleNamespace(text_layer_ratio=1.0, has_text_layer=True, warnings=[])
+
+    document = _paragraphs_to_document("legacy.pdf", "Legacy", validation, gathered=gathered)
+    assert [block.type for block in document.blocks] == ["page_break", "heading", "paragraph"]
+    assert document.meta["num_columns"] == 1
+    assert document.meta["body_font_size"] == 0.0
+    json.dumps(document.to_dict(), ensure_ascii=False)
+
+    out_json = tmp_path / "legacy-gathered.json"
+    write_gathered_text_json(gathered, str(out_json))
+    payload = json.loads(out_json.read_text(encoding="utf-8"))
+    assert {"version", "is_dual_column", "headers_removed", "footers_removed", "paragraphs"} <= set(payload)
+    assert payload["version"] == "1.0"
+    assert payload["paragraphs"][0]["text"] == "1 Legacy heading"
+    assert payload["paragraphs"][0]["heading_level"] == 0
+    assert payload["toc"] == []
+
+    record = AttachmentRecord("figure", "1", 1, "Figure 1: Legacy", "")
+    contexts = build_figure_contexts("unused.pdf", [record], gathered_text=gathered)
+    assert len(contexts) == 1
+    assert contexts[0].first_mention is not None
+    assert "legacy consumer" in contexts[0].first_mention.text_window
+
+
 def test_layout_model_detail_export_modes(tmp_path: Path) -> None:
     """WP-4.2：layout_model.to_dict 与 extract_pdf_assets --layout-model-detail 支持 summary/blocks/full。"""
     import json
@@ -998,6 +1459,7 @@ def test_layout_model_detail_export_modes(tmp_path: Path) -> None:
 
     model = extract_text_with_format(str(pdf_path))
     summary_d = model.to_dict(include_details=False)
+    legacy_summary_d = model.to_dict(False)
     default_d = model.to_dict()
     no_units_d = model.to_dict(include_units=False)
     full_d = model.to_dict(full_text_export=True)
@@ -1007,6 +1469,7 @@ def test_layout_model_detail_export_modes(tmp_path: Path) -> None:
     no_units_page_blocks = next(iter(no_units_d["text_blocks"].values()))
 
     assert "text_blocks" not in summary_d
+    assert legacy_summary_d == summary_d
     assert page_blocks, "应生成非空 text_blocks"
     assert len(page_blocks[0]["text"]) <= 2000
     assert len(page_blocks[0]["units"][0]["text"]) <= 200
@@ -1049,3 +1512,193 @@ def test_pdf_to_markdown_meta_carries_body_font_size_and_toc(tmp_path: Path) -> 
     assert blocks_payload["meta"]["body_font_size"] > 0
     assert blocks_payload["meta"]["toc"] == [{"level": 1, "title": "Introduction", "page": 1}]
     assert report_payload["status"] == "ready"
+
+
+def test_layout_columns_use_same_page_body_font_size(tmp_path: Path) -> None:
+    """CHK-094：前页 10pt 双栏不被后页 14pt 单栏正文的字号参照滤掉。"""
+    from lib.layout_model import detect_columns
+    from lib.text_extract import extract_text_with_format
+
+    pdf = tmp_path / "page-local-layout-font.pdf"
+    with fitz.open() as doc:
+        dense = doc.new_page(width=600, height=800)
+        for index in range(4):
+            dense.insert_text((50, 100 + 50 * index), f"Left column text at row {index}.", fontsize=10)
+            dense.insert_text((330, 100 + 50 * index), f"Right column text at row {index}.", fontsize=10)
+        wide = doc.new_page(width=600, height=800)
+        for index in range(4):
+            wide.insert_text(
+                (50, 180 + 25 * index),
+                "Wide typography in editorial appendix: text has sufficient length to span most of the page.",
+                fontsize=14,
+            )
+        doc.save(pdf)
+
+    model = extract_text_with_format(str(pdf))
+    num_columns, column_gap, _units = detect_columns(model.text_units, 600.0)
+
+    assert num_columns == 2
+    assert column_gap > 0
+
+
+def test_bold_literal_stars_and_backslashes_roundtrip(tmp_path: Path) -> None:
+    """CHK-094：粗体 x**2 与两个连续反斜杠必须逐字回读且保留粗体。"""
+    from markdown_it import MarkdownIt
+
+    pdf = tmp_path / "bold-literals.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        page.insert_text((50, 130), "x**2", fontsize=11, fontname="Helvetica-Bold")
+        page.insert_text((50, 230), r"Path: \\server", fontsize=11, fontname="Helvetica-Bold")
+        page.insert_text((50, 330), "A normal body sentence.", fontsize=11)
+        doc.save(pdf)
+
+    markdown = render_markdown(_paragraphs_to_document(str(pdf), title="Bold"))
+    tokens = MarkdownIt("commonmark").parse(markdown)
+    text = "".join(
+        child.content for token in tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+
+    assert "x**2" in text
+    assert r"Path: \\server" in text
+    assert sum(
+        child.type == "strong_open" for token in tokens for child in token.children or []
+    ) >= 2
+
+
+def test_right_column_list_resets_indent_stack() -> None:
+    """CHK-094：右栏列表起点更低、x0 更大时也不能继承左栏缩进。"""
+    from markdown_it import MarkdownIt
+
+    from lib.markdown import MarkdownDocument
+
+    document = MarkdownDocument(title="Columns", source_pdf="synthetic.pdf")
+    document.blocks = [
+        MarkdownBlock(type="list", text="- Left column item", page=1,
+                      meta={"bbox": [50, 300, 260, 312], "column": 0}),
+        MarkdownBlock(type="list", text="- Right column item", page=1,
+                      meta={"bbox": [330, 400, 540, 412], "column": 1}),
+    ]
+    markdown = render_markdown(document)
+    tokens = MarkdownIt("commonmark").parse(markdown)
+
+    assert "\n- Right column item" in markdown
+    assert "    - Right column item" not in markdown
+    assert [token.level for token in tokens if token.type == "list_item_open"] == [1, 1]
+
+
+def test_unconfirmed_cross_page_list_keeps_page_marker(tmp_path: Path) -> None:
+    """CHK-094：编号虽连续但缩进不同，跨页列表不合并，分页标记保留。"""
+    from markdown_it import MarkdownIt
+
+    pdf = tmp_path / "distinct-cross-page-lists.pdf"
+    with fitz.open() as doc:
+        first = doc.new_page(width=600, height=800)
+        first.insert_text((60, 110), "1. Common item A", fontsize=10)
+        first.insert_text((60, 126), "2. Common item B", fontsize=10)
+        second = doc.new_page(width=600, height=800)
+        second.insert_text((180, 140), "3. Separate item C", fontsize=10)
+        second.insert_text((180, 156), "4. Separate item D", fontsize=10)
+        doc.save(pdf)
+
+    markdown = render_markdown(_paragraphs_to_document(str(pdf), title="Lists"))
+    tokens = MarkdownIt("commonmark").parse(markdown)
+
+    assert "<!-- page 2 -->" in markdown
+    assert sum(token.type == "ordered_list_open" for token in tokens) == 2
+
+
+def test_explicit_layout_export_works_when_assets_disabled(tmp_path: Path) -> None:
+    """CHK-094：--images off --tables off 配显式 full 仍生成 layout_model.json。"""
+    import json
+
+    pdf = tmp_path / "layout-export-off.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=420, height=320)
+        page.insert_text((48, 72), "Layout export while assets are off.", fontsize=11)
+        doc.save(pdf)
+
+    out_md = tmp_path / "result" / "paper.md"
+    assert main([
+        "--pdf", str(pdf), "--out", str(out_md),
+        "--images", "off", "--tables", "off",
+        "--layout-model-detail", "full",
+    ]) == 0
+    layout_path = out_md.parent / "images" / "layout_model.json"
+
+    assert layout_path.exists()
+    payload = json.loads(layout_path.read_text(encoding="utf-8"))
+    assert "text_units" in payload
+
+
+@pytest.mark.parametrize("font", ["Helvetica", "Helvetica-Bold"])
+def test_asterisk_list_items_survive_rich_text_escaping(tmp_path: Path, font: str) -> None:
+    """CHK-095/BUG-233：星号项目符号在 rich_text 里被转义成字面星号后仍须渲染为列表。"""
+    from markdown_it import MarkdownIt
+
+    pdf = tmp_path / "asterisk-list.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        page.insert_text((50, 100), "* First item in an asterisk list.", fontsize=10, fontname=font)
+        page.insert_text((50, 117), "* Second item in an asterisk list.", fontsize=10, fontname=font)
+        doc.save(pdf)
+
+    gathered = gather_structured_text(str(pdf))
+    items = [p for p in gathered.paragraphs if p.text.startswith("* ")]
+
+    assert [p.para_type for p in items] == ["list", "list"]
+    # 生成期把星号当字面字符转义（BUG-217），列表渲染必须认得这种写法
+    assert all("\\* " in p.rich_text for p in items)
+    markdown = render_markdown(_paragraphs_to_document(str(pdf), title="Stars", gathered=gathered))
+    tokens = MarkdownIt("commonmark").parse(markdown)
+
+    assert sum(token.type == "bullet_list_open" for token in tokens) == 1
+    assert sum(token.type == "list_item_open" for token in tokens) == 2
+    assert "\\*" not in markdown
+    plain = "".join(
+        child.content for token in tokens for child in token.children or []
+        if child.type in ("text", "text_special")
+    )
+    assert "First item in an asterisk list." in plain
+    assert "Second item in an asterisk list." in plain
+    assert sum(
+        child.type == "strong_open" for token in tokens for child in token.children or []
+    ) == (2 if font == "Helvetica-Bold" else 0)
+
+
+def test_layout_only_export_preserves_existing_assets(tmp_path: Path) -> None:
+    """CHK-095/BUG-231：关闭图表时显式导出布局模型，不得覆盖索引或删除已有图表 PNG。"""
+    import json
+
+    pdf = tmp_path / "one-figure.pdf"
+    with fitz.open() as doc:
+        page = doc.new_page(width=600, height=800)
+        page.insert_text((60, 100), "A short paper with one figure and its caption below the framed box.", fontsize=10)
+        page.draw_rect(fitz.Rect(150, 180, 450, 380), color=(0, 0, 0), width=1.5)
+        page.insert_text((60, 420), "Figure 1: A framed box used as the only figure.", fontsize=10)
+        doc.save(pdf)
+
+    out_md = tmp_path / "result" / "paper.md"
+    assert main(["--pdf", str(pdf), "--out", str(out_md), "--tables", "off"]) == 0
+    asset_dir = out_md.parent / "images"
+    index_path = asset_dir / "index.json"
+    baseline_index = index_path.read_bytes()
+    baseline_images = {path.name: path.read_bytes() for path in asset_dir.glob("Figure_*.png")}
+    assert json.loads(baseline_index)["items"] and baseline_images
+
+    assert main([
+        "--pdf", str(pdf), "--out", str(out_md), "--images", "off", "--tables", "off",
+        "--layout-model-detail", "full",
+    ]) == 0
+
+    assert index_path.read_bytes() == baseline_index
+    assert {path.name: path.read_bytes() for path in asset_dir.glob("Figure_*.png")} == baseline_images
+    layout_only = (asset_dir / "layout_model.json").read_bytes()
+    assert "text_units" in json.loads(layout_only)
+    # 与完整资产提取按同档位写出的布局模型逐字节一致
+    assert main([
+        "--pdf", str(pdf), "--out", str(out_md), "--tables", "off",
+        "--layout-model-detail", "full",
+    ]) == 0
+    assert (asset_dir / "layout_model.json").read_bytes() == layout_only

@@ -99,6 +99,54 @@ def test_bug154_rejects_file_aliases_to_source_pdf(
     assert pdf.read_bytes()[:5] == b"%PDF-"
 
 
+@pytest.mark.parametrize("entry", ["layout-only", "markdown", "assets"])
+@pytest.mark.parametrize("link_kind", ["same-path", "symlink", "hardlink"])
+def test_bug154_rejects_derived_layout_alias_to_source(
+    tmp_path: Path, entry: str, link_kind: str,
+) -> None:
+    layout = tmp_path / "images" / "layout_model.json"
+    source = layout if link_kind == "same-path" else tmp_path / "source.pdf"
+    _make_two_figure_pdf(source, "Layout path")
+    if source != layout:
+        layout.parent.mkdir()
+        _make_file_alias(source, layout, link_kind)
+    original = source.read_bytes()
+    markdown = tmp_path / "markdown" / "paper.md"
+    text = tmp_path / "text" / "paper.txt"
+
+    if entry == "assets":
+        rc = extract_main([
+            "--pdf", str(source), "--out-dir", str(layout.parent), "--out-text", str(text),
+            "--layout-driven", "on",
+        ])
+    else:
+        options = ["--images", "off", "--tables", "off"] if entry == "layout-only" else []
+        rc = pdf_to_markdown_main([
+            "--pdf", str(source), "--out", str(markdown), "--asset-dir", str(layout.parent),
+            "--layout-model-detail", "full", *options,
+        ])
+
+    assert rc == 2
+    assert source.read_bytes() == original
+    assert not markdown.exists() and not text.exists()
+    assert not (layout.parent / "index.json").exists()
+
+
+def test_bug154_rejects_layout_and_report_path_collision(tmp_path: Path) -> None:
+    source = tmp_path / "source.pdf"
+    _make_two_figure_pdf(source, "Layout and report")
+    layout = tmp_path / "images" / "layout_model.json"
+    markdown = tmp_path / "markdown" / "paper.md"
+    rc = pdf_to_markdown_main([
+        "--pdf", str(source), "--out", str(markdown), "--asset-dir", str(layout.parent),
+        "--images", "off", "--tables", "off", "--layout-model-detail", "full",
+        "--report-json", str(layout),
+    ])
+
+    assert rc == 2
+    assert not layout.exists() and not markdown.exists()
+
+
 @pytest.mark.parametrize("log_option", ["--log-file", "--log-jsonl"])
 def test_bug154_extract_rejects_log_path_equal_to_source_pdf(
     tmp_path: Path, log_option: str,
